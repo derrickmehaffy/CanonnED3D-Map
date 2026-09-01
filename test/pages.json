@@ -57,7 +57,7 @@
   {
     "path": "colonisation_data.html",
     "query": "",
-    "offlineSkip": true
+    "offlineSkip": false
   },
   {
     "path": "cs-data.html",
@@ -67,12 +67,12 @@
   {
     "path": "dcoh.html",
     "query": "",
-    "offlineSkip": true
+    "offlineSkip": false
   },
   {
     "path": "dcoh_headless.html",
     "query": "",
-    "offlineSkip": true
+    "offlineSkip": false
   },
   {
     "path": "faction_data.html",
