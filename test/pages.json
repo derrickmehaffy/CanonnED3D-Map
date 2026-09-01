@@ -7,17 +7,17 @@
   {
     "path": "ap-data.html",
     "query": "",
-    "offlineSkip": false
+    "offlineSkip": true
   },
   {
     "path": "biology-combo.html",
     "query": "",
-    "offlineSkip": false
+    "offlineSkip": true
   },
   {
     "path": "bm-data.html",
     "query": "",
-    "offlineSkip": false
+    "offlineSkip": true
   },
   {
     "path": "bt-data.html",
@@ -37,7 +37,7 @@
   {
     "path": "cartographics-combo.html",
     "query": "",
-    "offlineSkip": false
+    "offlineSkip": true
   },
   {
     "path": "cloud_data.html",
@@ -57,42 +57,42 @@
   {
     "path": "colonisation_data.html",
     "query": "",
-    "offlineSkip": false
+    "offlineSkip": true
   },
   {
     "path": "cs-data.html",
     "query": "",
-    "offlineSkip": false
+    "offlineSkip": true
   },
   {
     "path": "dcoh.html",
     "query": "",
-    "offlineSkip": false
+    "offlineSkip": true
   },
   {
     "path": "dcoh_headless.html",
     "query": "",
-    "offlineSkip": false
+    "offlineSkip": true
   },
   {
     "path": "faction_data.html",
     "query": "",
-    "offlineSkip": false
+    "offlineSkip": true
   },
   {
     "path": "faction_res_data.html",
     "query": "",
-    "offlineSkip": false
+    "offlineSkip": true
   },
   {
     "path": "fg-data.html",
     "query": "",
-    "offlineSkip": false
+    "offlineSkip": true
   },
   {
     "path": "fm-data.html",
     "query": "",
-    "offlineSkip": false
+    "offlineSkip": true
   },
   {
     "path": "galnet.html",
@@ -117,7 +117,7 @@
   {
     "path": "geology-combo.html",
     "query": "",
-    "offlineSkip": false
+    "offlineSkip": true
   },
   {
     "path": "gnosis_data.html",
@@ -142,12 +142,12 @@
   {
     "path": "gv-data.html",
     "query": "",
-    "offlineSkip": false
+    "offlineSkip": true
   },
   {
     "path": "gy-data.html",
     "query": "",
-    "offlineSkip": false
+    "offlineSkip": true
   },
   {
     "path": "hyperdiction_data.html",
@@ -162,7 +162,7 @@
   {
     "path": "index.html",
     "query": "",
-    "offlineSkip": false
+    "offlineSkip": true
   },
   {
     "path": "landscape_signal.html",
@@ -177,7 +177,7 @@
   {
     "path": "ls-data.html",
     "query": "",
-    "offlineSkip": false
+    "offlineSkip": true
   },
   {
     "path": "megaships-data.html",
@@ -186,8 +186,8 @@
   },
   {
     "path": "multifaction.html",
-    "query": "",
-    "offlineSkip": false
+    "query": "?factions=Canonn",
+    "offlineSkip": true
   },
   {
     "path": "nhss-data.html",
@@ -212,7 +212,7 @@
   {
     "path": "route_data.html",
     "query": "",
-    "offlineSkip": false
+    "offlineSkip": true
   },
   {
     "path": "route_uia.html",
@@ -242,7 +242,7 @@
   {
     "path": "tw-data.html",
     "query": "",
-    "offlineSkip": false
+    "offlineSkip": true
   },
   {
     "path": "voyager.html",
