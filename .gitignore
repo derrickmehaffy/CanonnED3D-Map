@@ -22,3 +22,6 @@ Source/samples/
 *.sln
 
 Web.config
+
+# Superpowers SDD scratch
+.superpowers/
