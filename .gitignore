@@ -25,3 +25,10 @@ Web.config
 
 # Superpowers SDD scratch
 .superpowers/
+
+# Playwright test harness
+node_modules/
+test-results/
+playwright-report/
+blob-report/
+.playwright/
