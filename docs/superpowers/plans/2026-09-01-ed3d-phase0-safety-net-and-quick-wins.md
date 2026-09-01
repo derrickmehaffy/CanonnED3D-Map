@@ -99,10 +99,25 @@ const MIME = {
 
 createServer(async (req, res) => {
   const requested = new URL(req.url, 'http://localhost').pathname;
-  let pathname = decodeURIComponent(requested);
+  let pathname;
+  try {
+    pathname = decodeURIComponent(requested);
+  } catch {
+    // decodeURIComponent throws on a malformed percent-escape (e.g. a lone
+    // "%"). Answer 400 instead of letting the throw become an unhandled
+    // rejection in this async handler, which would crash the process — and
+    // with it the single webServer shared by every parallel Playwright worker.
+    res.writeHead(400, { 'Content-Type': 'text/plain' });
+    res.end('Bad Request');
+    return;
+  }
   if (pathname.endsWith('/')) pathname += 'index.html';
-  // normalize() then strip any leading traversal so ".." cannot escape ROOT
-  const safe = normalize(pathname).replace(/^([.][.][/\\])+/, '');
+  // pathname always starts with "/" (it comes from URL.pathname), and
+  // normalize() on an absolute path can never leave a leading ".." — there
+  // is nothing above "/" to traverse to (e.g. normalize("/../etc") === "/etc").
+  // That, plus join(ROOT, safe) and the startsWith(ROOT) check below, is what
+  // keeps the resolved file inside ROOT.
+  const safe = normalize(pathname);
   const file = join(ROOT, safe);
   if (!file.startsWith(ROOT)) {
     res.writeHead(403, { 'Content-Type': 'text/plain' });
