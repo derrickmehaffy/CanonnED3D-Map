@@ -218,6 +218,33 @@ var System = {
   },
 
   /**
+   * Empty the store, ready for a different dataset.
+   *
+   * Unlike remove(), the shared point material is kept — it is identical
+   * whatever the data is, and rebuilding it would undo the size that
+   * Action.sizeOnScroll is driving.
+   */
+
+  'reset': function () {
+
+    if (this.particle !== null) {
+      scene.remove(this.particle);
+      if (this.particle.geometry) this.particle.geometry.dispose();
+      this.particle = null;
+    }
+
+    this.positions = [];
+    this.colorValues = [];
+    this.particleColor = [];
+    this.particleInfos = [];
+    this.particleGeo = null;
+    this.points = [];
+    this.nameIndex = {};
+    this.count = 0;
+
+  },
+
+  /**
    * Load Spectral system color
    */
 

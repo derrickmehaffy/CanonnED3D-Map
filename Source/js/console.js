@@ -523,19 +523,41 @@
   /* ── status strip, polled off Ed3d's own camera ───────────────────────── */
   var lastPointCount = -1;
 
+  /* Ed3d keeps appending points after it first reports the data complete —
+     codex.html finishes at 3,422 having been readable at 500 — and a map can
+     replace its data outright through Ed3d.updateSystems(). Either way the
+     panel and counts have to follow rather than being rendered once.
+
+     The engine emits 'systemsChanged', so that is the signal. The length check
+     in tick() stays as a backstop for data arriving by a path that does not
+     announce itself. */
+  var consoleReady = false;
+
+  function syncToData() {
+    if (!window.System || !System.points) return;
+    // 'systemsChanged' fires from loadDatasComplete, which runs before
+    // whenReady has read the categories out of Ed3d's HUD. Acting on it that
+    // early would build the system list with CATS still empty — and an empty
+    // CATS is how SYSLIST tells "this map has no categories" from "the
+    // categories have not been read yet", so Ed3d's uncategorised reference
+    // point would be counted as a system and then cached that way.
+    if (!consoleReady) return;
+    lastPointCount = System.points.length;
+    invalidateSystems();
+    if (arguments.length && arguments[0] && arguments[0].replaced) CATS = readCats();
+    refreshCatCounts();
+    updateShown();
+    if (panel === 'layers' || panel === 'systems') renderPanel();
+    setFeed('live', SYSLIST().length + ' systems');
+  }
+
+  if (window.Ed3d && Ed3d.on) Ed3d.on('systemsChanged', syncToData);
+
   function tick() {
     if (typeof controls === 'undefined' || !controls) return;
 
-    // Ed3d keeps appending points after it first reports the data complete —
-    // codex.html finishes at 3,422 having been readable at 500 — so the panel
-    // and the counts have to follow rather than being rendered once.
     if (window.System && System.points && System.points.length !== lastPointCount) {
-      lastPointCount = System.points.length;
-      invalidateSystems();
-      refreshCatCounts();
-      updateShown();
-      if (panel === 'layers' || panel === 'systems') renderPanel();
-      setFeed('live', SYSLIST().length + ' systems');
+      syncToData();
     }
 
     var t = controls.target;
@@ -1267,6 +1289,7 @@
     }
 
     CATS = readCats();
+    consoleReady = true;
     hoverType = catName(0);
     $('mapname').textContent = MAPNAME;
     $('st-map').textContent = MAPNAME;

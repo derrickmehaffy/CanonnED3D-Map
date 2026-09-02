@@ -33,11 +33,16 @@ test('region labels share two materials rather than one each', async ({ page }) 
 test('both label opacity bands still respond to the distance callback', async ({ page }) => {
   await loaded(page);
   const r = await page.evaluate(() => {
+    // infosUpdateCallback returns early when labels are off, and the console's
+    // display timer flips that flag as the camera crosses into far view — so
+    // pin it rather than racing it.
+    Ed3d.showGalaxyInfos = true;
     Galaxy.infos.previousOpacity = -1;
     Galaxy.infosUpdateCallback(150);          // scale-70 = 80 -> clamped to 0.8
     const a = { n: Galaxy.textMaterials.normal.opacity, r: Galaxy.textMaterials.revert.opacity };
+    Ed3d.showGalaxyInfos = true;
     Galaxy.infos.previousOpacity = -1;
-    Galaxy.infosUpdateCallback(75);           // scale-70 = 5  -> 0.5 band
+    Galaxy.infosUpdateCallback(75);           // scale-70 = 5  -> a lower band
     const b = { n: Galaxy.textMaterials.normal.opacity, r: Galaxy.textMaterials.revert.opacity };
     return { a, b };
   });

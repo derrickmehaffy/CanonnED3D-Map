@@ -717,6 +717,9 @@ var Ed3d = {
     HUD.init();
     this.Action.init();
     Ed3d._testDataComplete = true;
+    var replaced = Ed3d._replacing === true;
+    Ed3d._replacing = false;
+    Ed3d.emit('systemsChanged', { count: System.count, replaced: replaced });
 
     // Codex overlay: when codex URL params are present on non-codex pages,
     // load codex-overlay.js once and overlay the matching data.
@@ -751,6 +754,100 @@ var Ed3d = {
    *                             routes / heatmap) or a plain systems array.
    * @param {function}     [done] Optional callback fired when the batch is done.
    */
+  /**
+   * A small event bus.
+   *
+   * Components reach each other through globals today, and the console polls
+   * on a timer because there is nothing to subscribe to. Events give it a
+   * signal instead: 'systemsChanged' whenever the point cloud is rebuilt, and
+   * 'farView' when the camera crosses the far-view threshold.
+   *
+   * A throwing listener must not take the engine's frame or load with it, so
+   * each is called in isolation.
+   */
+
+  '_listeners': {},
+
+  'on': function (name, fn) {
+    if (typeof fn !== 'function') return this;
+    (this._listeners[name] = this._listeners[name] || []).push(fn);
+    return this;
+  },
+
+  'off': function (name, fn) {
+    var list = this._listeners[name];
+    if (!list) return this;
+    if (fn === undefined) { delete this._listeners[name]; return this; }
+    var i = list.indexOf(fn);
+    if (i > -1) list.splice(i, 1);
+    return this;
+  },
+
+  'emit': function (name, payload) {
+    var list = this._listeners[name];
+    if (!list || !list.length) return this;
+    //-- Copy first: a listener may unsubscribe itself while we iterate.
+    list.slice().forEach(function (fn) {
+      try { fn(payload); } catch (e) { console.error('Ed3d: listener for "' + name + '" threw', e); }
+    });
+    return this;
+  },
+
+  /**
+   * Replace the map's data without tearing down the page.
+   *
+   * addBatch() only ever appends, and System.remove() discards everything, so
+   * there was no way to swap a dataset for another — which is what a live map
+   * needs to do when its source refreshes.
+   *
+   * Categories are optional: pass them to replace the filters too, leave them
+   * out to keep the ones already on screen. Systems merge by coordinate the
+   * same way they do on first load, so re-sending a system appends its info
+   * and unions its categories rather than duplicating the point.
+   *
+   * @param {object}   data  { systems: [...], categories: {...}, routes: {...} }
+   * @param {function} [done]
+   */
+
+  'updateSystems': function (data, done) {
+
+    //-- Routes are held by name in a module-scope map and added straight to the
+    //   scene, so they have to come out explicitly or they linger as orphans.
+    Object.keys(routes).forEach(function (id) {
+      var r = routes[id];
+      if (!r) return;
+      scene.remove(r);
+      ['', '-first', '-last'].forEach(function (suffix) {
+        var extra = scene.getObjectByName(r.name + suffix);
+        if (extra && extra !== r) scene.remove(extra);
+      });
+      if (r.geometry) r.geometry.dispose();
+      delete routes[id];
+    });
+    Ed3d.catObjsRoutes = [];
+
+    //-- Selection and hover hold point indices, which every index below is
+    //   about to shift under them.
+    if (Ed3d.Action) {
+      Ed3d.Action.selectedPoint = null;
+      Ed3d.Action.prevScale = null;
+    }
+
+    System.reset();
+
+    if (data.categories !== undefined) {
+      $('#filters').empty();
+      HUD.filterGroupIds = {};
+      Ed3d.catObjs = [];
+    }
+
+    //-- loadDatasComplete() is what emits; flag the reason so listeners can
+    //   tell a replacement from a first load without getting two events.
+    Ed3d._replacing = true;
+    Ed3d.loadDatasAsync(data, 500, done);
+
+  },
+
   'addBatch': function (data, done) {
 
     Ed3d.loadDatasAsync(data, 500, done, true);
