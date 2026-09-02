@@ -177,7 +177,7 @@
       hudMultipleSelect: true,
       startAnim: false,
       showGalaxyInfos: true,
-      effectScaleSystem: [20, 500],
+      effectScaleSystem: [8, 28],    // was [20,500]; 500 made flares enormous zoomed out
       cameraPos: CFG.cam,          // same framing the real pages use
       systemColor: '#FF9D00'
     });
@@ -189,7 +189,7 @@
     // for several of them starts so far out that the systems are invisible —
     // you arrive in deep space and have to go looking. Framing the actual
     // extent is a small change with an outsized effect on first impressions.
-    setTimeout(frameData, 400);
+    setTimeout(function () { frameData(); applySize(); applyDisplay(); syncDisplay(); }, 400);
 
     $('st-map').textContent = CFG.name;
     $('mapname').textContent = CFG.name;
@@ -259,6 +259,7 @@
   function tick() {
     if (typeof controls === 'undefined' || !controls) return;
     var t = controls.target;
+    applyDisplay();
     $('st-pos').textContent = Math.round(t.x) + ' · ' + Math.round(t.y) + ' · ' + Math.round(-t.z);
     $('st-sol').textContent = Math.round(Math.sqrt(t.x * t.x + t.y * t.y + t.z * t.z)).toLocaleString() + ' ly';
   }
@@ -324,14 +325,16 @@
   function panelCamera() {
     return '<div class="s-t">Camera</div><div class="s-sub">Ed3d\'s own camera, driven from here</div>' +
       '<div class="btnrow">' +
-      '<button data-cam="top">Top down</button><button data-cam="iso">Isometric</button>' +
-      '<button data-cam="sol">Centre Sol</button><button data-cam="reset">Reset</button>' +
+      '<button data-cam="iso">Isometric</button><button data-cam="top">Top down</button>' +
+      '<button data-cam="side">Side on</button><button data-cam="sol">Centre Sol</button>' +
+      '<button data-cam="reset">Frame the data</button><button data-cam="hint">&nbsp;</button>' +
       '</div>' +
       '<div class="row" style="margin-top:14px"><span class="lb">Distance</span>' +
       '<span class="vv" id="camdist">—</span></div>' +
       '<input type="range" id="camrange" min="200" max="30000" step="100" style="width:100%">' +
-      '<div class="note">Top down sets <b>Ed3d.isTopView</b> and tweens the camera through ' +
-      '<b>HUD.moveCamera</b> — the same path the 3D/2D buttons use.</div>';
+      '<div class="note">Top down sets <b>Ed3d.isTopView</b>, the same flag the 3D/2D ' +
+      'buttons use. Zoom and pan live in the arrow cluster bottom-right — those are ' +
+      'the existing controls, kept as they were.</div>';
   }
 
   function panelRoutes() {
@@ -364,7 +367,7 @@
       sw('stars', 'Starfield', true) +
       '<div class="row" style="margin-top:10px"><span class="lb">System size</span>' +
       '<span class="vv" id="szval">—</span></div>' +
-      '<input type="range" id="sizerange" min="16" max="160" step="4" style="width:100%">' +
+      '<input type="range" id="sizerange" min="6" max="70" step="2" style="width:100%">' +
       '<div class="note">Each toggle calls the engine directly — <b>Grid.toggleGrid()</b>, ' +
       '<b>Galaxy.infosShow/Hide()</b>, and the point material\'s own size.</div>';
   }
@@ -447,14 +450,36 @@
       pos
     );
   }
+  function place(x, y, z) {
+    // Set the camera outright rather than tweening. HUD.moveCamera's tween is
+    // driven by TWEEN.update() inside animate(), and while it runs it rewrites
+    // camera.position every frame — which fought OrbitControls and made the
+    // presets look like they only worked in the locked 2D view.
+    camera.position.set(x, y, z);
+    camera.lookAt(controls.target);
+    controls.update();
+    syncCamera();
+  }
   function doCamera(what) {
     if (typeof camera === 'undefined') return;
-    var t = controls.target, d = Math.max(600, camDist());
-    if (what === 'top')   { Ed3d.isTopView = true;  setViewButtons('2d'); moveTo({ x: t.x, y: t.y + d, z: t.z }); }
-    if (what === 'iso')   { Ed3d.isTopView = false; setViewButtons('3d'); moveTo({ x: t.x - d * .6, y: t.y + d * .5, z: t.z + d * .6 }); }
-    if (what === 'sol')   { controls.target.set(0, 0, 0); moveTo({ x: 0, y: d * .5, z: d * .8 }); }
-    if (what === 'reset') { frameData(); }
-    setTimeout(syncCamera, 900);
+    var t = controls.target, d = Math.max(400, camDist());
+    if (what === 'top') {
+      Ed3d.isTopView = true; setViewButtons('2d');
+      place(t.x, t.y + d, t.z);
+    } else if (what === 'iso') {
+      Ed3d.isTopView = false; setViewButtons('3d');
+      place(t.x - d * 0.55, t.y + d * 0.5, t.z + d * 0.65);
+    } else if (what === 'side') {
+      Ed3d.isTopView = false; setViewButtons('3d');
+      place(t.x, t.y, t.z + d);
+    } else if (what === 'sol') {
+      Ed3d.isTopView = false; setViewButtons('3d');
+      controls.target.set(0, 0, 0);
+      place(-d * 0.55, d * 0.5, d * 0.65);
+    } else if (what === 'reset') {
+      Ed3d.isTopView = false; setViewButtons('3d');
+      frameData();
+    }
   }
   var camRangeBound = false;
   document.addEventListener('input', function (e) {
@@ -465,34 +490,59 @@
       $('camdist').textContent = d.toLocaleString() + ' ly';
     }
     if (e.target.id === 'sizerange') {
-      var n = +e.target.value;
-      System.scaleSize = n;
-      if (System.particle && System.particle.material) System.particle.material.size = n;
-      $('szval').textContent = n;
+      sysSize = +e.target.value;
+      applySize();
+      $('szval').textContent = sysSize;
     }
   });
 
-  /* ── display ──────────────────────────────────────────────────────────── */
+  /* ── display ──────────────────────────────────────────────────────────
+     These three fight the engine's own far-view logic: crossing the far-view
+     threshold calls enableFarView/disableFarView, which reach in and set grid
+     visibility, galaxy labels and the starfield themselves. So the panel keeps
+     its own intent and re-asserts it on a timer rather than setting once. */
   var disp = { grid: true, galaxy: true, stars: true };
+  var sysSize = 20;                       // flares got huge on zoom-out at 64
+
+  function applyDisplay() {
+    if (typeof Ed3d === 'undefined' || !Ed3d.grid1H) return;
+    // Grids are scale-dependent: the fine ones are meaningless at galaxy scale
+    // and the XL one is meaningless up close, which is why turning them all on
+    // at once produced a moire mess. Mirror what disableFarView/enableFarView do.
+    var far = !!window.isFarView;
+    if (Ed3d.grid1H.obj)  Ed3d.grid1H.obj.visible  = disp.grid && !far;
+    if (Ed3d.grid1K.obj)  Ed3d.grid1K.obj.visible  = disp.grid && !far;
+    if (Ed3d.grid1XL.obj) Ed3d.grid1XL.obj.visible = disp.grid && far;
+    if (Ed3d.grid1H.coordGrid)  Ed3d.grid1H.coordGrid.visible  = disp.grid && !far;
+    if (Ed3d.grid1K.coordGrid)  Ed3d.grid1K.coordGrid.visible  = disp.grid && !far;
+
+    // Galaxy.infosShow() reads Ed3d.showGalaxyInfos, so the flag has to be set
+    // BEFORE the call — setting it after was why labels never came back.
+    Ed3d.showGalaxyInfos = disp.galaxy;
+    if (typeof Galaxy !== 'undefined') {
+      if (disp.galaxy) Galaxy.infosShow(); else Galaxy.infosHide();
+    }
+    if (Ed3d.starfield) Ed3d.starfield.visible = disp.stars;
+  }
+
+  function applySize() {
+    // sizeOnScroll() recomputes point size from camera distance every frame and
+    // clamps it to effectScaleSystem. Setting material.size directly is pointless
+    // — it is overwritten on the next frame. Drive the clamp instead.
+    Ed3d.effectScaleSystem = [Math.max(4, sysSize * 0.4), sysSize * 1.4];
+    if (typeof Action !== 'undefined') Action.prevScale = null;  // force recompute
+    System.scaleSize = sysSize;
+  }
+
   function syncDisplay() {
     var s = $('sizerange');
-    if (s) { s.value = System.scaleSize || 64; $('szval').textContent = s.value; }
+    if (s) { s.value = sysSize; $('szval').textContent = sysSize; }
     Object.keys(disp).forEach(function (k) {
       var el = document.querySelector('[data-sw="' + k + '"]');
       if (el) { el.classList.toggle('on', disp[k]); el.setAttribute('aria-checked', disp[k]); }
     });
   }
-  function doDisplay(k, state) {
-    disp[k] = state;
-    if (k === 'grid') {
-      [Ed3d.grid1H, Ed3d.grid1K, Ed3d.grid1XL].forEach(function (g) {
-        if (g && g.obj) g.obj.visible = state;
-      });
-    }
-    if (k === 'galaxy') { state ? Galaxy.infosShow() : Galaxy.infosHide(); Ed3d.showGalaxyInfos = state; }
-    if (k === 'stars' && Ed3d.starfield) Ed3d.starfield.visible = state;
-    syncDisplay();
-  }
+  function doDisplay(k, state) { disp[k] = state; applyDisplay(); syncDisplay(); }
 
   /* ── routes: parse a journal in-browser and push it onto the live map ─── */
   function wireDrop() {
@@ -549,14 +599,7 @@
   }
   $('v3d').onclick = function () { doCamera('iso'); };
   $('v2d').onclick = function () { doCamera('top'); };
-  $('zin').onclick = function () {
-    var t = controls.target, d = camera.position.clone().sub(t);
-    camera.position.copy(t.clone().add(d.multiplyScalar(0.75))); syncCamera();
-  };
-  $('zout').onclick = function () {
-    var t = controls.target, d = camera.position.clone().sub(t);
-    camera.position.copy(t.clone().add(d.multiplyScalar(1.35))); syncCamera();
-  };
+  // Zoom and pan are lcunfool's #nav-controls, restored rather than reimplemented.
   $('zfit').onclick = function () { frameAll = !frameAll; frameData(); };
 
   /* ── selection: poll Ed3d's own picking result ────────────────────────── */

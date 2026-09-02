@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Canonn Map Console — prototype</title>
 <link rel="icon" type="image/x-icon" href="../img/favicon.ico">
+<!-- lcunfool's nav arrows use Font Awesome glyphs; without this they render blank. -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;450;500&display=swap">
 <style>
 :root{
@@ -41,15 +43,20 @@ input[type=range]{accent-color:var(--amber)}
 .feed .d{width:6px;height:6px;border-radius:50%;background:var(--dimmer)}
 .feed.live .d{background:#5FD08A;box-shadow:0 0 6px #5FD08A}
 .feed.snapshot .d{background:var(--amber)}
-.tools-btn{display:flex;align-items:center;gap:7px;border:1px solid var(--rule);
-  padding:5px 10px;font-family:var(--cond);font-size:12px;color:var(--dim)}
-.tools-btn:hover{border-color:var(--ion);color:var(--ion)}
+.toprail{display:flex;align-items:stretch;gap:0;border:1px solid var(--rule)}
+.toprail .tb{display:flex;align-items:center;gap:6px;padding:5px 11px;
+  font-family:var(--cond);font-size:12px;font-weight:600;color:var(--dim);
+  text-decoration:none;white-space:nowrap}
+.toprail .tb + .tb{border-left:1px solid var(--rule)}
+.toprail .tb:hover{color:var(--ion)}
+.toprail .tb.donate{color:var(--amber)}
+.toprail .tb.donate:hover{background:var(--amber);color:#0B0700}
 
 /* body */
 .mid{display:flex;min-height:0;position:relative}
-.rail{width:44px;flex:none;background:var(--panel);border-right:1px solid var(--rule);
+.rail{width:50px;flex:none;background:var(--panel);border-right:1px solid var(--rule);
   display:flex;flex-direction:column;align-items:center;padding:7px 0;gap:2px;z-index:20}
-.rail button{width:31px;height:31px;display:grid;place-items:center;color:var(--dim);font-size:14px}
+.rail button{width:36px;height:36px;display:grid;place-items:center;color:var(--dim);font-size:20px;line-height:1}
 .rail button:hover{color:var(--text);background:var(--panel-2)}
 .rail button.on{color:var(--amber);background:var(--panel-2);box-shadow:inset 2px 0 0 var(--amber)}
 .side{width:258px;flex:none;background:var(--panel);border-right:1px solid var(--rule);
@@ -103,7 +110,18 @@ input[type=range]{accent-color:var(--amber)}
 .stage{flex:1;position:relative;min-width:0;background:var(--void)}
 #edmap{position:absolute;inset:0}
 #edmap #ed3dmap{width:100%;height:100%}
-#nav-controls{display:none!important}
+/* lcunfool's zoom + pan cluster, kept and restyled rather than replaced.
+   Its handlers are bound by HUD.initHudAction(), which runs even with
+   withHudPanel:false, so the buttons work as they always did. */
+#nav-controls{position:absolute;right:12px;bottom:12px;z-index:8;
+  display:flex;flex-direction:column;align-items:center;gap:6px}
+#nav-controls .nav-zoom{display:flex;flex-direction:column;gap:4px}
+#nav-controls .nav-pan{display:flex;flex-direction:column;align-items:center;gap:4px}
+#nav-controls .nav-pan-row{display:flex;gap:4px}
+#nav-controls .nav-btn{width:28px;height:28px;border:1px solid var(--rule);
+  background:var(--panel);color:var(--dim);display:grid;place-items:center;
+  font-size:12px;cursor:pointer;text-decoration:none}
+#nav-controls .nav-btn:hover{border-color:var(--amber);color:var(--amber)}
 #loading{position:absolute;inset:0;display:grid;place-items:center;z-index:4;
   font-family:var(--mono);font-size:12px;color:var(--dimmer);pointer-events:none}
 .hint{position:absolute;left:14px;bottom:12px;font-family:var(--mono);font-size:10.5px;
@@ -115,7 +133,7 @@ input[type=range]{accent-color:var(--amber)}
 .viewmode button + button{border-left:1px solid var(--rule)}
 .viewmode button.on{background:var(--amber);color:#0B0700}
 .viewmode button:not(.on):hover{color:var(--text)}
-.zoomers{position:absolute;right:12px;bottom:12px;display:flex;flex-direction:column;gap:4px;z-index:8}
+.zoomers{position:absolute;right:48px;bottom:12px;display:flex;flex-direction:column;gap:4px;z-index:8}
 .zoomers button{width:28px;height:28px;border:1px solid var(--rule);background:var(--panel);
   color:var(--dim);display:grid;place-items:center;font-size:14px}
 .zoomers button:hover{border-color:var(--dim);color:var(--text)}
@@ -237,7 +255,13 @@ input[type=range]{accent-color:var(--amber)}
     <button class="find" id="findbtn">Find anything <span class="k">&#8984;K</span></button>
     <span class="sp"></span>
     <span class="feed" id="feed"><span class="d"></span><span id="feedtxt">loading&#8230;</span></span>
-    <button class="tools-btn" id="toolsbtn">&#8862; Canonn tools</button>
+    <div class="toprail">
+      <button class="tb" id="toolsbtn" title="Canonn tools">&#8862; Tools</button>
+      <a class="tb" href="https://github.com/canonn-science/CanonnED3D-Map" target="_blank"
+         rel="noopener" title="Source on GitHub">GitHub</a>
+      <a class="tb donate" href="https://canonn.science/donate/" target="_blank"
+         rel="noopener" title="Support Canonn">Donate</a>
+    </div>
   </div>
 
   <div class="mid">
@@ -257,9 +281,7 @@ input[type=range]{accent-color:var(--amber)}
       </div>
       <div class="hint" id="hint">drag to orbit &#183; scroll to zoom &#183; click a system</div>
       <div class="zoomers">
-        <button id="zin" aria-label="Zoom in">+</button>
-        <button id="zout" aria-label="Zoom out">&#8722;</button>
-        <button id="zfit" title="Reset view" aria-label="Reset view">&#9673;</button>
+        <button id="zfit" title="Frame everything" aria-label="Frame the data">&#9673;</button>
       </div>
       <div class="card hidden" id="card"></div>
     </div>
