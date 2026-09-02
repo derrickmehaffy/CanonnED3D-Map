@@ -249,6 +249,41 @@ new work in Canonn-GCloud — LCU No Fool Like One's domain, not this plan's.
    pays this cost before seeing anything. Worth asking whether multifaction should
    be the default at all — see Open Questions.
 
+---
+
+## The loading overlay is a contract, not a detail
+
+Worth knowing before any page is touched: **the engine never dismisses the
+loader.** Every one of the 35 `MapData-*.js` files ends its load with
+
+```js
+document.getElementById('loading').style.display = 'none';
+```
+
+on its success path *and* its error path. Nothing in `Source/js/` references
+`#loading` at all. So that id is an interface between the pages and the data
+layer — drop the element while re-doing a page's chrome and the map sits behind
+a black screen with nothing in the console.
+
+The console therefore keeps `id="loading"`, and moves the fade into a
+MutationObserver watching for the callers' `display:none`. Zero data files
+change. `test/boot.spec.mjs` asserts the contract across all 35.
+
+Two loaders exist today. `index.html`, `multifaction.html`, `galnet.html` and
+`gec.html` use the Lottie **R&D animated logo** (`data/rd-banner-v2-1.json` via
+`vendor/bodymovin`, 654 KB together). The other 31 pages use
+`img/Canonn-Logo.gif` — **3.65 MB**, 800x800, ~300 frames, displayed at 300x300.
+
+That GIF is the second-largest asset on the site after the faction dump, and it
+is downloaded before the map starts. Standardising every page on the Lottie
+(now the console's boot screen) removes 3.65 MB from 31 pages and costs 654 KB
+on those that don't already load it — a net win everywhere, and the loader
+becomes consistent as a side effect.
+
+The animation is a 15 s build-and-fade, so it needs driving rather than looping
+from the top: frame 0 is empty, the atom assembles by ~300, and it fades at
+~440. The console plays the assembly once and then loops the formed logo.
+
 ## Open questions for Derrick
 
 1. **Does the console replace `include/nav.html`, or coexist with it?** The plan
@@ -259,7 +294,9 @@ new work in Canonn-GCloud — LCU No Fool Like One's domain, not this plan's.
    it is your call.
 2. **Do the combo pages survive?** `aliens-combo`, `guardians-combo`, `thargoids-combo` load two data files each. They work, but the layer panel's group headers may make them redundant now.
 3. **`dcoh_headless.html`** exists to be embedded in an iframe. Should it get the chrome at all, or stay bare?
-4. **Should multifaction stay the landing page?** It costs every first-time
+**Settled:** multifaction stays the landing page.
+
+4. **Should multifaction stay the landing page?** ~~Open~~ — keeping it. It costs every first-time
    visitor 5.6 s (3.1 s even warm) before anything renders, because of the 16.6 MB
    Spansh dump. A lighter default would make the site feel dramatically faster;
    keeping it means fixing the caching first.
