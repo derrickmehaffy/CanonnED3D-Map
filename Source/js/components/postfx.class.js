@@ -33,11 +33,14 @@ var PostFX = {
   'origRender': null,
   'origToneMapping': null,
   'origExposure': null,
+  'origColorSpace': null,
   'inside': false,
 
-  //-- Tunables. exposure and bloom threshold trade against each other and
-  //   against how present the Milky Way should be; expected to be adjusted.
-  'exposure': 0.75,
+  //-- Calibrated so nothing gets darker than it is today: at 1.30 the
+  //   background reads 13,13,17 against the unprocessed 13,13,16 on
+  //   gr-data.html, so the change is confined to the bright end, which is
+  //   where the headroom was missing. Bloom is the part still open to taste.
+  'exposure': 1.30,
   'strength': 0.7,
   'radius': 0.5,
   'threshold': 0.85,
@@ -72,6 +75,19 @@ var PostFX = {
 
     this.origToneMapping = renderer.toneMapping;
     this.origExposure = renderer.toneMappingExposure;
+    this.origColorSpace = renderer.outputColorSpace;
+
+    //-- OutputPass applies the sRGB transfer function on the way out. Ed3d runs
+    //   with ColorManagement disabled, so the values already in the buffer are
+    //   display-referred, not linear — converting them again lifts the whole
+    //   frame. Measured on gr-data.html, the background went from the authored
+    //   #0d0d10 (13,13,16) to 39,39,46. Telling the renderer the output is
+    //   already linear makes OutputPass tone map without re-encoding.
+    //
+    //   The properly correct fix is to turn ColorManagement on so the pipeline
+    //   is linear end to end, but that reinterprets every authored colour on
+    //   the site and is a deliberate palette change, not a flag flip.
+    renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = this.exposure;
 
@@ -99,6 +115,7 @@ var PostFX = {
     renderer.render = this.origRender;
     renderer.toneMapping = this.origToneMapping;
     renderer.toneMappingExposure = this.origExposure;
+    renderer.outputColorSpace = this.origColorSpace;
     this.origRender = null;
     this.enabled = false;
     return true;
