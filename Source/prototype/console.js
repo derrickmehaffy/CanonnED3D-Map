@@ -177,7 +177,7 @@
       hudMultipleSelect: true,
       startAnim: false,
       showGalaxyInfos: true,
-      effectScaleSystem: [8, 28],    // was [20,500]; 500 made flares enormous zoomed out
+      effectScaleSystem: [10, 200],  // was [20,500]; recomputed from the size slider
       cameraPos: CFG.cam,          // same framing the real pages use
       systemColor: '#FF9D00'
     });
@@ -529,7 +529,10 @@
     // sizeOnScroll() recomputes point size from camera distance every frame and
     // clamps it to effectScaleSystem. Setting material.size directly is pointless
     // — it is overwritten on the next frame. Drive the clamp instead.
-    Ed3d.effectScaleSystem = [Math.max(4, sysSize * 0.4), sysSize * 1.4];
+    // The clamp has to do two jobs: keep flares modest up close, and keep systems
+    // visible against the starfield when zoomed right out. [20,500] was too big
+    // at distance; [8,28] made them vanish. Scale the ceiling off the base.
+    Ed3d.effectScaleSystem = [Math.max(4, sysSize * 0.5), Math.min(240, sysSize * 10)];
     if (typeof Action !== 'undefined') Action.prevScale = null;  // force recompute
     System.scaleSize = sysSize;
   }
@@ -600,7 +603,20 @@
   $('v3d').onclick = function () { doCamera('iso'); };
   $('v2d').onclick = function () { doCamera('top'); };
   // Zoom and pan are lcunfool's #nav-controls, restored rather than reimplemented.
-  $('zfit').onclick = function () { frameAll = !frameAll; frameData(); };
+  // Its centre button means "reset view", which by default calls
+  // Action.moveInitalPosition() and returns to the fixed cameraPos — deep space
+  // on several maps. Repointed at frameData() so the obvious button does the
+  // useful thing; a second press widens to the full extent.
+  (function repointReset() {
+    var el = document.getElementById('nav-pan-reset');
+    if (!el) { setTimeout(repointReset, 300); return; }
+    if (window.jQuery) jQuery(el).off('mousedown touchstart');
+    el.title = 'Frame the data';
+    el.addEventListener('mousedown', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      frameAll = !frameAll; frameData();
+    });
+  })();
 
   /* ── selection: poll Ed3d's own picking result ────────────────────────── */
   setInterval(function () {

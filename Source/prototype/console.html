@@ -133,10 +133,6 @@ input[type=range]{accent-color:var(--amber)}
 .viewmode button + button{border-left:1px solid var(--rule)}
 .viewmode button.on{background:var(--amber);color:#0B0700}
 .viewmode button:not(.on):hover{color:var(--text)}
-.zoomers{position:absolute;right:48px;bottom:12px;display:flex;flex-direction:column;gap:4px;z-index:8}
-.zoomers button{width:28px;height:28px;border:1px solid var(--rule);background:var(--panel);
-  color:var(--dim);display:grid;place-items:center;font-size:14px}
-.zoomers button:hover{border-color:var(--dim);color:var(--text)}
 
 /* card */
 .card{position:absolute;right:12px;top:46px;width:280px;background:var(--panel);
@@ -280,9 +276,6 @@ input[type=range]{accent-color:var(--amber)}
         <button id="v2d" aria-pressed="false">2D</button>
       </div>
       <div class="hint" id="hint">drag to orbit &#183; scroll to zoom &#183; click a system</div>
-      <div class="zoomers">
-        <button id="zfit" title="Frame everything" aria-label="Frame the data">&#9673;</button>
-      </div>
       <div class="card hidden" id="card"></div>
     </div>
   </div>
