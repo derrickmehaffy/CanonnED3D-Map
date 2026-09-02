@@ -22,6 +22,12 @@ import { Route } from './components/route.class.js';
 import { System } from './components/system.class.js';
 import { Galaxy } from './components/galaxy.class.js';
 import { Heatmap } from './components/heat.class.js';
+import { PostFX } from './components/postfx.class.js';
+
+// ed3dmap.js resizes the composer's render targets on window resize, but it
+// cannot import postfx.class.js — that module imports ed3dmap's own globals.
+// Handing the reference over here keeps the dependency one-way.
+Ed3d.postfx = PostFX;
 
 // NOTE: THREE.ColorManagement.enabled is deliberately NOT set here. It lives at
 // the top of ed3dmap.js's body instead, because that module's Ed3d.material
@@ -48,6 +54,7 @@ Object.assign(window, {
   System: System,
   Galaxy: Galaxy,
   Heatmap: Heatmap,
+  PostFX: PostFX,
   // route.class.js and hud.class.js index into `routes` as a bare global.
   // It's a plain array, populated later by mutating indices (routes[id] =
   // ...), so publishing the reference once here is enough — no wrapper

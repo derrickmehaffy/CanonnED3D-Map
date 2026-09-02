@@ -638,7 +638,21 @@
       '<span class="vv" id="szval">—</span></div>' +
       '<input type="range" id="sizerange" min="6" max="70" step="2" style="width:100%">' +
       '<div class="note">Each toggle calls the engine directly — <b>Grid.toggleGrid()</b>, ' +
-      '<b>Galaxy.infosShow/Hide()</b>, and the point material\'s own size.</div>';
+      '<b>Galaxy.infosShow/Hide()</b>, and the point material\'s own size.</div>' +
+      '<div class="s-t" style="margin-top:18px">Lighting</div>' +
+      '<div class="s-sub">Experimental</div>' +
+      sw('hdr', 'HDR + bloom', disp.hdr) +
+      '<div class="row" style="margin-top:10px"><span class="lb">Exposure</span>' +
+      '<span class="vv" id="expval">—</span></div>' +
+      '<input type="range" id="exprange" min="20" max="200" step="5" style="width:100%">' +
+      '<div class="row" style="margin-top:10px"><span class="lb">Bloom</span>' +
+      '<span class="vv" id="bloomval">—</span></div>' +
+      '<input type="range" id="bloomrange" min="0" max="200" step="5" style="width:100%">' +
+      '<div class="note">The scene is almost all additive blending, and the default ' +
+      '8-bit buffer clamps at 1.0 — so in the galactic plane the overlaps blow past ' +
+      'white and clip flat. This renders to a <b>half-float</b> target and tone maps ' +
+      'on the way out, which is what gives bloom anything to work with. Exposure and ' +
+      'bloom trade against how present the Milky Way is.</div>';
   }
 
   function renderPanel() {
@@ -782,6 +796,16 @@
       applySize();
       $('szval').textContent = sysSize;
     }
+    if (e.target.id === 'exprange' && window.PostFX) {
+      var v = +e.target.value / 100;
+      PostFX.setExposure(v);
+      $('expval').textContent = v.toFixed(2);
+    }
+    if (e.target.id === 'bloomrange' && window.PostFX) {
+      var b = +e.target.value / 100;
+      PostFX.setBloom(b);
+      $('bloomval').textContent = b.toFixed(2);
+    }
   });
 
   /* ── display ──────────────────────────────────────────────────────────
@@ -789,7 +813,7 @@
      threshold calls enableFarView/disableFarView, which reach in and set grid
      visibility, galaxy labels and the starfield themselves. So the panel keeps
      its own intent and re-asserts it on a timer rather than setting once. */
-  var disp = { grid: true, galaxy: true, stars: true };
+  var disp = { grid: true, galaxy: true, stars: true, hdr: false };
   var sysSize = 20;                       // flares got huge on zoom-out at 64
 
   function applyDisplay() {
@@ -836,12 +860,26 @@
   function syncDisplay() {
     var s = $('sizerange');
     if (s) { s.value = sysSize; $('szval').textContent = sysSize; }
+    var e = $('exprange');
+    if (e && window.PostFX) {
+      e.value = Math.round(PostFX.exposure * 100);
+      $('expval').textContent = PostFX.exposure.toFixed(2);
+    }
+    var bl = $('bloomrange');
+    if (bl && window.PostFX) {
+      bl.value = Math.round(PostFX.strength * 100);
+      $('bloomval').textContent = PostFX.strength.toFixed(2);
+    }
     Object.keys(disp).forEach(function (k) {
       var el = document.querySelector('[data-sw="' + k + '"]');
       if (el) { el.classList.toggle('on', disp[k]); el.setAttribute('aria-checked', disp[k]); }
     });
   }
-  function doDisplay(k, state) { disp[k] = state; applyDisplay(); syncDisplay(); }
+  function doDisplay(k, state) {
+    disp[k] = state;
+    if (k === 'hdr' && window.PostFX) PostFX.toggle(state);
+    applyDisplay(); syncDisplay();
+  }
 
   /* ── routes: parse a journal in-browser and push it onto the live map ─── */
   function wireDrop() {

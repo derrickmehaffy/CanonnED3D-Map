@@ -116,3 +116,46 @@ test('the grid still follows the camera and toggles', async ({ page }) => {
   expect(r.hidden).toBe(false);
   expect(r.shown).toBe(true);
 });
+
+/* The HDR pipeline is opt-in: Ed3d's colours were authored against the
+   non-colour-managed path, so turning it on shifts every hue. It must stay off
+   until asked, and must restore the renderer exactly when switched back. */
+test('the HDR pipeline is off by default and reverts cleanly', async ({ page }) => {
+  await loaded(page);
+  const r = await page.evaluate(() => {
+    const before = {
+      enabled: PostFX.enabled,
+      toneMapping: renderer.toneMapping,
+      render: renderer.render
+    };
+    PostFX.enable();
+    const on = {
+      enabled: PostFX.enabled,
+      toneMapping: renderer.toneMapping,
+      // ACESFilmicToneMapping is 4 in three's enum
+      wrapped: renderer.render !== before.render,
+      halfFloat: PostFX.composer.renderTarget1.texture.type
+    };
+    PostFX.disable();
+    const after = {
+      enabled: PostFX.enabled,
+      toneMapping: renderer.toneMapping,
+      restored: renderer.render === before.render
+    };
+    return { before, on, after, HalfFloatType: THREE.HalfFloatType,
+             ACES: THREE.ACESFilmicToneMapping, NoToneMapping: THREE.NoToneMapping };
+  });
+
+  expect(r.before.enabled, 'off until asked for').toBe(false);
+  expect(r.before.toneMapping).toBe(r.NoToneMapping);
+
+  expect(r.on.enabled).toBe(true);
+  expect(r.on.toneMapping).toBe(r.ACES);
+  expect(r.on.wrapped, 'renders through the composer').toBe(true);
+  // The whole point: additive blending needs somewhere to accumulate past 1.0.
+  expect(r.on.halfFloat).toBe(r.HalfFloatType);
+
+  expect(r.after.enabled).toBe(false);
+  expect(r.after.toneMapping).toBe(r.before.toneMapping);
+  expect(r.after.restored, 'renderer.render put back').toBe(true);
+});

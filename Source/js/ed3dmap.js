@@ -1095,6 +1095,9 @@ function refresh3dMapSize() {
     renderer.setSize(width, height);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
+    // The post-processing composer keeps its own render targets, which have to
+    // follow the canvas or the frame is drawn at the old size and stretched.
+    if (Ed3d.postfx && Ed3d.postfx.resize) Ed3d.postfx.resize();
   }
 }
 
