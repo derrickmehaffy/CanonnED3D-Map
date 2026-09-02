@@ -469,7 +469,14 @@ var Ed3d = {
     container.appendChild(renderer.domElement);
 
     //controls
-    controls = new OrbitControls(camera, container);
+    // Bound to the canvas, NOT the #ed3dmap container.
+    //
+    // r185's OrbitControls calls domElement.setPointerCapture() on pointerdown.
+    // The press actually lands on the child <canvas>, and capturing on the
+    // parent div never delivers pointermove back to the div's own handler, so
+    // the map could not be rotated at all. The r75 copy we replaced used plain
+    // mouse listeners on document, which is why a div worked before.
+    controls = new OrbitControls(camera, renderer.domElement);
     controls.rotateSpeed = 0.6;
     controls.zoomSpeed = 2.0;
     controls.panSpeed = 0.8;
