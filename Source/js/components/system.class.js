@@ -7,6 +7,8 @@ var System = {
   'particleInfos': [],
   'points': [],
   'nameIndex': {},
+  'positions': null,
+  'colorValues': null,
   'count': 0,
   'scaleSize': 64,
 
@@ -31,21 +33,18 @@ var System = {
     //-- Particle for near and far view
 
     var colors = [];
-    if (this.particleGeo !== null) {
+    if (this.positions !== null) {
 
       //-- If system with info already registered, concat datas
       var idSys = x + '_' + y + '_' + z;
       if (val.infos != undefined && this.particleInfos[idSys]) {
         var indexParticle = this.particleInfos[idSys];
-        this.particleGeo.vertices[indexParticle].infos += val.infos;
         if (this.points[indexParticle] !== undefined) {
           this.points[indexParticle].infos = (this.points[indexParticle].infos || '') + val.infos;
         }
         if (val.cat != undefined) Ed3d.addObjToCategories(indexParticle, val.cat);
         return;
       }
-
-      var particle = new THREE.Vector3(x, y, z);
 
       //-- Get point color
 
@@ -59,24 +58,15 @@ var System = {
 
       if (val.cat != undefined) {
         Ed3d.addObjToCategories(this.count, val.cat);
-        particle.color = this.particleColor[this.count];
       }
 
-      //-- Attach name and set point as clickable
-
-      particle.clickable = true;
-      particle.visible = true;
-      particle.name = val.name;
       if (val.infos != undefined) {
-        particle.infos = val.infos;
         this.particleInfos[idSys] = this.count;
       }
-      if (val.url != undefined) {
-        particle.url = val.url;
-      }
 
-      this.particleGeo.vertices.push(particle);
-
+      this.positions.push(x, y, z);
+      var c = this.particleColor[this.count];
+      this.colorValues.push(c.r, c.g, c.b);
       this.count++;
 
       //-- Index-aligned metadata. The GPU only needs position and colour; every
@@ -145,7 +135,12 @@ var System = {
    */
 
   'initParticleSystem': function () {
-    this.particleGeo = new THREE.Geometry;
+    this.positions = [];
+    this.colorValues = [];
+    this.points = [];
+    this.nameIndex = {};
+    this.count = 0;
+    this.particleGeo = null;
   },
 
   /**
@@ -157,25 +152,21 @@ var System = {
 
   'endParticleSystem': function () {
 
-    if (this.particleGeo == null) {
-      return;
-    }
+    if (this.positions === null || this.positions.length === 0) return;
 
-    //-- Remove the previous particle cloud before replacing it.
-    if (this.particle != null) {
+    //-- Remove the previous particle cloud before replacing it. Three.js r75
+    //   keys its internal GPU buffer size to the geometry object's id, so a
+    //   fresh BufferGeometry (and fresh typed arrays sized to the current
+    //   accumulator) is built on every flush rather than resizing in place.
+    if (this.particle !== null) {
       scene.remove(this.particle);
+      if (this.particle.geometry) this.particle.geometry.dispose();
     }
 
-    //-- Wrap the accumulated vertex/color arrays in a brand-new Geometry
-    //   object on every flush.  Three.js r75 keys its internal GPU buffer
-    //   size to the geometry object's id; reusing the same geometry object
-    //   causes it to silently ignore all vertices beyond the first-upload
-    //   count.  A new wrapper object forces a correctly-sized GPU allocation
-    //   on each batch while still sharing the same underlying JS arrays
-    //   (no copying overhead).
-    var freshGeo = new THREE.Geometry();
-    freshGeo.vertices = this.particleGeo.vertices;
-    freshGeo.colors = this.particleColor;
+    var geo = new THREE.BufferGeometry();
+    // r75 spells this addAttribute; Phase 2b renames it to setAttribute.
+    geo.addAttribute('position', new THREE.BufferAttribute(new Float32Array(this.positions), 3));
+    geo.addAttribute('color', new THREE.BufferAttribute(new Float32Array(this.colorValues), 3));
 
     var particleMaterial = new THREE.PointsMaterial({
       map: Ed3d.textures.flare_yellow,
@@ -188,15 +179,11 @@ var System = {
       depthWrite: false
     });
 
-    this.particle = new THREE.Points(freshGeo, particleMaterial);
-
+    this.particle = new THREE.Points(geo, particleMaterial);
     this.particle.clickable = true;
+    this.particleGeo = geo;
 
     scene.add(this.particle);
-
-    //-- Swap the accumulator to the fresh geometry so that future create()
-    //   calls push into the same arrays that the live Points object holds.
-    this.particleGeo = freshGeo;
   },
 
 
@@ -206,6 +193,10 @@ var System = {
 
   'remove': function () {
 
+    if (this.particle !== null && this.particle.geometry) this.particle.geometry.dispose();
+
+    this.positions = null;
+    this.colorValues = null;
     this.particleColor = [];
     this.particleGeo = null;
     this.points = [];
@@ -237,16 +228,24 @@ var System = {
   },
 
   /**
-   * Set one point's colour. While the store is still a legacy Geometry this
-   * writes both the colour array and the metadata; Task 3 makes it write the
-   * typed array instead. Callers do not change again.
+   * Set one point's colour: updates the metadata, the flat accumulator (so a
+   * later flush doesn't lose the change) and, if a Points object already
+   * exists, the live GPU-bound attribute.
    */
   'setColor': function (index, color) {
     this.particleColor[index] = color;
     if (this.points[index] !== undefined) this.points[index].color = color;
-    if (this.particleGeo !== null) {
-      this.particleGeo.colors[index] = color;
-      this.particleGeo.colorsNeedUpdate = true;
+    if (this.colorValues !== null) {
+      this.colorValues[index * 3] = color.r;
+      this.colorValues[index * 3 + 1] = color.g;
+      this.colorValues[index * 3 + 2] = color.b;
+    }
+    if (this.particleGeo !== null && this.particleGeo.attributes.color) {
+      var attr = this.particleGeo.attributes.color;
+      attr.array[index * 3] = color.r;
+      attr.array[index * 3 + 1] = color.g;
+      attr.array[index * 3 + 2] = color.b;
+      attr.needsUpdate = true;
     }
   }
 

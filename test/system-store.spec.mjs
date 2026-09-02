@@ -35,3 +35,30 @@ test('findByName returns -1 for an unknown system', async ({ page }) => {
   const missing = await page.evaluate(() => System.findByName('No Such System Anywhere'));
   expect(missing).toBe(-1);
 });
+
+test('the point cloud is a BufferGeometry with typed attributes', async ({ page }) => {
+  await stubDataHosts(page);
+  await page.goto(REFERENCE_PAGE, { waitUntil: 'load' });
+  await waitForScene(page, expect);
+  await expect
+    .poll(() => page.evaluate(() => window.__ed3dTestState().dataComplete), { timeout: 60_000 })
+    .toBe(true);
+
+  const r = await page.evaluate(() => {
+    const g = System.particle.geometry;
+    const pos = g.attributes && g.attributes.position;
+    return {
+      isBuffer: g instanceof THREE.BufferGeometry,
+      hasLegacyVertices: Array.isArray(g.vertices) && g.vertices.length > 0,
+      positionIsFloat32: pos ? pos.array instanceof Float32Array : false,
+      positionCount: pos ? pos.count : -1,
+      count: System.count
+    };
+  });
+
+  expect(r.isBuffer).toBe(true);
+  expect(r.hasLegacyVertices).toBe(false);
+  expect(r.positionIsFloat32).toBe(true);
+  // One vec3 per system.
+  expect(r.positionCount).toBe(r.count);
+});
