@@ -24,16 +24,68 @@ var Grid = {
 
     this.size = size;
 
-    // r75: GridHelper(halfExtent, stepInWorldUnits) drew a grid spanning
-    // +/-1,000,000 with a line every `size` world units, coloured after the
-    // fact via setColors(). r185: GridHelper(fullExtent, divisions,
-    // colorCenterLine, colorGrid) takes the FULL extent and a division
-    // count, and setColors() no longer exists — colour is constructor-only.
-    // To reproduce the same line spacing: full extent is the old half-extent
-    // doubled, and divisions is extent / size (one division per `size`
-    // units, same as before).
+    // Drawn in a fragment shader on a single quad rather than as line geometry.
+    //
+    // GridHelper builds real lines: at the 100 ly spacing that is 20,000
+    // divisions, ~80,000 vertices, and the two grids together were 40% of the
+    // frame. Worse, line geometry has no anti-aliasing — once the lines fall
+    // below a pixel apart they alias into the moiré that shows up when the grid
+    // is toggled or the camera moves.
+    //
+    // A shader solves both. Line coverage is computed analytically from the
+    // world position, using screen-space derivatives (fwidth) so a line is
+    // always exactly one pixel wide however far away it is, and fades out
+    // smoothly instead of aliasing once the spacing gets tight. Two triangles
+    // instead of 80,000 line segments.
     var extent = 1000000 * 2;
-    this.obj = new THREE.GridHelper(extent, extent / size, color, color);
+
+    var material = new THREE.ShaderMaterial({
+      uniforms: {
+        uSize:  { value: size },
+        uColor: { value: new THREE.Color(color) },
+        // Distance over which lines fade to nothing. Scaled off the spacing so
+        // the fine grid disappears before it can turn into a haze, while the
+        // coarse one stays visible much further out.
+        uFade:  { value: size * 900 }
+      },
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      vertexShader: [
+        'varying vec3 vWorld;',
+        'void main() {',
+        '  vec4 wp = modelMatrix * vec4(position, 1.0);',
+        '  vWorld = wp.xyz;',
+        '  gl_Position = projectionMatrix * viewMatrix * wp;',
+        '}'
+      ].join('\n'),
+      fragmentShader: [
+        'uniform float uSize;',
+        'uniform vec3  uColor;',
+        'uniform float uFade;',
+        'varying vec3 vWorld;',
+        'void main() {',
+        // Grid coordinates in units of one cell. Lines sit on the integers.
+        '  vec2 c = vWorld.xz / uSize;',
+        // Distance to the nearest line, divided by how much c changes across
+        // one pixel: the result is "pixels from the line", so the line keeps a
+        // constant on-screen width at any zoom.
+        '  vec2 g = abs(fract(c - 0.5) - 0.5) / fwidth(c);',
+        '  float a = 1.0 - min(min(g.x, g.y), 1.0);',
+        '  if (a <= 0.002) discard;',
+        '  float d = distance(cameraPosition, vWorld);',
+        '  a *= 1.0 - smoothstep(uFade * 0.25, uFade, d);',
+        '  if (a <= 0.002) discard;',
+        '  gl_FragColor = vec4(uColor, a);',
+        '}'
+      ].join('\n')
+    });
+
+    this.obj = new THREE.Mesh(new THREE.PlaneGeometry(extent, extent), material);
+    this.obj.rotation.x = -Math.PI / 2;
+    // The quad is enormous and always under the camera; culling it by its
+    // bounding sphere only ever gets it wrong.
+    this.obj.frustumCulled = false;
     this.obj.minDistView = minDistView;
 
     scene.add(this.obj);

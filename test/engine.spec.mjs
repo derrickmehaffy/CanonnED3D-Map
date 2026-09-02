@@ -66,3 +66,53 @@ test('the point cloud reuses one material across batch flushes', async ({ page }
   expect(r.attached, 'the cloud draws with the shared material').toBe(true);
   expect(r.sizeKept).toBe(true);
 });
+
+/* The two grids were GridHelpers: at 100 ly spacing that is 20,000 divisions
+   and ~80,000 vertices, together 40% of the frame — and line geometry has no
+   anti-aliasing, which is what produced the moiré when the grid was toggled or
+   the camera moved. They are now drawn analytically in a fragment shader. */
+test('the grid is a shader quad, not line geometry', async ({ page }) => {
+  await loaded(page);
+  const r = await page.evaluate(() => {
+    const g = [Ed3d.grid1H.obj, Ed3d.grid1K.obj];
+    return {
+      types: g.map((o) => o.type),
+      materials: g.map((o) => o.material.type),
+      verts: g.reduce((a, o) => a + o.geometry.attributes.position.count, 0),
+      // fwidth-based coverage is the whole point: it is what removes the moiré.
+      usesDerivatives: g.every((o) => /fwidth/.test(o.material.fragmentShader)),
+      spacing: g.map((o) => o.material.uniforms.uSize.value),
+      culled: g.map((o) => o.frustumCulled)
+    };
+  });
+  expect(r.types).toEqual(['Mesh', 'Mesh']);
+  expect(r.materials).toEqual(['ShaderMaterial', 'ShaderMaterial']);
+  expect(r.verts, 'two quads, not 88,008 line vertices').toBe(8);
+  expect(r.usesDerivatives).toBe(true);
+  // The 100 ly and 1000 ly grids Ed3d.initScene() asks for.
+  expect(r.spacing).toEqual([100, 1000]);
+  // The quad is always under the camera; culling by bounding sphere only
+  // ever gets it wrong.
+  expect(r.culled).toEqual([false, false]);
+});
+
+test('the grid still follows the camera and toggles', async ({ page }) => {
+  await loaded(page);
+  const r = await page.evaluate(() => {
+    // moveGridTo snaps X/Z to 1000 ly, which both grids divide evenly, so the
+    // shader's world-anchored lines stay aligned with the old behaviour.
+    Action.moveGridTo(12345, 678, -9876);
+    const p = Ed3d.grid1H.obj.position;
+    const was = Ed3d.grid1H.obj.visible;
+    Ed3d.grid1H.hide();
+    const hidden = Ed3d.grid1H.obj.visible;
+    Ed3d.grid1H.visible = true;
+    Ed3d.grid1H.show();
+    return { x: p.x, y: p.y, z: p.z, was, hidden, shown: Ed3d.grid1H.obj.visible };
+  });
+  expect(r.x).toBe(12000);
+  expect(r.z).toBe(-10000);
+  expect(r.y).toBe(678);
+  expect(r.hidden).toBe(false);
+  expect(r.shown).toBe(true);
+});
