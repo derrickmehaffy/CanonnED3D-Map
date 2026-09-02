@@ -35,8 +35,20 @@ The engine is ES modules running on three.js r75. `Source/js/main.js` is the
 entry point: every page loads the four vendor classic scripts (OrbitControls,
 FontUtils, the typeface, Tween) and then `main.js` as
 `<script type="module">`, which imports the engine modules — including
-`Source/js/ed3dmap.js` — and publishes the compat globals (`Ed3d`,
-`canonnEd3d_*`, `__ed3dTestState`, etc.) that the rest of the page relies on.
+`Source/js/ed3dmap.js` — and republishes the engine singletons on `window`
+(`Ed3d`, `Grid`, `Ico`, `HUD`, `Action`, `Route`, `System`, `Galaxy`,
+`Heatmap`, `Loader`, `routes`, `isFarView`, plus `scene`/`camera`/`controls`/
+`renderer`/`container` once `initScene()` has created them).
+
+Engine files call each other by bare name, and so do the data files. Rather
+than converting those into imports — which would create real cycles, since
+`Ed3d`, `HUD` and `Action` all reference each other — everything is
+republished on `window` and bare references resolve against the global object
+at call time. This is deliberate, not an oversight.
+
+(`canonnEd3d_*` and `window.__ed3dTestState` are *not* published by `main.js`:
+the former are plain globals declared in each classic data file, the latter is
+assigned directly inside `ed3dmap.js`.)
 
 The 30 `Source/data/MapData-*.js` files are deliberately still classic
 scripts: they read those engine globals off `window` rather than importing
