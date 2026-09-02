@@ -26,6 +26,7 @@ prototype only supplies the interface around them:
 
 | Chrome | Drives |
 |---|---|
+| Systems list | the loaded system list; clicking flies the real camera |
 | 3D / 2D toggle | `Ed3d.isTopView` + `HUD.moveCamera` — the same path the real buttons use |
 | Layer toggles | `Ed3d.catObjs` + `System.setColor` — the real category filter |
 | Camera panel | `controls.target`, `camera.position`, `HUD.moveCamera` |
@@ -61,6 +62,12 @@ A generic "list of coloured checkboxes" cannot express any of that. The layer
 rail has to be map-aware.
 
 ## Two design decisions worth arguing about
+
+**Two lists, two questions.** The map index answers "which map"; the systems
+rail answers "what is on this one". Both are browsable rather than search-only —
+the systems list filters, sorts by name or distance from Sol, shows which site
+types each system holds as coloured wedges, and respects the layer toggles so it
+always agrees with the status strip.
 
 **The map index.** Search alone is not enough — you cannot search for a map you
 do not know exists. The header name opens a browsable grid of all 33 maps grouped

@@ -104,6 +104,7 @@
   var sel = null, selSite = 0, panel = 'layers';
   var catBase = 200;                       // category ids handed to Ed3d
   var extraRoutes = [];                    // systems added from a dropped journal
+  var sysQuery = '', sysSort = 'name';     // systems panel: filter text and order
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -374,14 +375,24 @@
 
   function renderPanel() {
     var host = $('side');
-    host.innerHTML = panel === 'layers' ? panelLayers()
-                   : panel === 'camera' ? panelCamera()
-                   : panel === 'routes' ? panelRoutes()
+    host.innerHTML = panel === 'layers'  ? panelLayers()
+                   : panel === 'systems' ? panelSystems()
+                   : panel === 'camera'  ? panelCamera()
+                   : panel === 'routes'  ? panelRoutes()
                    : panelDisplay();
     if (panel === 'layers' && CFG.templates) showTemplate(hoverType);
     if (panel === 'camera') syncCamera();
     if (panel === 'display') syncDisplay();
     if (panel === 'routes') wireDrop();
+    if (panel === 'systems') {
+      var f = $('sysfilter');
+      if (f) {
+        f.oninput = function () { sysQuery = this.value; renderPanel(); $('sysfilter').focus(); };
+        if (sysQuery) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
+      }
+      var cur = host.querySelector('.sysrow.on');
+      if (cur) cur.scrollIntoView({ block: 'nearest' });
+    }
   }
 
   function showTemplate(t) {
@@ -425,6 +436,16 @@
       renderPanel(); updateShown();
       return;
     }
+    var srow = e.target.closest('.sysrow[data-sys]');
+    if (srow) {
+      var name = srow.dataset.sys;
+      for (var k = 0; k < DATA.sys.length; k++) {
+        if (DATA.sys[k].n === name) { gotoSystem(DATA.sys[k]); break; }
+      }
+      return;
+    }
+    var srt = e.target.closest('[data-sort]');
+    if (srt) { sysSort = srt.dataset.sort; renderPanel(); return; }
     var cam = e.target.closest('[data-cam]');
     if (cam) { doCamera(cam.dataset.cam); return; }
     var swt = e.target.closest('[data-sw]');
@@ -696,6 +717,70 @@
     // whatever the pointer was hovering.
   }
 
+  /* Select a system and fly the camera to it. Shared by the palette and the
+     systems list so they behave identically. */
+  function gotoSystem(rec) {
+    sel = rec; selSite = 0; renderCard();
+    if (CFG.templates) showTemplate(TYPES[rec.s[0][0]]);
+    if (typeof controls === 'undefined') return;
+    controls.target.set(rec.x, rec.y, -rec.z);
+    camera.position.set(rec.x - 120, rec.y + 90, -rec.z + 120);
+    camera.lookAt(controls.target);
+    controls.update();
+    if (panel === 'systems') renderPanel();
+  }
+
+  /* ── systems list: what is actually on this map ────────────────────────
+     The map index answers "which map"; nothing answered "what is on this one".
+     Respects the layer toggles so it always agrees with the status strip. */
+  function visibleSystems() {
+    return SYSLIST().filter(function (r) {
+      return r.s.some(function (site) { return on[site[0]]; });
+    });
+  }
+  function SYSLIST() { return DATA.sys; }
+
+  function panelSystems() {
+    var q = sysQuery.toLowerCase();
+    var rows = visibleSystems().filter(function (r) {
+      return !q || r.n.toLowerCase().indexOf(q) > -1;
+    });
+    rows.forEach(function (r) {
+      if (r._ly === undefined) r._ly = Math.round(Math.sqrt(r.x * r.x + r.y * r.y + r.z * r.z));
+    });
+    rows.sort(sysSort === 'name'
+      ? function (a, b) { return a.n.localeCompare(b.n, undefined, { numeric: true }); }
+      : function (a, b) { return a._ly - b._ly; });
+
+    var h = '<div class="s-t">Systems on this map</div>' +
+      '<div class="s-sub"><b>' + rows.length + '</b> of ' + DATA.sys.length +
+      (q ? ' matching' : ' shown') + '</div>' +
+      '<input class="sysfilter" id="sysfilter" type="text" placeholder="Filter by name…" ' +
+      'autocomplete="off" spellcheck="false" value="' + esc(sysQuery) + '">' +
+      '<div class="syssort">' +
+      '<button data-sort="name"' + (sysSort === 'name' ? ' class="on"' : '') + '>Name</button>' +
+      '<button data-sort="dist"' + (sysSort === 'dist' ? ' class="on"' : '') + '>Distance</button>' +
+      '</div><div class="syslist">';
+
+    if (!rows.length) {
+      h += '<div class="note" style="margin:10px 13px">No system matches. Clear the filter, ' +
+        'or re-enable a type in the Layers panel.</div>';
+    }
+    rows.forEach(function (r) {
+      var types = {}; r.s.forEach(function (x) { types[x[0]] = 1; });
+      var wedge = Object.keys(types).map(function (t) {
+        return '<i style="background:' + col(+t) + '"></i>';
+      }).join('');
+      h += '<div class="sysrow' + (sel && sel.n === r.n ? ' on' : '') + '" data-sys="' + esc(r.n) + '" ' +
+        'role="button" tabindex="0" title="' + esc(r.n) + ' — ' + r.s.length + ' ' + CFG.unit +
+        (r.s.length > 1 ? 's' : '') + '">' +
+        '<span class="wedge">' + wedge + '</span>' +
+        '<span class="nm">' + hl(r.n, sysQuery) + '</span>' +
+        '<span class="ly">' + r._ly.toLocaleString() + '</span></div>';
+    });
+    return h + '</div>';
+  }
+
   /* ── map index: the browsable alternative to searching ────────────────── */
   function openIndex() {
     var live = 0, total = 0;
@@ -795,13 +880,7 @@
   function palRun() {
     var r = pflat[psel]; if (!r) return;
     if (r.k === 'tool') { window.open(r.u, '_blank', 'noopener'); closePal(); return; }
-    if (r.k === 'sys') {
-      closePal(); sel = r.s; selSite = 0; renderCard();
-      if (CFG.templates) showTemplate(TYPES[r.s.s[0][0]]);
-      controls.target.set(r.s.x, r.s.y, -r.s.z);
-      moveTo({ x: r.s.x - 120, y: r.s.y + 90, z: -r.s.z + 120 });
-      return;
-    }
+    if (r.k === 'sys') { closePal(); gotoSystem(r.s); return; }
     closePal();
     if (r.id) { location.search = '?map=' + r.id; }
     else { openIndex(); }

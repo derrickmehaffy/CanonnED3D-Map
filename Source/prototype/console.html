@@ -54,9 +54,9 @@ input[type=range]{accent-color:var(--amber)}
 
 /* body */
 .mid{display:flex;min-height:0;position:relative}
-.rail{width:50px;flex:none;background:var(--panel);border-right:1px solid var(--rule);
-  display:flex;flex-direction:column;align-items:center;padding:7px 0;gap:2px;z-index:20}
-.rail button{width:36px;height:36px;display:grid;place-items:center;color:var(--dim);font-size:20px;line-height:1}
+.rail{width:56px;flex:none;background:var(--panel);border-right:1px solid var(--rule);
+  display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:3px;z-index:20}
+.rail button{width:42px;height:42px;display:grid;place-items:center;color:var(--dim);font-size:17px;line-height:1}
 .rail button:hover{color:var(--text);background:var(--panel-2)}
 .rail button.on{color:var(--amber);background:var(--panel-2);box-shadow:inset 2px 0 0 var(--amber)}
 .side{width:258px;flex:none;background:var(--panel);border-right:1px solid var(--rule);
@@ -91,6 +91,27 @@ input[type=range]{accent-color:var(--amber)}
 .tmpl-f{padding:7px 10px;font-family:var(--mono);font-size:10px;color:var(--dimmer);
   border-top:1px solid var(--rule);line-height:1.5}
 
+.sysfilter{width:100%;background:var(--panel-2);border:1px solid #24303B;color:var(--text);
+  font-family:var(--mono);font-size:11.5px;padding:6px 9px;outline:none;margin-bottom:2px}
+.sysfilter:focus{border-color:var(--amber)}
+.sysfilter::placeholder{color:var(--dimmer)}
+.syssort{display:flex;gap:4px;margin:7px 0 4px}
+.syssort button{flex:1;border:1px solid var(--rule);padding:4px 6px;font-family:var(--cond);
+  font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}
+.syssort button.on{border-color:var(--amber);color:var(--amber)}
+.syslist{margin:0 -13px}
+.sysrow{display:flex;align-items:center;gap:8px;padding:6px 13px;cursor:pointer;
+  border-left:2px solid transparent}
+.sysrow:hover{background:var(--panel-2)}
+.sysrow.on{background:var(--panel-2);border-left-color:var(--amber)}
+.sysrow .wedge{display:flex;flex:none;gap:2px}
+.sysrow .wedge i{width:6px;height:6px;border-radius:1px;display:block}
+.sysrow .nm{flex:1;min-width:0;font-family:var(--mono);font-size:11px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sysrow .nm mark{background:none;color:var(--amber);font-weight:600}
+.sysrow .ly{font-family:var(--mono);font-size:9.5px;color:var(--dimmer);flex:none;
+  font-variant-numeric:tabular-nums}
+.sysrow.dim{opacity:.35}
 .row{display:flex;align-items:center;gap:9px;padding:6px 0;font-size:12.5px}
 .row .lb{flex:1;color:var(--text)}
 .row .vv{font-family:var(--mono);font-size:10.5px;color:var(--dimmer)}
@@ -262,10 +283,11 @@ input[type=range]{accent-color:var(--amber)}
 
   <div class="mid">
     <div class="rail">
-      <button class="on" data-p="layers" title="Layers" aria-label="Layers">&#9776;</button>
-      <button data-p="camera" title="Camera" aria-label="Camera">&#8982;</button>
-      <button data-p="routes" title="Routes &amp; journals" aria-label="Routes and journals">&#10547;</button>
-      <button data-p="display" title="Display" aria-label="Display">&#9680;</button>
+      <button class="on" data-p="layers" title="Layers" aria-label="Layers"><i class="fa fa-filter"></i></button>
+      <button data-p="systems" title="Systems on this map" aria-label="Systems on this map"><i class="fa fa-list"></i></button>
+      <button data-p="camera" title="Camera" aria-label="Camera"><i class="fa fa-crosshairs"></i></button>
+      <button data-p="routes" title="Routes &amp; journals" aria-label="Routes and journals"><i class="fa fa-location-arrow"></i></button>
+      <button data-p="display" title="Display" aria-label="Display"><i class="fa fa-adjust"></i></button>
     </div>
     <aside class="side" id="side"></aside>
 
