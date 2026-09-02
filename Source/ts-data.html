@@ -158,10 +158,14 @@
   </div>
 
   <!-- ED3D map engine -->
-  <script src="js/ed3dmap.js?v=6"></script>
+  <script src="vendor/three-js/OrbitControls.js"></script>
+  <script src="vendor/three-js/FontUtils.js"></script>
+  <script src="vendor/three-js/helvetiker_regular.typeface.js"></script>
+  <script src="vendor/tween-js/Tween.js"></script>
+  <script type="module" src="js/main.js?v=7"></script>
   <link href="css/styles.css" rel="stylesheet" type="text/css" />
   <!-- Map data for Thargoid Structures (will prefer data/surface_sites.json when present) -->
-  <script src="data/MapData-TS.js"></script>
+  <script defer src="data/MapData-TS.js"></script>
   <script>
     // Fullscreen image viewer functionality
     const imageModal = document.getElementById('imageModal');
