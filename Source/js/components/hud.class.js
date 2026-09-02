@@ -985,7 +985,7 @@ var HUD = {
 
       $(Ed3d.catObjs[idCat]).each(function (key, indexPoint) {
 
-        obj = System.points[indexPoint];
+        var obj = System.points[indexPoint];
 
         System.setColor(indexPoint, (active == 1)
           ? obj.color

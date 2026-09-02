@@ -11,7 +11,8 @@
 // This is the same compatibility posture the design doc chose for the data
 // files, applied one layer inward. Phase 2 may tighten it; Phase 1 does not.
 
-import { Ed3d, Loader, getEngineState, routes, isFarView } from './ed3dmap.js';
+import { Ed3d, Loader, getEngineState, routes, isFarView,
+         enableFarView, disableFarView, refresh3dMapSize } from './ed3dmap.js';
 import { Grid } from './components/grid.class.js';
 import { Ico } from './components/icon.class.js';
 import { HUD } from './components/hud.class.js';
@@ -36,7 +37,16 @@ Object.assign(window, {
   // It's a plain array, populated later by mutating indices (routes[id] =
   // ...), so publishing the reference once here is enough — no wrapper
   // needed, unlike scene/camera below.
-  routes: routes
+  routes: routes,
+  // action.class.js:495 calls disableFarView() and hud.class.js:70 calls
+  // refresh3dMapSize(), both as bare globals. They are plain function
+  // declarations in ed3dmap.js, so before Phase 1 they resolved via the
+  // global scope; as modules they need republishing or those click paths
+  // throw a ReferenceError. The smoke suite never clicks, so nothing
+  // caught this until picking was exercised by hand.
+  enableFarView: enableFarView,
+  disableFarView: disableFarView,
+  refresh3dMapSize: refresh3dMapSize
 });
 
 // grid.class.js and action.class.js read `isFarView` as a bare global to

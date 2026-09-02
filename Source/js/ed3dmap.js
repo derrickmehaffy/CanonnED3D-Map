@@ -1190,7 +1190,7 @@ window.__ed3dTestState = function () {
 // `routes`; grid.class.js and action.class.js branch on `isFarView`). Unlike
 // scene/camera/etc. they exist from module-evaluation time, not just after
 // initScene(), so main.js publishes them separately — see the comment there.
-export { Ed3d, Loader, animate, render, refresh3dMapSize, distance, distanceFromTarget, routes, isFarView };
+export { Ed3d, Loader, animate, render, refresh3dMapSize, distance, distanceFromTarget, routes, isFarView, enableFarView, disableFarView };
 export function getEngineState() {
   return { scene: scene, camera: camera, controls: controls, renderer: renderer, container: container };
 }
