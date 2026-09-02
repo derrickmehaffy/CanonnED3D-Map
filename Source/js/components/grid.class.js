@@ -190,3 +190,5 @@ var Grid = {
 
 }
 
+
+export { Grid };

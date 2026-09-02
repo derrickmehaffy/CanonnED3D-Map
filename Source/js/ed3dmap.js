@@ -1,3 +1,12 @@
+import { Grid } from './components/grid.class.js';
+import { Ico } from './components/icon.class.js';
+import { HUD } from './components/hud.class.js';
+import { Action } from './components/action.class.js';
+import { Route } from './components/route.class.js';
+import { System } from './components/system.class.js';
+import { Galaxy } from './components/galaxy.class.js';
+import { Heatmap } from './components/heat.class.js';
+
 //-- Nav-to-edmap position adjustment
 (function () {
   function adjustMapToNav() {
@@ -198,43 +207,11 @@ var Ed3d = {
     $('#' + Ed3d.container).append('<div id="ed3dmap"></div>');
 
 
-    //-- Load dependencies
-    Loader.update('Load core files');
-
-    if (typeof isMinified !== 'undefined') return Ed3d.launchMap();
-
-    $.when(
-      $.getScript(Ed3d.basePath + "vendor/three-js/OrbitControls.js"),
-      $.getScript(Ed3d.basePath + "vendor/three-js/FontUtils.js"),
-      $.Deferred(function (deferred) {
-        $(deferred.resolve);
-      })
-    ).done(function () {
-      $.when(
-        $.getScript(Ed3d.basePath + "vendor/three-js/helvetiker_regular.typeface.js"),
-
-        $.getScript(Ed3d.basePath + "js/components/grid.class.js"),
-        $.getScript(Ed3d.basePath + "js/components/icon.class.js"),
-        $.getScript(Ed3d.basePath + "js/components/hud.class.js"),
-        $.getScript(Ed3d.basePath + "js/components/action.class.js"),
-        $.getScript(Ed3d.basePath + "js/components/route.class.js"),
-        $.getScript(Ed3d.basePath + "js/components/system.class.js"),
-        $.getScript(Ed3d.basePath + "js/components/galaxy.class.js"),
-        $.getScript(Ed3d.basePath + "js/components/heat.class.js"),
-
-        $.getScript(Ed3d.basePath + "vendor/tween-js/Tween.js"),
-
-        $.Deferred(function (deferred) {
-          $(deferred.resolve);
-        })
-      ).done(function () {
-        Loader.update('Done !');
-        Ed3d.launchMap();
-        if (typeof options.finished === "function") options.finished();
-      }).fail(function (jqXHR, textStatus, errorThrown) {
-        console.log(errorThrown)
-      });
-    })
+    // Dependencies are now static ES module imports in js/main.js; there is
+    // nothing left to load at runtime.
+    Loader.update('Launch scene');
+    Ed3d.launchMap();
+    if (typeof options.finished === "function") options.finished();
   },
 
   /**
@@ -699,8 +676,15 @@ var Ed3d = {
       });
       if (hasCodexParams) {
         Ed3d._codexOverlayTriggered = true;
-        $.getScript(Ed3d.basePath + 'js/codex-overlay.js', function () {
-          CanonnCodexOverlay.loadIfNeeded();
+        // codex-overlay.js is now an ES module (it has an `export` statement),
+        // so $.getScript can no longer load it — that fetches and evals the
+        // response as a classic script, which would throw a syntax error on
+        // the export. Dynamic import() is the module equivalent of a lazy
+        // $.getScript call. The specifier is resolved relative to this
+        // module's own location (Source/js/ed3dmap.js), not the page's URL,
+        // so it does not go through Ed3d.basePath the way $.getScript did.
+        import('./codex-overlay.js').then(function (module) {
+          module.CanonnCodexOverlay.loadIfNeeded();
         });
       }
     }
@@ -921,7 +905,7 @@ function animate(time) {
 
   var scale = distanceFromTarget(camera) / 200;
 
-  this.Action.updateCursorSize(scale);
+  Action.updateCursorSize(scale);
 
   HUD.rotateText('system');
   HUD.rotateText('coords');
@@ -929,9 +913,9 @@ function animate(time) {
 
 
   //-- Zoom on on galaxy effect
-  this.Action.sizeOnScroll(scale);
+  Action.sizeOnScroll(scale);
 
-  this.Galaxy.infosUpdateCallback(scale);
+  Galaxy.infosUpdateCallback(scale);
 
   if (scale > 25) {
 
@@ -943,7 +927,7 @@ function animate(time) {
 
   }
 
-  this.Action.updatePointClickRadius(scale);
+  Action.updatePointClickRadius(scale);
 
   requestAnimationFrame(animate);
 
@@ -954,8 +938,8 @@ var isFarView = false;
 
 function enableFarView(scale, withAnim) {
 
-  if (isFarView || this.Galaxy == null) return;
-  if (!this.Galaxy.milkyway[0] || !this.Galaxy.milkyway[1]) return;
+  if (isFarView || Galaxy == null) return;
+  if (!Galaxy.milkyway[0] || !Galaxy.milkyway[1]) return;
   if (withAnim == undefined) withAnim = true;
 
   isFarView = true;
@@ -965,29 +949,27 @@ function enableFarView(scale, withAnim) {
   var scaleTo = { zoom: 500 };
   if (withAnim) {
 
-    var obj = this;
-
     //controls.enabled = false;
     Ed3d.tween = new TWEEN.Tween(scaleFrom, { override: true }).to(scaleTo, 500)
       .start()
       .onUpdate(function () {
-        obj.Galaxy.milkyway[0].material.size = scaleFrom.zoom;
-        obj.Galaxy.milkyway[1].material.size = scaleFrom.zoom * 4;
+        Galaxy.milkyway[0].material.size = scaleFrom.zoom;
+        Galaxy.milkyway[1].material.size = scaleFrom.zoom * 4;
       });
 
   } else {
-    this.Galaxy.milkyway[0].material.size = scaleTo;
-    this.Galaxy.milkyway[1].material.size = scaleTo * 4;
+    Galaxy.milkyway[0].material.size = scaleTo;
+    Galaxy.milkyway[1].material.size = scaleTo * 4;
   }
 
   //-- Enable 2D galaxy
-  this.Galaxy.milkyway2D.visible = this.Galaxy.milkyway[0].visible
-  this.Galaxy.infosShow();
+  Galaxy.milkyway2D.visible = Galaxy.milkyway[0].visible
+  Galaxy.infosShow();
 
 
-  //this.Galaxy.obj.scale.set(20,20,20);
+  //Galaxy.obj.scale.set(20,20,20);
 
-  this.Action.updateCursorSize(60);
+  Action.updateCursorSize(60);
 
   Ed3d.grid1H.hide();
   Ed3d.grid1K.hide();
@@ -1012,32 +994,30 @@ function disableFarView(scale, withAnim) {
   var scaleTo = { zoom: 64 };
   if (withAnim) {
 
-    var obj = this;
-
     //controls.enabled = false;
     Ed3d.tween = new TWEEN.Tween(scaleFrom, { override: true }).to(scaleTo, 500)
       .start()
       .onUpdate(function () {
-        obj.Galaxy.milkyway[0].material.size = scaleFrom.zoom;
-        obj.Galaxy.milkyway[1].material.size = scaleFrom.zoom;
+        Galaxy.milkyway[0].material.size = scaleFrom.zoom;
+        Galaxy.milkyway[1].material.size = scaleFrom.zoom;
       });
 
   } else {
-    this.Galaxy.milkyway[0].material.size = scaleTo;
-    this.Galaxy.milkyway[1].material.size = scaleTo;
+    Galaxy.milkyway[0].material.size = scaleTo;
+    Galaxy.milkyway[1].material.size = scaleTo;
   }
 
   //-- Disable 2D galaxy
-  this.Galaxy.milkyway2D.visible = false;
-  this.Galaxy.infosHide();
+  Galaxy.milkyway2D.visible = false;
+  Galaxy.infosHide();
 
   //-- Show element
-  this.Galaxy.milkyway[0].material.size = 16;
+  Galaxy.milkyway[0].material.size = 16;
 
   //--
   camera.scale.set(1, 1, 1);
 
-  this.Action.updateCursorSize(1);
+  Action.updateCursorSize(1);
 
   Ed3d.grid1H.show();
   Ed3d.grid1K.show();
@@ -1204,3 +1184,13 @@ window.__ed3dTestState = function () {
     dataComplete: Ed3d._testDataComplete === true
   };
 };
+
+// `routes` and `isFarView` are two more module-scope globals the component
+// files read as bare identifiers (route.class.js and hud.class.js index into
+// `routes`; grid.class.js and action.class.js branch on `isFarView`). Unlike
+// scene/camera/etc. they exist from module-evaluation time, not just after
+// initScene(), so main.js publishes them separately — see the comment there.
+export { Ed3d, Loader, animate, render, refresh3dMapSize, distance, distanceFromTarget, routes, isFarView };
+export function getEngineState() {
+  return { scene: scene, camera: camera, controls: controls, renderer: renderer, container: container };
+}

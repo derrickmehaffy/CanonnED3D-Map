@@ -123,3 +123,5 @@ var Heatmap = {
   }
 
 }
+
+export { Heatmap };

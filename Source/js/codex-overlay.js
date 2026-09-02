@@ -209,3 +209,5 @@ var CanonnCodexOverlay = (function () {
   return { loadIfNeeded: loadIfNeeded };
 
 })();
+
+export { CanonnCodexOverlay };

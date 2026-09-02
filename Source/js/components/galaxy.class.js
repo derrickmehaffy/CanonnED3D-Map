@@ -402,3 +402,5 @@ var Galaxy = {
   }
 
 }
+
+export { Galaxy };
