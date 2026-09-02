@@ -6,6 +6,7 @@ var Galaxy = {
   'obj' : null,
   'infos' : null,
   'milkyway' : [],
+  'previousBackdrop' : null,
   'milkyway2D' : null,
   'backActive' : true,
   'colors' : [],
@@ -192,6 +193,42 @@ var Galaxy = {
   /**
    * Appli opacity for Milky Way info based on distance
    */
+
+  /**
+   * Fade the backdrop back as the view widens.
+   *
+   * The Milky Way is ~26,000 additive sprites at size 500, and once the camera
+   * pulls out it covers the whole frame — at which point the map's own systems
+   * are competing with it and the clusters stop reading as clusters. Up close
+   * the backdrop is context and belongs at full strength; far out it should be
+   * background. Opacity is the right lever because additive blending makes it
+   * directly proportional to what the sprites contribute.
+   */
+
+  'backdropUpdateCallback' : function(scale) {
+
+    if (this.milkyway == null || !this.milkyway.length) return;
+
+    var t = (scale - 8) / 40;
+    if (t < 0) t = 0;
+    if (t > 1) t = 1;
+    var opacity = 1 - (0.75 * t);
+
+    if (this.previousBackdrop === opacity) return;
+    this.previousBackdrop = opacity;
+
+    for (var i = 0; i < this.milkyway.length; i++) {
+      var m = this.milkyway[i];
+      if (m && m.material) m.material.opacity = opacity;
+    }
+
+    //-- The 2D galaxy floor is the other half of the wash; without it the
+    //-- particles thin out but the grey stays.
+    if (this.milkyway2D && this.milkyway2D.material) {
+      this.milkyway2D.material.opacity = 0.4 * opacity;
+    }
+
+  },
 
   'infosUpdateCallback' : function(scale) {
 

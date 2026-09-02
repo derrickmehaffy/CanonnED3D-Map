@@ -341,3 +341,30 @@ input[type=range]{accent-color:var(--amber)}
 .sysrow .nm{font-family:var(--cond);font-size:12px;letter-spacing:.01em}
 .sysrow .ly{width:46px;text-align:right;flex:none}
 .sysrow .wedge{max-width:26px;overflow:hidden}
+
+/* ── systems panel: sticky controls, paging, back to top ─────────────────── */
+
+/* The filter and sort buttons stay put while the list scrolls; -13px cancels
+   the panel's own padding so the header sits flush at the top. */
+.syshead{position:sticky;top:-13px;z-index:3;background:var(--panel);
+  padding-top:13px;margin:-13px -13px 0;padding-left:13px;padding-right:13px;
+  border-bottom:1px solid var(--rule);padding-bottom:9px}
+.sysmore{font-family:var(--mono);font-size:9.5px;color:var(--dimmer);
+  padding:8px 13px 2px;text-align:center}
+.totop{position:sticky;bottom:6px;margin:6px auto 0;display:none;
+  font-family:var(--cond);font-size:11px;font-weight:600;letter-spacing:.06em;
+  padding:5px 12px;background:var(--panel-2);color:var(--dim);
+  border:1px solid var(--rule);cursor:pointer;z-index:4}
+.totop.show{display:block}
+.totop:hover{color:var(--amber);border-color:var(--amber)}
+
+/* ── resizable panel ─────────────────────────────────────────────────────── */
+
+.side{position:relative}
+.side-grip{position:absolute;top:0;right:-3px;width:7px;height:100%;
+  cursor:col-resize;z-index:25;touch-action:none}
+.side-grip::after{content:'';position:absolute;top:0;right:3px;width:1px;height:100%;
+  background:transparent;transition:background .12s ease}
+.side-grip:hover::after{background:var(--amber)}
+body.resizing{cursor:col-resize;user-select:none}
+body.resizing .side-grip::after{background:var(--amber)}

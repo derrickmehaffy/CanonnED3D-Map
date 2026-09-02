@@ -1068,6 +1068,7 @@ function animate(time) {
   Action.sizeOnScroll(scale);
 
   Galaxy.infosUpdateCallback(scale);
+  Galaxy.backdropUpdateCallback(scale);
 
   if (scale > 25) {
 

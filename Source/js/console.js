@@ -388,6 +388,28 @@
 
   function catName(i) { return (CATS[i] && CATS[i].name) || ''; }
 
+  /* Preferences live in localStorage: they are per-reader conveniences, and
+     the point of them is that they survive switching maps. Every access is
+     guarded — a private window can make even reading throw, and losing the
+     map over a remembered panel width would be a poor trade. */
+  var STORE = 'canonn.console.';
+
+  function remember(k, v) { try { localStorage.setItem(STORE + k, v); } catch (e) {} }
+  function recall(k, dflt) {
+    try {
+      var v = localStorage.getItem(STORE + k);
+      return v === null ? (dflt === undefined ? null : dflt) : v;
+    } catch (e) { return dflt === undefined ? null : dflt; }
+  }
+  function recallBool(k, dflt) {
+    var v = recall(k);
+    return v === null || v === '' ? dflt : v === '1';
+  }
+  function recallNum(k, dflt) {
+    var v = parseFloat(recall(k));
+    return isNaN(v) ? dflt : v;
+  }
+
   function setFeed(mode, txt) {
     $('feed').className = 'feed ' + mode;
     $('feedtxt').textContent = txt;
@@ -491,7 +513,7 @@
      every page. Points are grouped by name because a system holding several
      sites is several points. */
   var _sysCache = null, _sysCacheLen = -1;
-  function invalidateSystems() { _sysCache = null; _sysCacheLen = -1; }
+  function invalidateSystems() { _sysCache = null; _sysCacheLen = -1; sysRowsCache = null; }
   function SYSLIST() {
     if (!window.System || !System.points || !System.points.length) return [];
     // Ed3d keeps appending points as batches arrive, so cache against the
@@ -733,6 +755,12 @@
                    : panel === 'camera'  ? panelCamera()
                    : panel === 'routes'  ? panelRoutes()
                    : panelDisplay();
+    // renderPanel replaces the panel's contents, so the resize grip — which
+    // lives in the panel so it can sit on its edge — has to be put back.
+    if (typeof sideGrip !== 'undefined' && sideGrip && !sideGrip.parentNode) {
+      host.appendChild(sideGrip);
+    }
+    if (panel === 'systems') fillSysList();
     if (panel === 'layers' && CFG.templates) showTemplate(hoverType);
     if (panel === 'camera') syncCamera();
     if (panel === 'display') syncDisplay();
@@ -740,7 +768,7 @@
     if (panel === 'systems') {
       var f = $('sysfilter');
       if (f) {
-        f.oninput = function () { sysQuery = this.value; renderPanel(); $('sysfilter').focus(); };
+        f.oninput = function () { sysQuery = this.value; resetSysList(); renderPanel(); $('sysfilter').focus(); };
         if (sysQuery) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
       }
       // Only chase the selection when it has actually changed. The panel
@@ -774,10 +802,12 @@
     var p = b.dataset.p;
     if (p === panel && !$('side').classList.contains('hidden')) {
       $('side').classList.add('hidden');
+      remember('collapsed', '1');
       b.classList.remove('on');
     } else {
       panel = p;
       $('side').classList.remove('hidden');
+      remember('collapsed', '');
       Array.prototype.forEach.call(this.querySelectorAll('button'), function (x) {
         x.classList.toggle('on', x === b);
       });
@@ -804,6 +834,7 @@
       return;
     }
     var srt = e.target.closest('[data-sort]');
+    if (srt) resetSysList();
     if (srt) { sysSort = srt.dataset.sort; renderPanel(); return; }
     var cam = e.target.closest('[data-cam]');
     if (cam) { doCamera(cam.dataset.cam); return; }
@@ -871,16 +902,19 @@
     }
     if (e.target.id === 'sizerange') {
       sysSize = +e.target.value;
+      remember('sysSize', sysSize);
       applySize();
       $('szval').textContent = sysSize;
     }
     if (e.target.id === 'exprange' && window.PostFX) {
       var v = +e.target.value / 100;
+      remember('exposure', v);
       PostFX.setExposure(v);
       $('expval').textContent = v.toFixed(2);
     }
     if (e.target.id === 'bloomrange' && window.PostFX) {
       var b = +e.target.value / 100;
+      remember('bloom', b);
       PostFX.setBloom(b);
       $('bloomval').textContent = b.toFixed(2);
     }
@@ -891,8 +925,13 @@
      threshold calls enableFarView/disableFarView, which reach in and set grid
      visibility, galaxy labels and the starfield themselves. So the panel keeps
      its own intent and re-asserts it on a timer rather than setting once. */
-  var disp = { grid: true, galaxy: true, stars: true, hdr: false };
-  var sysSize = 20;                       // flares got huge on zoom-out at 64
+  var disp = {
+    grid:   recallBool('disp.grid', true),
+    galaxy: recallBool('disp.galaxy', true),
+    stars:  recallBool('disp.stars', true),
+    hdr:    recallBool('disp.hdr', false)
+  };
+  var sysSize = recallNum('sysSize', 20);  // flares got huge on zoom-out at 64
 
   function applyDisplay() {
     if (typeof Ed3d === 'undefined' || !Ed3d.grid1H) return;
@@ -960,6 +999,7 @@
   }
   function doDisplay(k, state) {
     disp[k] = state;
+    remember('disp.' + k, state ? '1' : '0');
     if (k === 'hdr' && window.PostFX) PostFX.toggle(state);
     applyDisplay(); syncDisplay();
   }
@@ -1131,7 +1171,20 @@
     });
   }
 
-  function panelSystems() {
+  /* The systems panel.
+
+     Rendered in pages rather than all at once. Guardian Ruins is 212 rows, but
+     codex.html finishes at nearly 35,000 — building that many nodes locked the
+     panel up for seconds every time it was opened or filtered. Rows are
+     appended as the reader scrolls instead, which keeps opening the panel
+     instant whatever the map. */
+
+  var SYS_PAGE = 80;
+  var sysLimit = SYS_PAGE;
+  var sysRowsCache = null;
+
+  function sysRows() {
+    if (sysRowsCache) return sysRowsCache;
     var q = sysQuery.toLowerCase();
     var rows = visibleSystems().filter(function (r) {
       return !q || r.n.toLowerCase().indexOf(q) > -1;
@@ -1142,34 +1195,58 @@
     rows.sort(sysSort === 'name'
       ? function (a, b) { return a.n.localeCompare(b.n, undefined, { numeric: true }); }
       : function (a, b) { return a._ly - b._ly; });
+    sysRowsCache = rows;
+    return rows;
+  }
 
-    var h = '<div class="s-t">Systems on this map</div>' +
+  function resetSysList() { sysRowsCache = null; sysLimit = SYS_PAGE; }
+
+  function sysRowHtml(r) {
+    var types = {}; r.s.forEach(function (x) { types[x[0]] = 1; });
+    var wedge = Object.keys(types).map(function (t) {
+      return '<i style="background:' + col(+t) + '"></i>';
+    }).join('');
+    return '<div class="sysrow' + (sel && sel.n === r.n ? ' on' : '') + '" data-sys="' + esc(r.n) + '" ' +
+      'role="button" tabindex="0" title="' + esc(r.n) + ' — ' + r.s.length + ' ' + CFG.unit +
+      (r.s.length > 1 ? 's' : '') + '">' +
+      '<span class="wedge">' + wedge + '</span>' +
+      '<span class="nm">' + hl(r.n, sysQuery) + '</span>' +
+      '<span class="ly">' + r._ly.toLocaleString() + '</span></div>';
+  }
+
+  /** Append the next page of rows; called on first render and while scrolling. */
+  function fillSysList() {
+    var list = document.querySelector('.syslist');
+    if (!list) return;
+    var rows = sysRows();
+    var have = list.querySelectorAll('.sysrow').length;
+    var want = Math.min(sysLimit, rows.length);
+    if (have >= want) return;
+    var html = '';
+    for (var i = have; i < want; i++) html += sysRowHtml(rows[i]);
+    list.insertAdjacentHTML('beforeend', html);
+    var more = $('sysmore');
+    if (more) more.textContent = want < rows.length
+      ? 'Showing ' + want + ' of ' + rows.length + ' — scroll for more' : '';
+  }
+
+  function panelSystems() {
+    var rows = sysRows();
+    return '<div class="syshead">' +
+      '<div class="s-t">Systems on this map</div>' +
       '<div class="s-sub"><b>' + rows.length + '</b> of ' + SYSLIST().length +
-      (q ? ' matching' : ' shown') + '</div>' +
+      (sysQuery ? ' matching' : ' shown') + '</div>' +
       '<input class="sysfilter" id="sysfilter" type="text" placeholder="Filter by name…" ' +
       'autocomplete="off" spellcheck="false" value="' + esc(sysQuery) + '">' +
       '<div class="syssort">' +
       '<button data-sort="name"' + (sysSort === 'name' ? ' class="on"' : '') + '>Name</button>' +
       '<button data-sort="dist"' + (sysSort === 'dist' ? ' class="on"' : '') + '>Distance</button>' +
-      '</div><div class="syslist">';
-
-    if (!rows.length) {
-      h += '<div class="note" style="margin:10px 13px">No system matches. Clear the filter, ' +
-        'or re-enable a type in the Layers panel.</div>';
-    }
-    rows.forEach(function (r) {
-      var types = {}; r.s.forEach(function (x) { types[x[0]] = 1; });
-      var wedge = Object.keys(types).map(function (t) {
-        return '<i style="background:' + col(+t) + '"></i>';
-      }).join('');
-      h += '<div class="sysrow' + (sel && sel.n === r.n ? ' on' : '') + '" data-sys="' + esc(r.n) + '" ' +
-        'role="button" tabindex="0" title="' + esc(r.n) + ' — ' + r.s.length + ' ' + CFG.unit +
-        (r.s.length > 1 ? 's' : '') + '">' +
-        '<span class="wedge">' + wedge + '</span>' +
-        '<span class="nm">' + hl(r.n, sysQuery) + '</span>' +
-        '<span class="ly">' + r._ly.toLocaleString() + '</span></div>';
-    });
-    return h + '</div>';
+      '</div></div>' +
+      (rows.length ? '' : '<div class="note" style="margin:10px 13px">No system matches. Clear the ' +
+        'filter, or re-enable a type in the Layers panel.</div>') +
+      '<div class="syslist"></div>' +
+      '<div class="sysmore" id="sysmore"></div>' +
+      '<button class="totop" id="systotop" title="Back to the top">&#8593; Top</button>';
   }
 
   /* ── map index: the browsable alternative to searching ────────────────── */
@@ -1329,6 +1406,74 @@
     else if (e.key === 'Escape') { closePal(); $('idxscrim').classList.remove('open'); }
   });
 
+  /* ── side panel: paging, resize and collapse ──────────────────────────── */
+
+  var side = $('side');
+  var sideGrip = null;
+
+  side.addEventListener('scroll', function () {
+    var top = $('systotop');
+    if (top) top.classList.toggle('show', side.scrollTop > 400);
+    if (panel !== 'systems') return;
+    // Within a screen and a half of the end, put the next page in.
+    if (side.scrollTop + side.clientHeight > side.scrollHeight - 600) {
+      var rows = sysRows();
+      if (sysLimit < rows.length) { sysLimit += SYS_PAGE; fillSysList(); }
+    }
+  });
+
+  side.addEventListener('click', function (e) {
+    if (e.target.closest('#systotop')) side.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  /* Width is a preference, so it is remembered per browser. Clamped on the way
+     in as well as on the way out: a stored value from a wider window should not
+     be able to leave the map with no room on a narrow one. */
+  function setSideWidth(px) {
+    var max = Math.max(260, Math.min(620, window.innerWidth - 420));
+    var w = Math.max(240, Math.min(max, Math.round(px)));
+    side.style.width = w + 'px';
+    return w;
+  }
+
+  var storedWidth = parseInt(recall('sideWidth'), 10);
+  if (storedWidth) setSideWidth(storedWidth);
+
+  //-- The rail stays put; only the panel beside it collapses.
+  if (recall('collapsed') === '1') {
+    side.classList.add('hidden');
+    var active = document.querySelector('.rail button.on');
+    if (active) active.classList.remove('on');
+  }
+
+  var grip = sideGrip = document.createElement('div');
+  grip.className = 'side-grip';
+  grip.title = 'Drag to resize · double-click to reset';
+  side.appendChild(grip);
+
+  grip.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    grip.setPointerCapture(e.pointerId);
+    document.body.classList.add('resizing');
+    var startX = e.clientX, startW = side.getBoundingClientRect().width;
+    function move(ev) { setSideWidth(startW + (ev.clientX - startX)); }
+    function up() {
+      grip.removeEventListener('pointermove', move);
+      grip.removeEventListener('pointerup', up);
+      document.body.classList.remove('resizing');
+      remember('sideWidth', Math.round(side.getBoundingClientRect().width));
+      if (typeof refresh3dMapSize === 'function') refresh3dMapSize();
+    }
+    grip.addEventListener('pointermove', move);
+    grip.addEventListener('pointerup', up);
+  });
+
+  grip.addEventListener('dblclick', function () {
+    side.style.width = '';
+    remember('sideWidth', '');
+    if (typeof refresh3dMapSize === 'function') refresh3dMapSize();
+  });
+
   /* ── bootstrap ──────────────────────────────────────────────────────────
      The page's own MapData-*.js calls Ed3d.init(), exactly as it always has;
      the console never drives the load. It waits for the engine to publish its
@@ -1371,6 +1516,13 @@
 
     // Open framed on the data. Pages inherit a fixed cameraPos, which on
     // several maps starts so far out the systems are invisible.
-    setTimeout(function () { frameData(); applySize(); applyDisplay(); syncDisplay(); }, 300);
+    setTimeout(function () {
+      if (window.PostFX) {
+        PostFX.setExposure(recallNum('exposure', PostFX.exposure));
+        PostFX.setBloom(recallNum('bloom', PostFX.strength));
+        if (disp.hdr) PostFX.enable();
+      }
+      frameData(); applySize(); applyDisplay(); syncDisplay();
+    }, 300);
   })();
 })();
