@@ -4,7 +4,6 @@
 :root{
   --void:#05070A; --panel:#0C1116; --panel-2:#111820; --rule:#1B242E;
   --amber:#FF9D00; --ion:#4DE3E1; --text:#CAD4DC; --dim:#6B7986; --dimmer:#414E5A;
-  --alpha:#FF9D00; --beta:#4DE3E1; --gamma:#B98CFF;
   --sans:'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif;
   --cond:'IBM Plex Sans Condensed','IBM Plex Sans',ui-sans-serif,sans-serif;
   --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
@@ -15,10 +14,8 @@ body{margin:0;background:var(--void);color:var(--text);font-family:var(--sans);
   font-size:14px;overflow:hidden;-webkit-font-smoothing:antialiased}
 :focus-visible{outline:2px solid var(--amber);outline-offset:2px}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
-
 .app{display:grid;grid-template-rows:44px 1fr 30px;height:100vh}
 
-/* ── top bar ─────────────────────────────────────────── */
 .top{display:flex;align-items:center;gap:12px;padding:0 12px;
   border-bottom:1px solid var(--rule);background:var(--panel)}
 .top .mark{width:19px;height:19px;flex:none}
@@ -26,70 +23,73 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
   padding:5px 10px;font-family:var(--cond);font-size:13px;font-weight:600}
 .switch:hover{border-color:var(--dim)}
 .switch .ch{color:var(--dimmer);font-size:9px}
-.find{flex:1;max-width:430px;display:flex;align-items:center;gap:9px;
+.find{flex:1;max-width:420px;display:flex;align-items:center;gap:9px;
   border:1px solid var(--rule);padding:5px 11px;color:var(--dimmer);
   font-family:var(--mono);font-size:12px}
 .find:hover{border-color:var(--dim)}
 .find .k{margin-left:auto;border:1px solid var(--rule);padding:1px 5px;font-size:9.5px}
 .top .sp{flex:1}
-.feed{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;
-  color:var(--dimmer)}
+.feed{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;color:var(--dimmer)}
 .feed .d{width:6px;height:6px;border-radius:50%;background:var(--dimmer)}
 .feed.live .d{background:#5FD08A;box-shadow:0 0 6px #5FD08A}
-.feed.snap .d{background:var(--amber)}
+.feed.snapshot .d{background:var(--amber)}
 .tools-btn{display:flex;align-items:center;gap:7px;border:1px solid var(--rule);
   padding:5px 10px;font-family:var(--cond);font-size:12px;color:var(--dim)}
 .tools-btn:hover{border-color:var(--ion);color:var(--ion)}
 
-/* ── body ────────────────────────────────────────────── */
 .mid{display:flex;min-height:0;position:relative}
 .rail{width:44px;flex:none;background:var(--panel);border-right:1px solid var(--rule);
   display:flex;flex-direction:column;align-items:center;padding:7px 0;gap:2px}
-.rail button{width:31px;height:31px;display:grid;place-items:center;color:var(--dim);
-  font-size:14px;border-radius:1px}
+.rail button{width:31px;height:31px;display:grid;place-items:center;color:var(--dim);font-size:14px}
 .rail button:hover{color:var(--text);background:var(--panel-2)}
 .rail button.on{color:var(--amber);background:var(--panel-2);box-shadow:inset 2px 0 0 var(--amber)}
-
-.side{width:252px;flex:none;background:var(--panel);border-right:1px solid var(--rule);
+.side{width:256px;flex:none;background:var(--panel);border-right:1px solid var(--rule);
   overflow-y:auto;padding:13px}
 .side.hidden{display:none}
 .s-t{font-family:var(--cond);font-size:10px;letter-spacing:.15em;text-transform:uppercase;
-  color:var(--dimmer);margin-bottom:10px}
-.s-t .badge{color:var(--amber)}
-
+  color:var(--dimmer);margin-bottom:4px}
+.s-sub{font-family:var(--mono);font-size:10px;color:var(--dimmer);margin-bottom:11px}
+.s-sub b{color:var(--amber);font-weight:500}
 .layer{display:flex;align-items:center;gap:9px;padding:6px 5px;cursor:pointer;
   border-left:2px solid transparent}
 .layer:hover{background:var(--panel-2)}
 .layer.sel{background:var(--panel-2);border-left-color:var(--amber)}
 .layer .sw{width:10px;height:10px;flex:none;border-radius:1px}
 .layer .nm{flex:1;font-family:var(--mono);font-size:12px}
-.layer .ct{font-family:var(--mono);font-size:10.5px;color:var(--dimmer);
-  font-variant-numeric:tabular-nums}
+.layer .ct{font-family:var(--mono);font-size:10.5px;color:var(--dimmer);font-variant-numeric:tabular-nums}
 .layer.off{opacity:.4}
 .layer.off .sw{background:transparent!important;box-shadow:inset 0 0 0 1px var(--dim)}
-
-.tmpl{margin-top:14px;border:1px solid var(--rule);background:#080C10}
-.tmpl-h{padding:8px 10px;border-bottom:1px solid var(--rule);
-  font-family:var(--cond);font-size:10px;letter-spacing:.13em;text-transform:uppercase;
-  color:var(--dimmer);display:flex;justify-content:space-between;align-items:center}
+.mixnote{margin-top:11px;padding:9px 10px;border:1px solid var(--rule);background:#080C10;
+  font-family:var(--mono);font-size:10px;color:var(--dimmer);line-height:1.6}
+.mixnote b{color:var(--text);font-weight:500}
+.tmpl{margin-top:12px;border:1px solid var(--rule);background:#080C10}
+.tmpl-h{padding:8px 10px;border-bottom:1px solid var(--rule);font-family:var(--cond);
+  font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--dimmer);
+  display:flex;justify-content:space-between;align-items:center}
 .tmpl-h b{color:var(--amber);font-weight:600}
 .tmpl img{display:block;width:100%;height:auto;background:#0C1116}
 .tmpl-f{padding:7px 10px;font-family:var(--mono);font-size:10px;color:var(--dimmer);
   border-top:1px solid var(--rule);line-height:1.5}
 
-/* ── canvas ──────────────────────────────────────────── */
 .stage{flex:1;position:relative;min-width:0;background:var(--void)}
-#plot{display:block;width:100%;height:100%;cursor:crosshair}
+#plot{display:block;width:100%;height:100%}
 .hint{position:absolute;left:14px;bottom:12px;font-family:var(--mono);font-size:10.5px;
   color:var(--dimmer);pointer-events:none;line-height:1.7}
+.viewmode{position:absolute;right:12px;top:12px;display:flex;border:1px solid var(--rule);
+  background:var(--panel);z-index:5}
+.viewmode button{padding:5px 12px;font-family:var(--cond);font-size:11.5px;font-weight:600;
+  letter-spacing:.06em;color:var(--dim)}
+.viewmode button + button{border-left:1px solid var(--rule)}
+.viewmode button.on{background:var(--amber);color:#0B0700}
+.viewmode button:not(.on):hover{color:var(--text)}
 .zoomers{position:absolute;right:12px;bottom:12px;display:flex;flex-direction:column;gap:4px}
 .zoomers button{width:28px;height:28px;border:1px solid var(--rule);background:var(--panel);
   color:var(--dim);display:grid;place-items:center;font-size:14px}
 .zoomers button:hover{border-color:var(--dim);color:var(--text)}
 
-/* ── system card ─────────────────────────────────────── */
-.card{position:absolute;right:12px;top:12px;width:268px;background:var(--panel);
-  border:1px solid var(--rule);box-shadow:0 8px 28px rgba(0,0,0,.6)}
+.card{position:absolute;right:12px;top:46px;width:276px;background:var(--panel);
+  border:1px solid var(--rule);box-shadow:0 8px 28px rgba(0,0,0,.6);
+  max-height:calc(100% - 168px);overflow-y:auto}
 .card.hidden{display:none}
 .c-h{padding:11px 13px;border-bottom:1px solid var(--rule);display:flex;
   justify-content:space-between;align-items:flex-start;gap:8px}
@@ -98,28 +98,33 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .c-h .x:hover{color:var(--text)}
 .c-meta{padding:9px 13px;font-family:var(--mono);font-size:10.5px;color:var(--dimmer);
   line-height:1.7;border-bottom:1px solid var(--rule)}
-.c-type{display:flex;align-items:center;gap:8px;padding:10px 13px}
-.c-type .sw{width:11px;height:11px;border-radius:1px}
-.c-type .lb{font-family:var(--cond);font-size:13px;font-weight:600}
-.c-tmpl{padding:0 13px 11px}
+.c-sec{padding:10px 13px 4px;font-family:var(--cond);font-size:10px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--dimmer);display:flex;justify-content:space-between;gap:8px}
+.c-sec b{color:var(--amber);font-weight:600}
+.site{display:flex;align-items:center;gap:9px;padding:6px 13px;cursor:pointer;
+  border-left:2px solid transparent}
+.site:hover{background:var(--panel-2)}
+.site.on{background:var(--panel-2);border-left-color:var(--amber)}
+.site .sw{width:9px;height:9px;flex:none;border-radius:1px}
+.site .ty{font-family:var(--cond);font-size:12.5px;font-weight:600;min-width:46px}
+.site .bd{font-family:var(--mono);font-size:10.5px;color:var(--dimmer);margin-left:auto}
+.c-tmpl{padding:9px 13px 11px}
 .c-tmpl img{display:block;width:100%;border:1px solid var(--rule);background:#080C10}
+.c-tmpl .cap{font-family:var(--mono);font-size:10px;color:var(--dimmer);margin-top:6px;line-height:1.5}
 .c-acts{padding:0 13px 13px;display:grid;grid-template-columns:1fr 1fr;gap:4px}
 .c-acts a,.c-acts button{display:flex;align-items:center;gap:6px;padding:6px 9px;
   border:1px solid var(--rule);font-size:11.5px;color:var(--text);text-decoration:none}
 .c-acts a:hover,.c-acts button:hover{border-color:var(--ion);color:var(--ion)}
 .c-acts .ax{margin-left:auto;color:var(--dimmer);font-size:9px}
 
-/* ── status strip ────────────────────────────────────── */
 .strip{display:flex;align-items:stretch;border-top:1px solid var(--rule);
   background:var(--panel);font-family:var(--mono);font-size:11px}
-.strip .cell{padding:0 13px;display:flex;align-items:center;gap:7px;
-  border-right:1px solid var(--rule)}
+.strip .cell{padding:0 13px;display:flex;align-items:center;gap:7px;border-right:1px solid var(--rule)}
 .strip .cell.end{border-right:0;margin-left:auto}
 .strip .lb{color:var(--dimmer);font-size:9px;letter-spacing:.09em;text-transform:uppercase}
 .strip .vl{color:var(--text);font-variant-numeric:tabular-nums}
 .strip .vl.ion{color:var(--ion)}
 
-/* ── palette ─────────────────────────────────────────── */
 .scrim{position:fixed;inset:0;background:rgba(3,5,8,.72);display:none;
   align-items:flex-start;justify-content:center;padding-top:12vh;z-index:50}
 .scrim.open{display:flex}
@@ -153,7 +158,6 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 </style>
 
 <div class="app">
-  <!-- top bar -->
   <div class="top">
     <svg class="mark" viewBox="0 0 40 40" aria-hidden="true">
       <ellipse cx="20" cy="20" rx="17" ry="7" fill="none" stroke="#FF9D00" stroke-width="2.4"/>
@@ -161,26 +165,27 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
       <ellipse cx="20" cy="20" rx="17" ry="7" fill="none" stroke="#FF9D00" stroke-width="2.4" transform="rotate(120 20 20)"/>
       <circle cx="20" cy="20" r="5" fill="#FF9D00"/>
     </svg>
-    <button class="switch" id="switcher">Guardian Ruins <span class="ch">▾</span></button>
-    <button class="find" id="findbtn">Find anything <span class="k">⌘K</span></button>
+    <button class="switch" id="switcher">Guardian Ruins <span class="ch">&#9662;</span></button>
+    <button class="find" id="findbtn">Find anything <span class="k">&#8984;K</span></button>
     <span class="sp"></span>
-    <span class="feed" id="feed"><span class="d"></span><span id="feedtxt">connecting…</span></span>
-    <button class="tools-btn" id="toolsbtn">⊞ Canonn tools</button>
+    <span class="feed" id="feed"><span class="d"></span><span id="feedtxt">connecting&#8230;</span></span>
+    <button class="tools-btn" id="toolsbtn">&#8862; Canonn tools</button>
   </div>
 
-  <!-- middle -->
   <div class="mid">
     <div class="rail">
-      <button class="on" id="r-layers" title="Site types" aria-label="Site types">☰</button>
-      <button id="r-cam" title="Camera" aria-label="Camera">⌖</button>
-      <button id="r-routes" title="Routes and journals" aria-label="Routes and journals">⤳</button>
-      <button id="r-disp" title="Display" aria-label="Display">◐</button>
+      <button class="on" id="r-layers" title="Site types" aria-label="Site types">&#9776;</button>
+      <button id="r-cam" title="Camera" aria-label="Camera">&#8982;</button>
+      <button id="r-routes" title="Routes and journals" aria-label="Routes and journals">&#10547;</button>
+      <button id="r-disp" title="Display" aria-label="Display">&#9680;</button>
     </div>
 
     <aside class="side" id="side">
-      <div class="s-t">Site types <span class="badge" id="totct"></span></div>
+      <div class="s-t">Site types</div>
+      <div class="s-sub" id="totct"></div>
       <div id="layers"></div>
-      <div class="tmpl" id="tmpl">
+      <div class="mixnote" id="mixnote"></div>
+      <div class="tmpl">
         <div class="tmpl-h"><span>Template map</span><b id="tmpl-n">Alpha</b></div>
         <img id="tmpl-img" alt="Guardian ruins site template map">
         <div class="tmpl-f" id="tmpl-f"></div>
@@ -189,35 +194,35 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 
     <div class="stage">
       <canvas id="plot"></canvas>
-      <div class="hint">drag to pan · scroll to zoom · click a site<br>galactic plane — X / Z</div>
+      <div class="viewmode" role="group" aria-label="View mode">
+        <button id="v3d" class="on" aria-pressed="true">3D</button>
+        <button id="v2d" aria-pressed="false">2D</button>
+      </div>
+      <div class="hint" id="hint"></div>
       <div class="zoomers">
         <button id="zin" aria-label="Zoom in">+</button>
-        <button id="zout" aria-label="Zoom out">−</button>
-        <button id="zfit" aria-label="Fit all" title="Fit all">⊙</button>
+        <button id="zout" aria-label="Zoom out">&#8722;</button>
+        <button id="zfit" title="Fit all (incl. outliers)" aria-label="Fit">&#9673;</button>
       </div>
       <div class="card hidden" id="card"></div>
     </div>
   </div>
 
-  <!-- status strip -->
   <div class="strip">
-    <div class="cell"><span class="lb">Cursor</span><span class="vl" id="st-pos">—</span></div>
-    <div class="cell"><span class="lb">Sol</span><span class="vl" id="st-sol">—</span></div>
-    <div class="cell"><span class="lb">Shown</span><span class="vl ion" id="st-shown">—</span></div>
+    <div class="cell"><span class="lb">Cursor</span><span class="vl" id="st-pos">&#8212;</span></div>
+    <div class="cell"><span class="lb">Sol</span><span class="vl" id="st-sol">&#8212;</span></div>
+    <div class="cell"><span class="lb">Shown</span><span class="vl ion" id="st-shown">&#8212;</span></div>
     <div class="cell end"><span class="lb">Map</span><span class="vl">Guardian Ruins</span></div>
   </div>
 </div>
 
-<!-- command palette -->
 <div class="scrim" id="scrim">
   <div class="pal" role="dialog" aria-label="Find anything">
-    <div class="pal-in">
-      <span class="cr">&gt;</span>
-      <input id="pq" type="text" placeholder="Search sites, maps and Canonn tools…"
-             autocomplete="off" spellcheck="false" aria-label="Search">
-    </div>
+    <div class="pal-in"><span class="cr">&gt;</span>
+      <input id="pq" type="text" placeholder="Search systems, maps and Canonn tools&#8230;"
+             autocomplete="off" spellcheck="false" aria-label="Search"></div>
     <div class="pal-res" id="pres" role="listbox"></div>
-    <div class="pal-foot"><span>↑↓ move</span><span>↵ open</span><span>esc close</span></div>
+    <div class="pal-foot"><span>&#8593;&#8595; move</span><span>&#8629; open</span><span>esc close</span></div>
   </div>
 </div>
 
@@ -228,318 +233,366 @@ var SNAPSHOT = [["Synuefe XR-H d11-102",1,357.3,-49.3,-74.8,"1 B"],["IC 2391 Sec
 <script>
 (function(){
 "use strict";
-var TYPES = ['Alpha','Beta','Gamma','Unknown'];
-var TCOL  = ['#FF9D00','#4DE3E1','#B98CFF','#6B7986'];
-var TNOTE = {
-  Alpha:'Six-pointed plan. Obelisks around a raised central dais.',
-  Beta:'Two long approach corridors meeting at a central spire.',
-  Gamma:'Broad triangular plan with the widest obelisk spread.'
-};
-var SITES = [], shown = [], on = [true,true,true,true], sel = null, hoverType = 'Alpha';
+var TYPES=['Alpha','Beta','Gamma','Unknown'];
+var TCOL =['#FF9D00','#4DE3E1','#B98CFF','#6B7986'];
+var TNOTE={Alpha:'Six-pointed plan. Obelisks around a raised central dais.',
+           Beta:'Two long approach corridors meeting at a central spire.',
+           Gamma:'Broad triangular plan with the widest obelisk spread.'};
 
-/* ── data: live first, embedded snapshot as fallback ── */
-var SRC = 'https://storage.googleapis.com/canonn-downloads/guardian_ruins.json';
-function setFeed(mode, txt){
-  var f = document.getElementById('feed');
-  f.className = 'feed ' + mode;
-  document.getElementById('feedtxt').textContent = txt;
-}
-function fromRows(rows){
-  return rows.map(function(r){
-    return {name:r[0], t:r[1], x:r[2], y:r[3], z:r[4], body:r[5]};
+/* A system can hold several ruin sites, often of different types. In this data
+   198 of 212 systems hold more than one, and 166 of those mix types. So the unit
+   plotted is the SYSTEM, and each carries its list of sites. */
+var SYS=[], shown=[], on=[true,true,true,true], sel=null, selSite=0, hoverType='Alpha', nSites=0;
+
+function group(recs){
+  var by={}, out=[];
+  recs.forEach(function(r){
+    var k=r.name+'|'+r.x+'|'+r.y+'|'+r.z;
+    if(!by[k]){ by[k]={name:r.name,x:r.x,y:r.y,z:r.z,sites:[],counts:[0,0,0,0]}; out.push(by[k]); }
+    by[k].sites.push({t:r.t,body:r.body});
+    by[k].counts[r.t]++;
   });
+  out.forEach(function(s){
+    s.sites.sort(function(a,b){ return a.t-b.t || String(a.body).localeCompare(String(b.body)); });
+    s.types=[0,1,2,3].filter(function(i){ return s.counts[i]>0; });
+  });
+  return out;
 }
-function fromLive(data){
-  var out = [];
-  for (var i=0;i<data.length;i++){
-    var s = data[i], n = (s['System Name']||'').trim();
-    if (!n) continue;
-    var x = parseFloat(String(s.x).replace(',','')), y = parseFloat(s.y), z = parseFloat(s.z);
-    if (isNaN(x)||isNaN(y)||isNaN(z)) continue;
-    var ti = TYPES.indexOf(s['Site Type']); if (ti < 0) ti = 3;
-    out.push({name:n, t:ti, x:x, y:y, z:z, body:(s['Body Name']||'').trim()});
+
+var SRC='https://storage.googleapis.com/canonn-downloads/guardian_ruins.json';
+function setFeed(m,t){ document.getElementById('feed').className='feed '+m;
+  document.getElementById('feedtxt').textContent=t; }
+function fromRows(rows){ return rows.map(function(r){
+  return {name:r[0],t:r[1],x:r[2],y:r[3],z:r[4],body:r[5]}; }); }
+function fromLive(d){
+  var out=[];
+  for(var i=0;i<d.length;i++){
+    var s=d[i], n=(s['System Name']||'').trim(); if(!n) continue;
+    var x=parseFloat(String(s.x).replace(',','')), y=parseFloat(s.y), z=parseFloat(s.z);
+    if(isNaN(x)||isNaN(y)||isNaN(z)) continue;
+    var ti=TYPES.indexOf(s['Site Type']); if(ti<0) ti=3;
+    out.push({name:n,t:ti,x:x,y:y,z:z,body:(s['Body Name']||'').trim()});
   }
   return out;
 }
-function boot(sites, mode, note){
-  SITES = sites; setFeed(mode, note);
-  drawLayers(); fit(); apply();
+function boot(recs,mode){
+  nSites=recs.length; SYS=group(recs);
+  setFeed(mode, mode+' &#183; '+SYS.length+' systems');
+  document.getElementById('feedtxt').textContent = mode+' · '+SYS.length+' systems · '+nSites+' sites';
+  drawLayers(); setMode('3d'); fit(); apply();
 }
 (function load(){
-  var done = false;
-  var timer = setTimeout(function(){
-    if (done) return; done = true;
-    boot(fromRows(SNAPSHOT), 'snap', 'snapshot · ' + SNAPSHOT.length + ' sites');
-  }, 6000);
-  try {
-    fetch(SRC, {cache:'no-store'})
+  var done=false;
+  var timer=setTimeout(function(){ if(done)return; done=true; boot(fromRows(SNAPSHOT),'snapshot'); },6000);
+  try{
+    fetch(SRC,{cache:'no-store'})
       .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function(d){
-        if (done) return; done = true; clearTimeout(timer);
-        var s = fromLive(d);
-        boot(s, 'live', 'live · ' + s.length + ' sites');
-      })
-      .catch(function(){
-        if (done) return; done = true; clearTimeout(timer);
-        boot(fromRows(SNAPSHOT), 'snap', 'snapshot · ' + SNAPSHOT.length + ' sites');
-      });
-  } catch(e) {
-    if (!done){ done = true; clearTimeout(timer);
-      boot(fromRows(SNAPSHOT), 'snap', 'snapshot · ' + SNAPSHOT.length + ' sites'); }
-  }
+      .then(function(d){ if(done)return; done=true; clearTimeout(timer); boot(fromLive(d),'live'); })
+      .catch(function(){ if(done)return; done=true; clearTimeout(timer); boot(fromRows(SNAPSHOT),'snapshot'); });
+  }catch(e){ if(!done){ done=true; clearTimeout(timer); boot(fromRows(SNAPSHOT),'snapshot'); } }
 })();
 
-/* ── layer panel (map-specific: Guardian Ruins site types) ── */
-function counts(){
-  var c=[0,0,0,0];
-  SITES.forEach(function(s){ c[s.t]++; });
-  return c;
-}
+function siteCounts(){ var c=[0,0,0,0];
+  SYS.forEach(function(s){ for(var i=0;i<4;i++) c[i]+=s.counts[i]; }); return c; }
 function drawLayers(){
-  var c = counts(), host = document.getElementById('layers'), html='';
-  document.getElementById('totct').textContent = SITES.length + ' sites';
-  for (var i=0;i<3;i++){
-    if (!c[i]) continue;
-    html += '<div class="layer'+(on[i]?'':' off')+(hoverType===TYPES[i]?' sel':'')+
+  var c=siteCounts(), html='';
+  var multi=SYS.filter(function(s){ return s.sites.length>1; }).length;
+  var mixed=SYS.filter(function(s){ return s.types.length>1; }).length;
+  document.getElementById('totct').innerHTML='<b>'+SYS.length+'</b> systems &#183; <b>'+nSites+'</b> sites';
+  document.getElementById('mixnote').innerHTML='<b>'+multi+'</b> systems hold more than one site, <b>'+
+    mixed+'</b> of them mixing types. One dot is one system; its wedges are the types present.';
+  for(var i=0;i<4;i++){
+    if(!c[i]) continue;
+    html+='<div class="layer'+(on[i]?'':' off')+(hoverType===TYPES[i]?' sel':'')+
       '" data-t="'+i+'" role="button" tabindex="0" aria-pressed="'+on[i]+'">'+
-      '<span class="sw" style="background:'+TCOL[i]+'"></span>'+
-      '<span class="nm">'+TYPES[i]+'</span><span class="ct">'+c[i]+'</span></div>';
+      '<span class="sw" style="background:'+TCOL[i]+'"></span><span class="nm">'+TYPES[i]+
+      '</span><span class="ct">'+c[i]+'</span></div>';
   }
-  if (c[3]) html += '<div class="layer'+(on[3]?'':' off')+'" data-t="3" role="button" tabindex="0">'+
-      '<span class="sw" style="background:'+TCOL[3]+'"></span>'+
-      '<span class="nm">Unknown</span><span class="ct">'+c[3]+'</span></div>';
-  host.innerHTML = html;
+  document.getElementById('layers').innerHTML=html;
   showTemplate(hoverType);
 }
 function showTemplate(t){
-  hoverType = t;
-  var img = document.getElementById('tmpl-img');
-  document.getElementById('tmpl-n').textContent = t;
-  if (THUMBS[t.toLowerCase()]) { img.src = THUMBS[t.toLowerCase()]; img.style.display='block'; }
+  hoverType=t;
+  var img=document.getElementById('tmpl-img');
+  document.getElementById('tmpl-n').textContent=t;
+  if(THUMBS[t.toLowerCase()]){ img.src=THUMBS[t.toLowerCase()]; img.style.display='block'; }
   else img.style.display='none';
-  document.getElementById('tmpl-f').textContent = TNOTE[t] || '';
-  Array.prototype.forEach.call(document.querySelectorAll('.layer'), function(el){
-    el.classList.toggle('sel', TYPES[+el.dataset.t] === t);
-  });
+  document.getElementById('tmpl-f').textContent=TNOTE[t]||'No template map for this type.';
+  Array.prototype.forEach.call(document.querySelectorAll('.layer'),function(el){
+    el.classList.toggle('sel',TYPES[+el.dataset.t]===t); });
 }
-document.getElementById('layers').addEventListener('click', function(e){
-  var el = e.target.closest('.layer'); if(!el) return;
-  var i = +el.dataset.t;
-  if (e.shiftKey){ showTemplate(TYPES[i]); return; }
-  on[i] = !on[i]; drawLayers(); apply();
+document.getElementById('layers').addEventListener('click',function(e){
+  var el=e.target.closest('.layer'); if(!el) return;
+  var i=+el.dataset.t;
+  if(e.shiftKey){ showTemplate(TYPES[i]); return; }
+  on[i]=!on[i]; drawLayers(); apply();
 });
-document.getElementById('layers').addEventListener('mouseover', function(e){
-  var el = e.target.closest('.layer'); if(!el) return;
+document.getElementById('layers').addEventListener('mouseover',function(e){
+  var el=e.target.closest('.layer'); if(!el) return;
   showTemplate(TYPES[+el.dataset.t]);
 });
 
-/* ── canvas plot ── */
-var cv = document.getElementById('plot'), ctx = cv.getContext('2d');
-var view = {cx:0, cz:9000, scale:0.02}, dpr = 1, W=0, H=0;
+/* canvas: perspective 3D. 2D is the same camera pinned overhead, which is what
+   isTopView does on the real map today. */
+var cv=document.getElementById('plot'), ctx=cv.getContext('2d');
+var view={yaw:0.62,pitch:0.40,dist:2600,tx:600,ty:-120,tz:1200,mode:'3d'};
+var dpr=1,W=0,H=0,focal=1;
 
 function resize(){
-  dpr = Math.min(window.devicePixelRatio||1, 2);
-  var r = cv.getBoundingClientRect();
-  W = r.width; H = r.height;
-  cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  draw();
+  dpr=Math.min(window.devicePixelRatio||1,2);
+  var r=cv.getBoundingClientRect(); W=r.width; H=r.height;
+  cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0); focal=H*1.05; draw();
 }
-function sx(x){ return W/2 + (x - view.cx)*view.scale; }
-function sy(z){ return H/2 - (z - view.cz)*view.scale; }
-function ux(px){ return (px - W/2)/view.scale + view.cx; }
-function uz(py){ return (H/2 - py)/view.scale + view.cz; }
-
+function proj(x,y,z){
+  var dx=x-view.tx, dy=y-view.ty, dz=z-view.tz;
+  var cy=Math.cos(view.yaw), sy=Math.sin(view.yaw);
+  var rx=dx*cy-dz*sy, rz=dx*sy+dz*cy;
+  var cp=Math.cos(view.pitch), sp=Math.sin(view.pitch);
+  var ry=dy*cp-rz*sp, rz2=dy*sp+rz*cp;
+  var d=rz2+view.dist;
+  if(d<12) return null;
+  var f=focal/d;
+  return {x:W/2+rx*f, y:H/2-ry*f, d:d, f:f};
+}
+function visTypes(s){ return s.types.filter(function(t){ return on[t]; }); }
 function apply(){
-  shown = SITES.filter(function(s){ return on[s.t]; });
-  document.getElementById('st-shown').textContent = shown.length + ' / ' + SITES.length;
+  shown=SYS.filter(function(s){ return visTypes(s).length>0; });
+  var sc=0;
+  shown.forEach(function(s){ visTypes(s).forEach(function(t){ sc+=s.counts[t]; }); });
+  document.getElementById('st-shown').textContent=shown.length+' / '+SYS.length+' sys · '+sc+' sites';
   draw();
 }
-function pct(arr, p){
-  var a = arr.slice().sort(function(m,n){return m-n;});
-  return a[Math.max(0, Math.min(a.length-1, Math.floor(a.length*p)))];
-}
-// Fit to the 2nd-98th percentile, not the full extent. Guardian sites cluster
-// hard in Guardian space with a handful of far outliers; fitting everything
-// leaves the frame almost empty. Double-click ⊙ for the true full extent.
+function pct(a,p){ var b=a.slice().sort(function(m,n){return m-n;});
+  return b[Math.max(0,Math.min(b.length-1,Math.floor(b.length*p)))]; }
+var fitAll=false;
 function fit(all){
-  if (!SITES.length || !W) return;
-  var xs = SITES.map(function(s){return s.x;}), zs = SITES.map(function(s){return s.z;});
-  var x0,x1,z0,z1;
-  if (all){ x0=Math.min.apply(null,xs); x1=Math.max.apply(null,xs);
-            z0=Math.min.apply(null,zs); z1=Math.max.apply(null,zs); }
-  else    { x0=pct(xs,0.02); x1=pct(xs,0.98); z0=pct(zs,0.02); z1=pct(zs,0.98); }
-  var padx=(x1-x0)*0.12+40, padz=(z1-z0)*0.12+40;
-  view.cx=(x0+x1)/2; view.cz=(z0+z1)/2;
-  view.scale = Math.min(W/(x1-x0+padx*2), H/(z1-z0+padz*2));
+  if(!SYS.length||!W) return;
+  var xs=SYS.map(function(s){return s.x;}), ys=SYS.map(function(s){return s.y;}),
+      zs=SYS.map(function(s){return s.z;}), x0,x1,z0,z1;
+  if(all){ x0=Math.min.apply(null,xs); x1=Math.max.apply(null,xs);
+           z0=Math.min.apply(null,zs); z1=Math.max.apply(null,zs); }
+  else   { x0=pct(xs,0.02); x1=pct(xs,0.98); z0=pct(zs,0.02); z1=pct(zs,0.98); }
+  view.tx=(x0+x1)/2; view.tz=(z0+z1)/2; view.ty=(pct(ys,0.02)+pct(ys,0.98))/2;
+  var span=Math.max(x1-x0,z1-z0)*1.25+200;
+  view.dist=span*(H/focal)*0.75+span*0.35;
   draw();
+}
+function gline(x0,z0,x1,z1,st){
+  var a=proj(x0,0,z0), b=proj(x1,0,z1); if(!a||!b) return;
+  ctx.strokeStyle=st; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+}
+/* one dot per system, wedged by the site types present */
+function dot(px,py,r,types,counts){
+  if(types.length===1){
+    ctx.fillStyle=TCOL[types[0]];
+    ctx.beginPath(); ctx.arc(px,py,r,0,6.283); ctx.fill(); return;
+  }
+  var tot=0; types.forEach(function(t){ tot+=counts[t]; });
+  var a0=-Math.PI/2;
+  types.forEach(function(t){
+    var a1=a0+6.283*(counts[t]/tot);
+    ctx.fillStyle=TCOL[t];
+    ctx.beginPath(); ctx.moveTo(px,py); ctx.arc(px,py,r,a0,a1); ctx.closePath(); ctx.fill();
+    a0=a1;
+  });
 }
 function draw(){
-  if (!W) return;
-  ctx.clearRect(0,0,W,H);
-  ctx.fillStyle = '#05070A'; ctx.fillRect(0,0,W,H);
-
-  // grid — 1000 ly
-  var step = 1000*view.scale, g0 = 1000;
-  while (step < 42){ g0 *= 2; step = g0*view.scale; }
-  ctx.strokeStyle = '#101922'; ctx.lineWidth = 1;
-  var startX = Math.floor((ux(0))/g0)*g0;
-  for (var x=startX; x<ux(W)+g0; x+=g0){
-    var px = Math.round(sx(x))+0.5;
-    ctx.beginPath(); ctx.moveTo(px,0); ctx.lineTo(px,H); ctx.stroke();
+  if(!W) return;
+  ctx.clearRect(0,0,W,H); ctx.fillStyle='#05070A'; ctx.fillRect(0,0,W,H);
+  var step=500; while(step*focal/view.dist<26) step*=2;
+  var reach=step*14, gx=Math.round(view.tx/step)*step, gz=Math.round(view.tz/step)*step;
+  ctx.lineWidth=1;
+  for(var i=-14;i<=14;i++){
+    var ax=gx+i*step, az=gz+i*step;
+    gline(ax,gz-reach,ax,gz+reach,i===0?'#1C2833':'#0F1720');
+    gline(gx-reach,az,gx+reach,az,i===0?'#1C2833':'#0F1720');
   }
-  var startZ = Math.floor((uz(H))/g0)*g0;
-  for (var z=startZ; z<uz(0)+g0; z+=g0){
-    var py = Math.round(sy(z))+0.5;
-    ctx.beginPath(); ctx.moveTo(0,py); ctx.lineTo(W,py); ctx.stroke();
-  }
-
-  // Sol
-  var solx = sx(0), soly = sy(0);
-  if (solx>-40 && solx<W+40 && soly>-40 && soly<H+40){
-    ctx.strokeStyle='#2A3742'; ctx.beginPath(); ctx.arc(solx,soly,7,0,6.283); ctx.stroke();
-    ctx.fillStyle='#8E9BA6'; ctx.beginPath(); ctx.arc(solx,soly,2,0,6.283); ctx.fill();
+  var sol=proj(0,0,0);
+  if(sol){
+    ctx.strokeStyle='#2A3742'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.arc(sol.x,sol.y,6,0,6.283); ctx.stroke();
+    ctx.fillStyle='#8E9BA6'; ctx.beginPath(); ctx.arc(sol.x,sol.y,2,0,6.283); ctx.fill();
     ctx.fillStyle='#4A5762'; ctx.font='10px "IBM Plex Mono",monospace';
-    ctx.fillText('Sol', solx+11, soly+3);
+    ctx.fillText('Sol',sol.x+10,sol.y+3);
   }
-
-  // sites
-  var r = view.scale > 0.25 ? 4 : (view.scale > 0.06 ? 3.2 : 2.4);
-  for (var i=0;i<shown.length;i++){
-    var s = shown[i], px = sx(s.x), py = sy(s.z);
-    if (px<-8||px>W+8||py<-8||py>H+8) continue;
-    ctx.fillStyle = TCOL[s.t];
-    ctx.globalAlpha = 0.82;
-    ctx.beginPath(); ctx.arc(px,py,r,0,6.283); ctx.fill();
+  var pts=[];
+  for(var j=0;j<shown.length;j++){
+    var s=shown[j], q=proj(s.x,s.y,s.z); if(!q) continue;
+    if(q.x<-20||q.x>W+20||q.y<-20||q.y>H+20) continue;
+    pts.push({s:s,q:q});
   }
-  ctx.globalAlpha = 1;
-
-  // selection
-  if (sel){
-    var px2 = sx(sel.x), py2 = sy(sel.z);
-    ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.4;
-    ctx.beginPath(); ctx.arc(px2,py2,9,0,6.283); ctx.stroke();
-    ctx.strokeStyle = TCOL[sel.t]; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(px2,py2,13,0,6.283); ctx.stroke();
+  pts.sort(function(a,b){ return b.q.d-a.q.d; });
+  for(var k=0;k<pts.length;k++){
+    var p=pts[k], q=p.q, vt=visTypes(p.s);
+    var r=Math.max(2,Math.min(9,2600*q.f/60));
+    if(view.mode==='3d'){
+      var base=proj(p.s.x,0,p.s.z);
+      if(base){ ctx.strokeStyle='rgba(90,110,128,.20)'; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.moveTo(q.x,q.y); ctx.lineTo(base.x,base.y); ctx.stroke(); }
+    }
+    ctx.globalAlpha=0.6+0.4*Math.min(1,2600/q.d);
+    dot(q.x,q.y,r,vt,p.s.counts);
+    if(vt.length>1){
+      ctx.strokeStyle='rgba(6,9,13,.85)'; ctx.lineWidth=0.8;
+      ctx.beginPath(); ctx.arc(q.x,q.y,r,0,6.283); ctx.stroke();
+    }
+  }
+  ctx.globalAlpha=1;
+  if(sel){
+    var sq=proj(sel.x,sel.y,sel.z);
+    if(sq){
+      ctx.strokeStyle='#FFFFFF'; ctx.lineWidth=1.4;
+      ctx.beginPath(); ctx.arc(sq.x,sq.y,11,0,6.283); ctx.stroke();
+      ctx.strokeStyle=TCOL[sel.types[0]]; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.arc(sq.x,sq.y,15,0,6.283); ctx.stroke();
+    }
   }
 }
 function pick(px,py){
-  var best=null, bd=15*15;
-  for (var i=0;i<shown.length;i++){
-    var s=shown[i], dx=sx(s.x)-px, dy=sy(s.z)-py, d=dx*dx+dy*dy;
-    if (d<bd){ bd=d; best=s; }
+  var best=null,bd=16*16;
+  for(var i=0;i<shown.length;i++){
+    var s=shown[i], q=proj(s.x,s.y,s.z); if(!q) continue;
+    var dx=q.x-px, dy=q.y-py, d=dx*dx+dy*dy;
+    if(d<bd){ bd=d; best=s; }
   }
   return best;
 }
+function setMode(m){
+  view.mode=m;
+  if(m==='2d'){ view.yaw=0; view.pitch=Math.PI/2-0.0001; }
+  else { view.yaw=0.62; view.pitch=0.40; }
+  document.getElementById('v3d').classList.toggle('on',m==='3d');
+  document.getElementById('v2d').classList.toggle('on',m==='2d');
+  document.getElementById('v3d').setAttribute('aria-pressed',m==='3d');
+  document.getElementById('v2d').setAttribute('aria-pressed',m==='2d');
+  document.getElementById('hint').innerHTML = m==='3d'
+    ? 'drag to orbit &#183; shift-drag to pan &#183; scroll to zoom &#183; click a system<br>3D &#8212; droplines show height above the galactic plane'
+    : 'drag to pan &#183; scroll to zoom &#183; click a system<br>2D &#8212; camera locked overhead, X / Z';
+  draw();
+}
+document.getElementById('v3d').onclick=function(){ setMode('3d'); };
+document.getElementById('v2d').onclick=function(){ setMode('2d'); };
 
-/* ── interaction ── */
 var drag=null;
-cv.addEventListener('mousedown', function(e){
-  drag={x:e.clientX,y:e.clientY,cx:view.cx,cz:view.cz,moved:false};
+cv.addEventListener('mousedown',function(e){
+  drag={x:e.clientX,y:e.clientY,yaw:view.yaw,pitch:view.pitch,tx:view.tx,tz:view.tz,
+        moved:false,pan:(e.shiftKey||view.mode==='2d'||e.button===2)};
 });
-window.addEventListener('mousemove', function(e){
-  if (drag){
+window.addEventListener('mousemove',function(e){
+  if(drag){
     var dx=e.clientX-drag.x, dy=e.clientY-drag.y;
-    if (Math.abs(dx)+Math.abs(dy) > 3) drag.moved = true;
-    view.cx = drag.cx - dx/view.scale;
-    view.cz = drag.cz + dy/view.scale;
+    if(Math.abs(dx)+Math.abs(dy)>3) drag.moved=true;
+    if(drag.pan){
+      var k=view.dist/focal, cy=Math.cos(view.yaw), sy=Math.sin(view.yaw);
+      view.tx=drag.tx-(dx*cy+dy*sy)*k; view.tz=drag.tz-(-dx*sy+dy*cy)*k;
+    } else {
+      view.yaw=drag.yaw+dx*0.006;
+      view.pitch=Math.max(-1.45,Math.min(1.45,drag.pitch+dy*0.006));
+    }
     draw();
   }
-  var r = cv.getBoundingClientRect();
-  if (e.clientX>=r.left && e.clientX<=r.right && e.clientY>=r.top && e.clientY<=r.bottom){
-    var mx = ux(e.clientX-r.left), mz = uz(e.clientY-r.top);
-    document.getElementById('st-pos').textContent =
-      Math.round(mx) + ' · ' + Math.round(mz);
-    document.getElementById('st-sol').textContent =
-      Math.round(Math.sqrt(mx*mx+mz*mz)).toLocaleString() + ' ly';
-    cv.style.cursor = pick(e.clientX-r.left, e.clientY-r.top) ? 'pointer' : 'crosshair';
+  var r=cv.getBoundingClientRect();
+  if(e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom){
+    var hit=pick(e.clientX-r.left,e.clientY-r.top);
+    cv.style.cursor=hit?'pointer':(view.mode==='3d'?'grab':'crosshair');
+    document.getElementById('st-pos').textContent = hit
+      ? Math.round(hit.x)+' · '+Math.round(hit.y)+' · '+Math.round(hit.z)
+      : Math.round(view.tx)+' · '+Math.round(view.tz);
+    document.getElementById('st-sol').textContent = hit
+      ? Math.round(Math.sqrt(hit.x*hit.x+hit.y*hit.y+hit.z*hit.z)).toLocaleString()+' ly'
+      : Math.round(Math.sqrt(view.tx*view.tx+view.tz*view.tz)).toLocaleString()+' ly';
   }
 });
-window.addEventListener('mouseup', function(e){
-  if (drag && !drag.moved){
-    var r = cv.getBoundingClientRect();
-    var hit = pick(e.clientX-r.left, e.clientY-r.top);
-    if (hit) select(hit); else closeCard();
+window.addEventListener('mouseup',function(e){
+  if(drag&&!drag.moved){
+    var r=cv.getBoundingClientRect();
+    var hit=pick(e.clientX-r.left,e.clientY-r.top);
+    if(hit) select(hit); else closeCard();
   }
   drag=null;
 });
-cv.addEventListener('wheel', function(e){
+cv.addEventListener('contextmenu',function(e){ e.preventDefault(); });
+cv.addEventListener('wheel',function(e){
   e.preventDefault();
-  var r = cv.getBoundingClientRect(), mx = ux(e.clientX-r.left), mz = uz(e.clientY-r.top);
-  var f = e.deltaY < 0 ? 1.18 : 1/1.18;
-  view.scale = Math.max(0.0016, Math.min(3, view.scale*f));
-  view.cx = mx - (e.clientX-r.left - W/2)/view.scale;
-  view.cz = mz + (e.clientY-r.top - H/2)/view.scale;
+  view.dist=Math.max(60,Math.min(90000,view.dist*(e.deltaY<0?1/1.15:1.15)));
   draw();
-}, {passive:false});
-document.getElementById('zin').onclick  = function(){ view.scale=Math.min(3,view.scale*1.4); draw(); };
-document.getElementById('zout').onclick = function(){ view.scale=Math.max(0.0016,view.scale/1.4); draw(); };
-var fitAll = false;
-document.getElementById('zfit').onclick = function(){ fitAll = !fitAll; fit(fitAll);
-  this.title = fitAll ? 'Fit main cluster' : 'Fit all (incl. outliers)'; };
+},{passive:false});
+document.getElementById('zin').onclick=function(){ view.dist=Math.max(60,view.dist/1.4); draw(); };
+document.getElementById('zout').onclick=function(){ view.dist=Math.min(90000,view.dist*1.4); draw(); };
+document.getElementById('zfit').onclick=function(){
+  fitAll=!fitAll; fit(fitAll);
+  this.title=fitAll?'Fit main cluster':'Fit all (incl. outliers)';
+};
 
-/* ── system card ── */
 function esc(s){ return String(s).replace(/[&<>"]/g,function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
-function select(s){
-  sel = s;
-  showTemplate(TYPES[s.t]);
-  var q = encodeURIComponent(s.name), t = TYPES[s.t], th = THUMBS[t.toLowerCase()];
-  var c = document.getElementById('card');
-  c.className = 'card';
-  c.innerHTML =
-    '<div class="c-h"><div><div class="n">'+esc(s.name)+'</div></div>'+
-      '<button class="x" id="cx" aria-label="Close">×</button></div>'+
+function summary(s){
+  return s.types.map(function(t){ return s.counts[t]+' '+TYPES[t]; }).join(' · ');
+}
+function renderCard(){
+  var s=sel, q=encodeURIComponent(s.name);
+  var site=s.sites[selSite], ty=TYPES[site.t], th=THUMBS[ty.toLowerCase()];
+  var rows=s.sites.map(function(si,i){
+    return '<div class="site'+(i===selSite?' on':'')+'" data-i="'+i+'" role="button" tabindex="0">'+
+      '<span class="sw" style="background:'+TCOL[si.t]+'"></span>'+
+      '<span class="ty">'+TYPES[si.t]+'</span>'+
+      '<span class="bd">'+(si.body?esc(si.body):'&#8212;')+'</span></div>';
+  }).join('');
+  var c=document.getElementById('card');
+  c.className='card';
+  c.innerHTML=
+    '<div class="c-h"><div class="n">'+esc(s.name)+'</div>'+
+      '<button class="x" id="cx" aria-label="Close">&times;</button></div>'+
     '<div class="c-meta">'+s.x+' · '+s.y+' · '+s.z+'<br>'+
-      Math.round(Math.sqrt(s.x*s.x+s.y*s.y+s.z*s.z)).toLocaleString()+' ly from Sol'+
-      (s.body ? '<br>body '+esc(s.body) : '')+'</div>'+
-    '<div class="c-type"><span class="sw" style="background:'+TCOL[s.t]+'"></span>'+
-      '<span class="lb">Ancient Ruins — '+t+'</span></div>'+
-    (th ? '<div class="c-tmpl"><img src="'+th+'" alt="'+t+' site template map"></div>' : '')+
+      Math.round(Math.sqrt(s.x*s.x+s.y*s.y+s.z*s.z)).toLocaleString()+' ly from Sol</div>'+
+    '<div class="c-sec"><span>'+s.sites.length+' ruin site'+(s.sites.length>1?'s':'')+
+      '</span><b>'+summary(s)+'</b></div>'+rows+
+    (th?'<div class="c-tmpl"><img src="'+th+'" alt="'+ty+' site template map">'+
+        '<div class="cap">'+ty+' template &#8212; '+(TNOTE[ty]||'')+'</div></div>':'')+
     '<div class="c-acts">'+
-      '<a href="https://signals.canonn.tech/?system='+q+'" target="_blank" rel="noopener">Signals <span class="ax">↗</span></a>'+
-      '<a href="https://ruins.canonn.tech/" target="_blank" rel="noopener">Bifrost <span class="ax">↗</span></a>'+
-      '<a href="https://www.edsm.net/en/search/systems/index/name/'+q+'" target="_blank" rel="noopener">EDSM <span class="ax">↗</span></a>'+
-      '<a href="https://inara.cz/elite/starsystem/?search='+q+'" target="_blank" rel="noopener">Inara <span class="ax">↗</span></a>'+
-      '<button id="ccopy">Copy name</button>'+
-      '<button id="ccentre">Centre here</button>'+
+      '<a href="https://signals.canonn.tech/?system='+q+'" target="_blank" rel="noopener">Signals <span class="ax">&#8599;</span></a>'+
+      '<a href="https://ruins.canonn.tech/" target="_blank" rel="noopener">Bifrost <span class="ax">&#8599;</span></a>'+
+      '<a href="https://www.edsm.net/en/search/systems/index/name/'+q+'" target="_blank" rel="noopener">EDSM <span class="ax">&#8599;</span></a>'+
+      '<a href="https://inara.cz/elite/starsystem/?search='+q+'" target="_blank" rel="noopener">Inara <span class="ax">&#8599;</span></a>'+
+      '<button id="ccopy">Copy name</button><button id="ccentre">Centre here</button>'+
     '</div>';
-  document.getElementById('cx').onclick = closeCard;
-  document.getElementById('ccopy').onclick = function(){
-    var b=this; navigator.clipboard.writeText(s.name).then(function(){
+  document.getElementById('cx').onclick=closeCard;
+  document.getElementById('ccopy').onclick=function(){
+    var b=this;
+    navigator.clipboard.writeText(s.name).then(function(){
       b.textContent='Copied'; setTimeout(function(){ b.textContent='Copy name'; },1200);
     }).catch(function(){ b.textContent='Copy failed'; });
   };
-  document.getElementById('ccentre').onclick = function(){
-    view.cx=s.x; view.cz=s.z; view.scale=Math.max(view.scale,0.35); draw();
+  document.getElementById('ccentre').onclick=function(){
+    view.tx=s.x; view.ty=s.y; view.tz=s.z; view.dist=Math.min(view.dist,420); draw();
   };
-  draw();
+  Array.prototype.forEach.call(c.querySelectorAll('.site'),function(el){
+    el.onclick=function(){ selSite=+el.dataset.i; renderCard(); };
+  });
+  showTemplate(ty);
 }
+function select(s){ sel=s; selSite=0; renderCard(); draw(); }
 function closeCard(){ sel=null; document.getElementById('card').className='card hidden'; draw(); }
 
-/* ── rail ── */
-var railBtns = ['r-layers','r-cam','r-routes','r-disp'];
-railBtns.forEach(function(id){
-  document.getElementById(id).onclick = function(){
-    var side = document.getElementById('side');
-    if (id==='r-layers'){
-      var open = !side.classList.toggle('hidden');
-      this.classList.toggle('on', open);
-      setTimeout(resize,0);
+['r-layers','r-cam','r-routes','r-disp'].forEach(function(id){
+  document.getElementById(id).onclick=function(){
+    if(id==='r-layers'){
+      var open=!document.getElementById('side').classList.toggle('hidden');
+      this.classList.toggle('on',open); setTimeout(resize,0);
     } else {
-      alert('“'+this.title+'” is out of scope for this mockup.\n\nThe rail is here to show that layers, camera, routes and display\nshare one home instead of three screen corners.');
+      alert('"'+this.title+'" is out of scope for this mockup.\n\nThe rail is here to show that layers, camera, routes and display\nshare one home instead of three screen corners.');
     }
   };
 });
-document.getElementById('toolsbtn').onclick = function(){ openPal('>tools '); };
-document.getElementById('switcher').onclick = function(){ openPal('>map '); };
+document.getElementById('toolsbtn').onclick=function(){ openPal('>tools '); };
+document.getElementById('switcher').onclick=function(){ openPal('>map '); };
 
-/* ── command palette ── */
-var MAPS = ['Guardian Ruins','Guardian Beacons','Guardian Structures','Brain Trees',
+var MAPS=['Guardian Ruins','Guardian Beacons','Guardian Structures','Brain Trees',
   'Thargoid Structures','Thargoid Barnacles','Hyperdictions','Non-Human Signal Sources',
   'Galactic Exploration Catalog','Generation Ships','Megaships','Operation Ida',
   'Permit Locked Regions','Listening Posts','Voyager Pulsars','Canonn Challenge Route'];
-var TOOLS = [
+var TOOLS=[
   ['Signals','signals.canonn.tech','https://signals.canonn.tech/'],
   ['Bioforge','bioforge.canonn.tech','https://bioforge.canonn.tech/'],
   ['Bifrost — Guardian ruins','ruins.canonn.tech','https://ruins.canonn.tech/'],
@@ -549,92 +602,70 @@ var TOOLS = [
   ['Undiscovered Codex','canonn-science.github.io','https://canonn-science.github.io/undiscovered-codex/'],
   ['Abandoned Settlements','canonn-science.github.io','https://canonn-science.github.io/abandonned/'],
   ['Neutron Star Plots','canonn-science.github.io','https://canonn-science.github.io/Canonn-Plots/neutron_stars_plots.html'],
-  ['EDMC-Canonn plugin','github.com','https://github.com/canonn-science/EDMC-Canonn/releases/latest']
-];
+  ['EDMC-Canonn plugin','github.com','https://github.com/canonn-science/EDMC-Canonn/releases/latest']];
 var scrim=document.getElementById('scrim'), pq=document.getElementById('pq'),
     pres=document.getElementById('pres'), psel=0, pflat=[];
-
-function openPal(pre){
-  scrim.classList.add('open');
-  pq.value = pre || ''; psel = 0; renderPal(); pq.focus();
-}
+function openPal(pre){ scrim.classList.add('open'); pq.value=pre||''; psel=0; renderPal(); pq.focus(); }
 function closePal(){ scrim.classList.remove('open'); }
-document.getElementById('findbtn').onclick = function(){ openPal(''); };
-scrim.addEventListener('mousedown', function(e){ if(e.target===scrim) closePal(); });
-
-function hl(txt, term){
-  if(!term) return esc(txt);
-  var i = txt.toLowerCase().indexOf(term.toLowerCase());
-  if(i<0) return esc(txt);
-  return esc(txt.slice(0,i))+'<mark>'+esc(txt.slice(i,i+term.length))+'</mark>'+esc(txt.slice(i+term.length));
-}
+document.getElementById('findbtn').onclick=function(){ openPal(''); };
+scrim.addEventListener('mousedown',function(e){ if(e.target===scrim) closePal(); });
+function hl(t,q){ if(!q) return esc(t);
+  var i=t.toLowerCase().indexOf(q.toLowerCase()); if(i<0) return esc(t);
+  return esc(t.slice(0,i))+'<mark>'+esc(t.slice(i,i+q.length))+'</mark>'+esc(t.slice(i+q.length)); }
 function renderPal(){
-  var raw = pq.value.trim(), only=null, term=raw;
-  if (raw.indexOf('>tools')===0){ only='tools'; term=raw.slice(6).trim(); }
-  else if (raw.indexOf('>map')===0){ only='maps'; term=raw.slice(4).trim(); }
-  var lo = term.toLowerCase(), html=''; pflat=[];
-
-  function group(label, rows){
+  var raw=pq.value.trim(), only=null, term=raw;
+  if(raw.indexOf('>tools')===0){ only='tools'; term=raw.slice(6).trim(); }
+  else if(raw.indexOf('>map')===0){ only='maps'; term=raw.slice(4).trim(); }
+  var lo=term.toLowerCase(), html=''; pflat=[];
+  function grp(label,rows){
     if(!rows.length) return;
-    html += '<div class="pg">'+label+'</div>';
+    html+='<div class="pg">'+label+'</div>';
     rows.forEach(function(r){
-      var i = pflat.length; pflat.push(r);
-      html += '<div class="pr'+(r.k==='tool'?' ext':'')+'" role="option" data-i="'+i+'" '+
+      var i=pflat.length; pflat.push(r);
+      html+='<div class="pr'+(r.k==='tool'?' ext':'')+'" role="option" data-i="'+i+'" '+
         'aria-selected="'+(i===psel?'true':'false')+'"><span class="ic">'+
-        (r.k==='tool'?'↗':(r.k==='site'?'✦':'▣'))+'</span><span class="nm">'+
+        (r.k==='tool'?'&#8599;':(r.k==='sys'?'&#10022;':'&#9635;'))+'</span><span class="nm">'+
         hl(r.t,term)+'</span><span class="mt">'+esc(r.m)+'</span></div>';
     });
   }
-  if (only!=='tools'){
-    group('Maps', MAPS.filter(function(m){ return !lo || m.toLowerCase().indexOf(lo)>-1; })
-      .slice(0,6).map(function(m){ return {k:'map', t:m, m:m==='Guardian Ruins'?'current':'switch'}; }));
-  }
-  if (only!=='maps'){
-    group('Canonn tools', TOOLS.filter(function(t){
-      return !lo || t[0].toLowerCase().indexOf(lo)>-1;
-    }).map(function(t){ return {k:'tool', t:t[0], m:t[1], u:t[2]}; }));
-  }
-  if (!only && lo.length>0){
-    group('Ruin sites on this map', SITES.filter(function(s){
-      return s.name.toLowerCase().indexOf(lo)>-1;
-    }).slice(0,8).map(function(s){ return {k:'site', t:s.name, m:TYPES[s.t], s:s}; }));
-  }
-  pres.innerHTML = html || '<div class="pal-empty">No match.</div>';
+  if(only!=='tools') grp('Maps', MAPS.filter(function(m){ return !lo||m.toLowerCase().indexOf(lo)>-1; })
+    .slice(0,6).map(function(m){ return {k:'map',t:m,m:m==='Guardian Ruins'?'current':'switch'}; }));
+  if(only!=='maps') grp('Canonn tools', TOOLS.filter(function(t){ return !lo||t[0].toLowerCase().indexOf(lo)>-1; })
+    .map(function(t){ return {k:'tool',t:t[0],m:t[1],u:t[2]}; }));
+  if(!only&&lo.length>0) grp('Systems on this map', SYS.filter(function(s){
+      return s.name.toLowerCase().indexOf(lo)>-1; }).slice(0,8)
+    .map(function(s){ return {k:'sys',t:s.name,m:summary(s),s:s}; }));
+  pres.innerHTML=html||'<div class="pal-empty">No match.</div>';
 }
-function palMove(d){
-  if(!pflat.length) return;
+function palMove(d){ if(!pflat.length) return;
   psel=(psel+d+pflat.length)%pflat.length; renderPal();
-  var el=pres.querySelector('[data-i="'+psel+'"]'); if(el) el.scrollIntoView({block:'nearest'});
-}
+  var el=pres.querySelector('[data-i="'+psel+'"]'); if(el) el.scrollIntoView({block:'nearest'}); }
 function palRun(){
-  var r = pflat[psel]; if(!r) return;
-  if (r.k==='tool'){ window.open(r.u,'_blank','noopener'); closePal(); }
-  else if (r.k==='site'){ closePal(); select(r.s);
-    view.cx=r.s.x; view.cz=r.s.z; view.scale=Math.max(view.scale,0.35); draw(); }
-  else { closePal();
-    if (r.t!=='Guardian Ruins') alert('Switching to “'+r.t+'” is out of scope for this mockup.\n\nThe point is that every map is one keystroke away\ninstead of four levels of hover menu.'); }
+  var r=pflat[psel]; if(!r) return;
+  if(r.k==='tool'){ window.open(r.u,'_blank','noopener'); closePal(); }
+  else if(r.k==='sys'){ closePal(); select(r.s);
+    view.tx=r.s.x; view.ty=r.s.y; view.tz=r.s.z; view.dist=Math.min(view.dist,700); draw(); }
+  else { closePal(); if(r.t!=='Guardian Ruins')
+    alert('Switching to "'+r.t+'" is out of scope for this mockup.\n\nThe point is that every map is one keystroke away\ninstead of four levels of hover menu.'); }
 }
-pq.addEventListener('input', function(){ psel=0; renderPal(); });
-pq.addEventListener('keydown', function(e){
+pq.addEventListener('input',function(){ psel=0; renderPal(); });
+pq.addEventListener('keydown',function(e){
   if(e.key==='ArrowDown'){e.preventDefault();palMove(1);}
   else if(e.key==='ArrowUp'){e.preventDefault();palMove(-1);}
   else if(e.key==='Enter'){e.preventDefault();palRun();}
   else if(e.key==='Escape'){closePal();}
 });
-pres.addEventListener('mousemove', function(e){
+pres.addEventListener('mousemove',function(e){
   var r=e.target.closest('.pr'); if(!r) return;
-  var i=+r.dataset.i; if(i!==psel){ psel=i; renderPal(); }
-});
-pres.addEventListener('click', function(e){
-  var r=e.target.closest('.pr'); if(!r) return;
-  psel=+r.dataset.i; palRun();
-});
-document.addEventListener('keydown', function(e){
-  if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); openPal(''); }
-  else if(e.key==='Escape' && scrim.classList.contains('open')) closePal();
+  var i=+r.dataset.i; if(i!==psel){ psel=i; renderPal(); } });
+pres.addEventListener('click',function(e){
+  var r=e.target.closest('.pr'); if(!r) return; psel=+r.dataset.i; palRun(); });
+document.addEventListener('keydown',function(e){
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){ e.preventDefault(); openPal(''); }
+  else if(e.key==='Escape'&&scrim.classList.contains('open')) closePal();
 });
 
-window.addEventListener('resize', resize);
+window.addEventListener('resize',resize);
 resize();
 })();
 </script>

@@ -20,10 +20,24 @@ Run it: `npm run serve`, then http://localhost:4173/prototype/console.html
 
 ## What is a mockup
 
-- The plot is a 2D galactic-plane (X/Z) canvas, not the three.js scene. The point is
-  the interface around the map, not a second renderer.
+- The plot is a hand-rolled perspective renderer on a 2D canvas, not the three.js
+  scene. It opens in **3D** with a 3D/2D toggle, matching the real map; "2D" pins the
+  camera overhead, which is what `isTopView` does today. Droplines to the galactic
+  plane are what make height legible without a real depth buffer. The point is the
+  interface around the map, not a second renderer.
 - Only Guardian Ruins is wired up. Other maps in the switcher say so when picked.
 - Camera / routes / display rail buttons are placeholders.
+
+## One dot is one system, not one site
+
+600 ruin sites sit in only **212 systems**: 198 systems hold more than one site and
+166 of those mix types. So the unit plotted is the system, and a dot is drawn as
+wedges of the types it contains. Selecting one lists every site in it with its body,
+and clicking a site swaps the template map.
+
+Treating each record as its own point — which the first cut did — draws 600 dots
+where there are 212 places, stacks them exactly on top of each other, and can only
+ever show one type per system.
 
 ## Why Guardian Ruins
 
