@@ -1086,16 +1086,19 @@ function distanceFromTarget(v1) {
 var camSave = { 'x': 0, 'y': 0, 'z': 0 };
 
 
+var lastCoordRefresh = 0;
+
 function refreshWithCamPos() {
 
-  var d = new Date();
-  var n = d.getTime();
-
-  //-- Refresh only every 5 sec
-  if (n % 1 != 0) return;
-
-  Ed3d.grid1H.addCoords();
-  Ed3d.grid1K.addCoords();
+  //-- Throttle the grid coordinate labels to 10 Hz.  The previous guard here
+  //   was `if (n % 1 != 0) return;` which can never be true, so this ran on
+  //   every frame.
+  var now = performance.now();
+  if (now - lastCoordRefresh >= 100) {
+    lastCoordRefresh = now;
+    Ed3d.grid1H.addCoords();
+    Ed3d.grid1K.addCoords();
+  }
 
   //-- Refresh only if the camera moved
   var p = Ed3d.optDistObj / 2;
