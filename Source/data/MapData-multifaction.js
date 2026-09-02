@@ -41,6 +41,89 @@ var canonnEd3d_multifaction = {
 	 * Fetch a .json.gz URL and return the parsed JSON using the browser
 	 * DecompressionStream API (supported in Chrome 80+, Firefox 113+, Edge 80+).
 	 */
+	/**
+	 * A tiny IndexedDB cache for the *derived* result of the Spansh dump.
+	 *
+	 * The dump is 16.6 MB gzipped. Spansh already serves it with
+	 * cache-control: max-age=86400 and the fetch does not bust that, so on a
+	 * repeat visit the bytes come from the HTTP cache in ~180 ms — and the page
+	 * still takes over three seconds, because every load decompresses and
+	 * JSON.parses the whole thing again just to keep a few thousand systems.
+	 *
+	 * So cache what we built, not what we downloaded, keyed by the dump's ETag.
+	 * A repeat visit costs one HEAD request and a structured-clone read.
+	 * Every step is optional: no IndexedDB (private windows), no ETag, a failed
+	 * read — any of them just falls through to the full path.
+	 */
+	derivedCache: {
+		DB: 'canonn-map',
+		STORE: 'derived',
+
+		open: function () {
+			return new Promise(function (resolve) {
+				// Reading indexedDB can itself throw, not just return null — some
+				// private-browsing modes make the property access raise a
+				// SecurityError. Both have to be caught, or the whole map fails to
+				// load in a private window over an optional cache.
+				var idb, req;
+				try { idb = self.indexedDB; } catch (e) { return resolve(null); }
+				if (!idb) return resolve(null);
+				try { req = idb.open('canonn-map', 1); } catch (e) { return resolve(null); }
+				req.onupgradeneeded = function () {
+					var db = req.result;
+					if (!db.objectStoreNames.contains('derived')) db.createObjectStore('derived');
+				};
+				req.onsuccess = function () { resolve(req.result); };
+				req.onerror = function () { resolve(null); };
+				req.onblocked = function () { resolve(null); };
+			});
+		},
+
+		get: async function (key) {
+			var db = await this.open();
+			if (!db) return null;
+			return new Promise(function (resolve) {
+				try {
+					var r = db.transaction('derived', 'readonly').objectStore('derived').get(key);
+					r.onsuccess = function () { resolve(r.result || null); };
+					r.onerror = function () { resolve(null); };
+				} catch (e) { resolve(null); }
+			});
+		},
+
+		/** Store under `key` and drop every other entry sharing `prefix`, so a
+		 *  new dump replaces the old one instead of accumulating. */
+		put: async function (prefix, key, value) {
+			var db = await this.open();
+			if (!db) return false;
+			return new Promise(function (resolve) {
+				try {
+					var tx = db.transaction('derived', 'readwrite');
+					var store = tx.objectStore('derived');
+					var keys = store.getAllKeys();
+					keys.onsuccess = function () {
+						(keys.result || []).forEach(function (k) {
+							if (String(k).indexOf(prefix) === 0 && k !== key) store.delete(k);
+						});
+						store.put(value, key);
+					};
+					tx.oncomplete = function () { resolve(true); };
+					tx.onerror = function () { resolve(false); };
+					tx.onabort = function () { resolve(false); };
+				} catch (e) { resolve(false); }
+			});
+		}
+	},
+
+	/** The dump's ETag (or Last-Modified), via a HEAD that costs nothing. */
+	stampOf: async function (url) {
+		try {
+			var r = await fetch(url, { method: 'HEAD' });
+			if (!r.ok) return null;
+			return r.headers.get('etag') || r.headers.get('last-modified') || null;
+		} catch (e) { return null; }
+	},
+
 	fetchGzJson: async function (url) {
 		const response = await fetch(url);
 		if (!response.ok) {
@@ -92,11 +175,54 @@ var canonnEd3d_multifaction = {
 		const requestedLower = {};
 		requestedNames.forEach(function (n) { requestedLower[n.toLowerCase()] = n; });
 
+		const DUMP_URL = 'https://downloads.spansh.co.uk/factions.json.gz';
+		const CACHE_PREFIX = 'multifaction|';
+
+		function launch() {
+			document.getElementById('loading').style.display = 'none';
+			Ed3d.init({
+				container: 'edmap',
+				json: canonnEd3d_multifaction.systemsData,
+				withFullscreenToggle: false,
+				withHudPanel: true,
+				hudMultipleSelect: true,
+				effectScaleSystem: [20, 100],
+				startAnim: !isAllMode,
+				showGalaxyInfos: true,
+				systemColor: '#FF9D00',
+				finished: function () {
+					canonnEd3d_multifaction.finishMap();
+				},
+			});
+		}
+
+		let cacheKey = null;
+		try {
+			const stamp = await canonnEd3d_multifaction.stampOf(DUMP_URL);
+			if (stamp) {
+				cacheKey = CACHE_PREFIX + stamp + '|' + factionsParam.trim().toLowerCase();
+				const hit = await canonnEd3d_multifaction.derivedCache.get(cacheKey);
+				if (hit && hit.systemsData) {
+					canonnEd3d_multifaction.systemsData = hit.systemsData;
+					canonnEd3d_multifaction.allFactionNames = hit.allFactionNames || [];
+					canonnEd3d_multifaction.systemFactionIndex = hit.systemFactionIndex || null;
+					// The full dump is deliberately not cached — it is the 16.6 MB
+					// we are avoiding. The two click-time scans that use it already
+					// guard for its absence and fall back to the index.
+					canonnEd3d_multifaction.allFactions = null;
+					console.log('multifaction: served from cache,',
+						canonnEd3d_multifaction.systemsData.systems.length, 'systems');
+					launch();
+					return;
+				}
+			}
+		} catch (e) {
+			// Any cache trouble just means the full path below.
+		}
+
 		try {
 			// The Spansh dump is a JSON array of faction objects
-			const allFactions = await canonnEd3d_multifaction.fetchGzJson(
-				'https://downloads.spansh.co.uk/factions.json.gz'
-			);
+			const allFactions = await canonnEd3d_multifaction.fetchGzJson(DUMP_URL);
 
 			// Store all faction names (sorted, case-insensitive) for the search UI
 			canonnEd3d_multifaction.allFactionNames = allFactions
@@ -240,22 +366,18 @@ var canonnEd3d_multifaction = {
 				console.log('multifaction: faction index built for', Object.keys(factionIdx).length, 'systems');
 			}
 
-			document.getElementById('loading').style.display = 'none';
+			// Keep the derived result for the next visit; the dump itself is
+			// never worth re-parsing. Fire and forget — a failed write only
+			// costs the next load the slow path.
+			if (cacheKey) {
+				canonnEd3d_multifaction.derivedCache.put(CACHE_PREFIX, cacheKey, {
+					systemsData: canonnEd3d_multifaction.systemsData,
+					allFactionNames: canonnEd3d_multifaction.allFactionNames,
+					systemFactionIndex: canonnEd3d_multifaction.systemFactionIndex
+				});
+			}
 
-			Ed3d.init({
-				container: 'edmap',
-				json: canonnEd3d_multifaction.systemsData,
-				withFullscreenToggle: false,
-				withHudPanel: true,
-				hudMultipleSelect: true,
-				effectScaleSystem: [20, 100],
-				startAnim: !isAllMode,
-				showGalaxyInfos: true,
-				systemColor: '#FF9D00',
-				finished: function () {
-					canonnEd3d_multifaction.finishMap();
-				},
-			});
+			launch();
 
 		} catch (err) {
 			console.error('multifaction: error loading data –', err);
