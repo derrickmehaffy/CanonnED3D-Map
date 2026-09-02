@@ -286,31 +286,69 @@ from the top: frame 0 is empty, the atom assembles by ~300, and it fades at
 
 ---
 
-## Worth a look later: DarkSession's rewrite
+## Worth taking from DarkSession's rewrite: `updateSystems()`
 
 https://github.com/DarkSession/CanonnED3D-Map-DCoH-v2
 
-Not a GitHub fork — a standalone TypeScript + webpack rewrite of Ed3d,
-published to npm as `canonned3d-map` v0.1.8. Nine commits, all in January 2023,
-dormant since. Same class structure as ours but **fewer** features (no Route,
-Grid, Heatmap or Ico), and on three 0.148 where we are on 0.185.
+Not a GitHub fork — a standalone TypeScript + webpack rewrite, npm
+`canonned3d-map` v0.1.8, nine commits in January 2023 and dormant since. Fewer
+features than ours (no Route, Grid, Heatmap or Ico) on three 0.148 where we are
+on 0.185, and adopting it wholesale would mean the build step that was declined.
 
-Adopting it wholesale would mean a build step, which was declined on purpose,
-so this is a source of ideas rather than code.
+**The thing worth having is one method**: `updateSystems(systems, categories?,
+activeCategories?)` — swap the data on a live map without tearing down the UI.
+What it gets right:
 
-**The idea worth taking: its event bus.** `ED3DMap` emits `init`, `render`,
-`enableFarView`, `disableFarView` and `systemHoverChanged` through `emittery`,
-and components subscribe. That is directly relevant here — `js/console.js`
-polls the engine instead, on a 250 ms interval for the status strip and another
-for `Action.selectedPoint`. Events would replace both polls, and the idea ports
-without any of the TypeScript. Good candidate for after the rollout.
+  - keeps systems marked `permanent` (Sol, Sagittarius A*) across the swap
+  - carries the active category filters over, so a user's toggles survive
+  - merges by name rather than duplicating: appends the description, unions the
+    categories
+  - rebuilds category materials, disposing the old ones
+  - emits `systemsLoaded` when finished
 
-It also carries `src/dcoh_historical.html`, a historical DCoH map we do not have.
+**Take the API, not the implementation.** Theirs is one `Sprite` plus one
+`Points` per system. On our landing page's 4,147 systems that is ~8,300 scene
+objects and as many draw calls; our single BufferGeometry point cloud is one.
+That was the Phase 2a work and we should not give it back.
 
-It does **not** fix the selection-cursor artifact: its cursor is the same
-ring-and-cone build as `action.class.js:583`, an outer cone and an inner black
-cone 0.2 apart with no depth bias. Ours is 20 / 20.2, theirs 12.5 / 12.7 — the
-same latent z-fighting, so there is nothing to copy for that one.
+### What we have today
+
+`Ed3d.addBatch(data, done)` — **append only**, no remove and no update.
+`System.remove()` exists but discards *everything*. There is no way to drop one
+system, change one, or replace the set.
+
+The primitives are already there, though: `System.endParticleSystem()`
+(`system.class.js:154`) already disposes the old geometry and rebuilds the cloud
+from the `positions` / `colorValues` accumulators, which is exactly the
+expensive half. Phase 2a also added `findByName()`, `getPoint()` and
+`setColor()`, and `HUD.initFilters()` already appends new categories while
+skipping ones it has seen.
+
+### The actual difficulty: indices
+
+`Ed3d.catObjs[cat]` holds **indices into `System.points`** (`ed3dmap.js:768`),
+and so does `System.particleInfos`. Removing a system shifts every index after
+it, so a real `updateSystems` has to rebuild both maps — plus `nameIndex` and
+whatever `Action` is holding as the current selection. That bookkeeping, not the
+geometry, is the work.
+
+### Why it is worth doing here
+
+The console already wants it. The systems panel, the layer counts and the
+journal-drop feature all rebuild off `System.points`, and `js/console.js`
+currently caches that list against its length because there is no change
+signal. It also unblocks the caching idea for the landing page: render the
+cached dump immediately, then *update* when the fresh one finishes parsing,
+instead of holding a boot screen for 3-5 seconds.
+
+Sequencing: after the rollout, and it pairs naturally with their other good
+idea — an event bus (`init`, `render`, `enableFarView`, `disableFarView`,
+`systemHoverChanged`, `systemsLoaded`) to replace the console's two polling
+intervals.
+
+It does **not** fix the selection-cursor artifact: same ring-and-cone build as
+`action.class.js:583`, cones 0.2 apart with no depth bias. It also carries
+`src/dcoh_historical.html`, a historical DCoH map we do not have.
 
 ## Open questions for Derrick
 
