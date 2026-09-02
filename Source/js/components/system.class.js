@@ -4,6 +4,7 @@ var System = {
 
   'particle': null,
   'particleGeo': null,
+  'particleMaterial': null,
   'particleColor': [],
   'particleInfos': [],
   'points': [],
@@ -168,18 +169,24 @@ var System = {
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.positions), 3));
     geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(this.colorValues), 3));
 
-    var particleMaterial = new THREE.PointsMaterial({
-      map: Ed3d.textures.flare_yellow,
-      vertexColors: true,
-      size: this.scaleSize,
-      fog: false,
-      blending: THREE.AdditiveBlending,
-      transparent: true,
-      depthTest: true,
-      depthWrite: false
-    });
+    //-- The material is identical on every flush, and this runs once per
+    //   500-system batch. Building a new one each time (and only ever
+    //   disposing the geometry, just above) leaked ceil(N/500)-1 materials per
+    //   load, each holding a texture reference. Build it once and reuse.
+    if (this.particleMaterial === null) {
+      this.particleMaterial = new THREE.PointsMaterial({
+        map: Ed3d.textures.flare_yellow,
+        vertexColors: true,
+        size: this.scaleSize,
+        fog: false,
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        depthTest: true,
+        depthWrite: false
+      });
+    }
 
-    this.particle = new THREE.Points(geo, particleMaterial);
+    this.particle = new THREE.Points(geo, this.particleMaterial);
     this.particle.clickable = true;
     this.particleGeo = geo;
 
@@ -194,6 +201,10 @@ var System = {
   'remove': function () {
 
     if (this.particle !== null && this.particle.geometry) this.particle.geometry.dispose();
+    if (this.particleMaterial !== null) {
+      this.particleMaterial.dispose();
+      this.particleMaterial = null;
+    }
 
     this.positions = null;
     this.colorValues = null;

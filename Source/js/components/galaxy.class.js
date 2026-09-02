@@ -207,9 +207,11 @@ var Galaxy = {
     var opacityMiddle = 1.1-opacity;
     if(opacityMiddle<=0.4) opacityMiddle = 0.2;
 
-    for( var i = 0; i < this.infos.children.length; i++ ) {
-      var txt = this.infos.children[ i ];
-      txt.material.opacity = (!txt.revert) ? opacity : opacityMiddle;
+    // Two shared materials cover every label, so this is two assignments
+    // rather than a walk over ~98 meshes.
+    if (this.textMaterials !== null) {
+      this.textMaterials.normal.opacity = opacity;
+      this.textMaterials.revert.opacity = opacityMiddle;
     }
 
     this.infos.previousOpacity = opacity;
@@ -251,6 +253,34 @@ var Galaxy = {
    * Add Shape text
    */
 
+  /**
+   * The two materials every region label shares.
+   *
+   * There is one per opacity band rather than one per label: infosUpdateCallback
+   * drives labels to two different opacities depending on their `revert` flag,
+   * so two materials cover every case. Previously each label allocated its own
+   * identical MeshBasicMaterial — ~98 of them on a galaxy — and the opacity
+   * update walked all of them on every scale change. Now it sets two.
+   */
+
+  'textMaterials' : null,
+
+  'textMaterial' : function (revert) {
+    if (this.textMaterials === null) {
+      var make = function () {
+        return new THREE.MeshBasicMaterial({
+          color: 0x999999,
+          transparent: true,
+          opacity: 0.7,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        });
+      };
+      this.textMaterials = { normal: make(), revert: make() };
+    }
+    return revert ? this.textMaterials.revert : this.textMaterials.normal;
+  },
+
   'addText' : function(textShow, x, y, z, rot, size, revert) {
 
     // r185 dropped THREE.FontUtils; Ed3d.font (loaded once in Ed3d.init())
@@ -266,16 +296,7 @@ var Galaxy = {
 
     var textGeo = new THREE.ShapeGeometry(textShapes);
 
-    var textMesh = new THREE.Mesh(textGeo, new THREE.MeshBasicMaterial({
-      color: 0x999999,
-      transparent: true,
-      opacity: 0.7,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    }));
-
-    textMesh.geometry = textGeo;
-    textMesh.geometry.needsUpdate = true;
+    var textMesh = new THREE.Mesh(textGeo, Galaxy.textMaterial(revert));
 
     //x -= Math.round(textShow.length*400/2);
     var middleTxt = Math.round(size/2);
