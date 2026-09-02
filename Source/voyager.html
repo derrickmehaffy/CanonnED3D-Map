@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
   <meta http-equiv="content-type" content="text/html; charset=UTF-8">
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/x-icon" href="img/favicon.ico" />
 
   <!-- Google tag (gtag.js) -->
@@ -16,68 +16,61 @@
 
     gtag('config', 'G-Z047QW7Q79');
   </script>
-  <link href="https://fonts.googleapis.com/css?family=Orbitron:400" rel="stylesheet" type="text/css" />
+
   <script src="/js/jquery-2.1.4.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.min.js"></script>
   <script src="vendor/papaparse/papaparse.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/randomcolor/0.5.4/randomColor.js"></script>
+
+  <!-- lcunfool's nav arrows use Font Awesome glyphs; without this they render blank. -->
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
-  <link rel="stylesheet" type="text/css" href="css/menu.css" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;450;500&display=swap">
   <link rel="stylesheet" type="text/css" href="css/style.css" />
-
-  <!-- Custom CSS -->
-  <style type="text/css">
-    #systemDetails,
-    #hud {
-      width: 350px;
-    }
-
-    #edmap {
-      position: fixed;
-      top: 6%;
-      right: 0;
-      width: 100%;
-      height: 93%;
-      z-index: -1;
-    }
-  </style>
+  <link rel="stylesheet" type="text/css" href="css/styles.css" />
+  <!-- The console owns the page layout: top bar, rail, panels, status strip.
+       It replaces include/nav.html, so css/menu.css is no longer loaded. -->
+  <link rel="stylesheet" type="text/css" href="css/console.css" />
 
   <title>CanonnED3D - Voyager Pulsars</title>
-
 </head>
 
-<body bgcolor="#000000">
-  <script src="js/nav-include.js"></script>
-  <div w3-include-html="include/nav.html"></div>
-
-  <script>
-    w3IncludeHTML();
-  </script>
-
+<body>
+  <!-- The console injects its chrome around this, so #edmap holds only the
+       boot overlay. id="loading" is the contract every MapData-*.js relies on
+       to dismiss the loader; see js/console.js. -->
   <div id="edmap">
-    <div id="loading">
-      <img src="img/Canonn-Logo.gif" alt="Loading" height="300" width="300" />
+    <div id="loading" role="status" aria-live="polite">
+      <div id="bootlogo"></div>
+      <div id="bootfallback">Canonn R&amp;D</div>
+      <div id="bootbar"><i></i></div>
+      <p id="bootmsg">Initialising</p>
     </div>
-    <!-- Launch ED3Dmap -->
-    <script src="vendor/tween-js/Tween.js"></script>
-    <script type="importmap">
-    {
-      "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.185.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.0/examples/jsm/"
-      }
-    }
-    </script>
-    <script type="module" src="js/main.js?v=7"></script>
-    <link href="css/styles.css" rel="stylesheet" type="text/css" />
-    <!-- Voyager Pulsars MapData -->
-    <script defer src="data/MapData-Voyager.js"></script>
-    <script type="text/javascript">
-      document.addEventListener('DOMContentLoaded', function () {
-        canonnEd3d_voyager.init();
-      });
-    </script>
   </div>
+
+  <!-- Launch ED3Dmap -->
+  <script src="vendor/tween-js/Tween.js"></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.185.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="js/main.js?v=7"></script>
+
+  <!-- Lottie player for the R&D animated logo on the boot screen. -->
+  <script defer src="vendor/bodymovin/bodymovin.min.js"></script>
+  <!-- Ordered before the map data so the chrome exists when Ed3d sizes itself. -->
+  <script defer src="js/console.js"></script>
+
+  <!-- Voyager Pulsars MapData -->
+  <script defer src="data/MapData-Voyager.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      canonnEd3d_voyager.init();
+    });
+  </script>
 </body>
 
 </html>

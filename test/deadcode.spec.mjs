@@ -31,9 +31,12 @@ test('nav renders without contacting w3schools', async ({ page }) => {
   });
 
   await stubDataHosts(page);
-  await page.goto(REFERENCE_PAGE, { waitUntil: 'load' });
+  // NOT the reference page: voyager.html has moved to the console, which
+  // replaces include/nav.html. Any page still on the old chrome will do, and
+  // this test retires with the last of them.
+  await page.goto('/gr-data.html', { waitUntil: 'load' });
 
-  // nav.html contains <div id="cssmenu">; voyager.html includes it.
+  // nav.html contains <div id="cssmenu">.
   await expect(page.locator('#cssmenu')).toBeAttached({ timeout: 30_000 });
   expect(thirdParty, 'no request reached w3schools.com').toEqual([]);
 });
