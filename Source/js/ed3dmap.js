@@ -1098,6 +1098,8 @@ function refresh3dMapSize() {
     // The post-processing composer keeps its own render targets, which have to
     // follow the canvas or the frame is drawn at the old size and stretched.
     if (Ed3d.postfx && Ed3d.postfx.resize) Ed3d.postfx.resize();
+    // Line2 works out its pixel width from the canvas size.
+    Route.resize();
   }
 }
 

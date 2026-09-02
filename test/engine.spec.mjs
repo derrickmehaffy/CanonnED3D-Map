@@ -159,3 +159,45 @@ test('the HDR pipeline is off by default and reverts cleanly', async ({ page }) 
   expect(r.after.toneMapping).toBe(r.before.toneMapping);
   expect(r.after.restored, 'renderer.render put back').toBe(true);
 });
+
+/* LineBasicMaterial.linewidth is a documented no-op in WebGL, so every route
+   was a 1px hairline whatever it asked for. Line2 draws the line as
+   camera-facing quads, which gives it real width — but its material has to be
+   told the canvas resolution to convert that width into pixels. */
+test('routes are drawn with real line width', async ({ page }) => {
+  await loaded(page);
+  const r = await page.evaluate(() => {
+    const rs = Object.keys(routes).map((k) => routes[k]).filter(Boolean);
+    const size = new THREE.Vector2();
+    renderer.getSize(size);
+    return {
+      count: rs.length,
+      types: [...new Set(rs.map((x) => x.type))],
+      materials: [...new Set(rs.map((x) => x.material.type))],
+      width: rs[0].material.linewidth,
+      // Names are the handle HUD uses to toggle route visibility by category.
+      named: rs.every((x) => /^route-/.test(x.name)),
+      resMatches: rs.every((x) => x.material.resolution.x === size.x &&
+                                  x.material.resolution.y === size.y)
+    };
+  });
+  expect(r.count).toBeGreaterThan(0);
+  expect(r.types).toEqual(['Line2']);
+  expect(r.materials).toEqual(['LineMaterial']);
+  expect(r.width).toBeGreaterThan(1);
+  expect(r.named, 'route names survive for HUD toggling').toBe(true);
+  expect(r.resMatches, 'materials know the canvas size').toBe(true);
+});
+
+test('route materials follow a canvas resize', async ({ page }) => {
+  await loaded(page);
+  await page.setViewportSize({ width: 900, height: 700 });
+  await page.waitForTimeout(400);
+  const ok = await page.evaluate(() => {
+    const size = new THREE.Vector2();
+    renderer.getSize(size);
+    return Object.keys(routes).map((k) => routes[k]).filter(Boolean)
+      .every((x) => x.material.resolution.x === size.x);
+  });
+  expect(ok, 'stale resolution would draw lines at the wrong width').toBe(true);
+});

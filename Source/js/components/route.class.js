@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { Line2 } from 'three/addons/lines/Line2.js';
+import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 
 var Route = {
 
@@ -67,7 +70,7 @@ var Route = {
     var first = null;
     var last = null;
     var color = Ed3d.material.orange;
-    var colorLine = Ed3d.material.line;
+    var colorLine = null;   // built below, once the colour is known
 	var circle = true;
 
     var hideLast = (route.hideLast !== undefined && route.hideLast);
@@ -78,12 +81,11 @@ var Route = {
       color = new THREE.MeshBasicMaterial({
         color: Ed3d.colors[route.cat[0]]
       });
-      colorLine = new THREE.MeshBasicMaterial({
-        color: Ed3d.colors[route.cat[0]]
-      });
+      colorLine = Route.lineMaterial(Ed3d.colors[route.cat[0]]);
     } else {
       color = Ed3d.material.orange;
     }
+    if (colorLine === null) colorLine = Route.lineMaterial(Ed3d.material.line.color);
 
     $.each(route.points, function(key2, val) {
 
@@ -107,9 +109,16 @@ var Route = {
     });
 
     //-- Add lines to scene
-    var geometryL = new THREE.BufferGeometry();
-    geometryL.setAttribute('position', new THREE.BufferAttribute(new Float32Array(routeVerts), 3));
-    routes[idRoute] = new THREE.Line(geometryL, colorLine);
+    // LineBasicMaterial.linewidth is a documented no-op in WebGL, so every
+    // route was a 1px hairline whatever it asked for. Line2 draws the line as
+    // camera-facing quads, so width, joins and caps actually work. It needs at
+    // least two points, and its material needs the canvas resolution — see
+    // Route.resize().
+    var geometryL = new LineGeometry();
+    geometryL.setPositions(routeVerts.length >= 6 ? routeVerts
+                                                  : routeVerts.concat(routeVerts));
+    routes[idRoute] = new Line2(geometryL, colorLine);
+    routes[idRoute].computeLineDistances();
 
     //-- Add object for start & end
 	
@@ -137,6 +146,31 @@ var Route = {
      });
    }
 
+  },
+
+  //-- Line2 materials need the canvas size in pixels to work out how wide a
+  //   line should be; they are collected so a resize can update them all.
+  'lineMaterials' : [],
+
+  'lineMaterial' : function (color) {
+    var size = new THREE.Vector2(window.innerWidth, window.innerHeight);
+    if (typeof renderer !== 'undefined' && renderer) renderer.getSize(size);
+    var mat = new LineMaterial({
+      color: new THREE.Color(color),
+      linewidth: 2,             // pixels, because worldUnits is false
+      worldUnits: false,
+      alphaToCoverage: false,
+      resolution: size
+    });
+    this.lineMaterials.push(mat);
+    return mat;
+  },
+
+  'resize' : function () {
+    if (typeof renderer === 'undefined' || !renderer) return;
+    var size = new THREE.Vector2();
+    renderer.getSize(size);
+    this.lineMaterials.forEach(function (m) { m.resolution.copy(size); });
   },
 
   'addCircle' : function(id, point, material, size) {
