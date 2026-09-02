@@ -234,7 +234,13 @@ var System = {
    */
   'setColor': function (index, color) {
     this.particleColor[index] = color;
-    if (this.points[index] !== undefined) this.points[index].color = color;
+    // points[index].color is the system's BASE colour and is deliberately not
+    // touched here. hud.class.js dims a filtered-out category with
+    // setColor(i, #111111) and restores it by reading points[i].color back, so
+    // overwriting it here left re-enabled categories permanently grey. Before
+    // the BufferGeometry migration the drawn colour lived in geometry.colors,
+    // a separate array from the vertex's own .color, which is what made the
+    // restore work; this keeps that separation.
     if (this.colorValues !== null) {
       this.colorValues[index * 3] = color.r;
       this.colorValues[index * 3 + 1] = color.g;
