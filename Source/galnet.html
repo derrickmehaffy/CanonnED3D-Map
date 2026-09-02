@@ -22,7 +22,6 @@
   <script src="vendor/papaparse/papaparse.min.js"></script>
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;450;500&display=swap">
-  <link rel="stylesheet" type="text/css" href="css/console.css" />
   <link rel="stylesheet" type="text/css" href="css/style.css" />
 
   <!-- Custom CSS -->
@@ -59,6 +58,9 @@
     </script>
     <script type="module" src="js/main.js?v=7"></script>
     <link rel="stylesheet" type="text/css" href="css/styles.css" />
+  <!-- Last, deliberately: the console owns layout, and style.css / styles.css
+       define #edmap, #loading, #nav-controls and #hud too. -->
+  <link rel="stylesheet" type="text/css" href="css/console.css" />
 
     <!-- Lottie player for the R&D animated logo on the boot screen. -->
     <script defer src="vendor/bodymovin/bodymovin.min.js"></script>

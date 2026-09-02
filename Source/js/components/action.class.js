@@ -86,7 +86,11 @@ var Action = {
 
     var minScale = Ed3d.effectScaleSystem[0];
     var maxScale = Ed3d.effectScaleSystem[1];
-    var newScale = scale*20;
+    //-- Point size is driven by camera distance. systemSizeScale multiplies
+    //   that, so a size control actually changes the size: adjusting only the
+    //   clamp does nothing whenever the computed value already sits between
+    //   the bounds, which is most of the range.
+    var newScale = scale * 20 * (Ed3d.systemSizeScale || 1);
 
     if(this.prevScale == newScale) return;
     this.prevScale = newScale;

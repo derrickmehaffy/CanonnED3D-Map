@@ -196,6 +196,7 @@ var Ed3d = {
   'startAnim': true,
 
   //-- Scale system effect
+  'systemSizeScale': 1,
   'effectScaleSystem': [10, 800],
 
   //-- Graphical Options
@@ -1245,6 +1246,8 @@ function refreshWithCamPos() {
   var now = performance.now();
   if (now - lastCoordRefresh >= 100) {
     lastCoordRefresh = now;
+    Ed3d.grid1H.updateOrigin();
+    Ed3d.grid1K.updateOrigin();
     Ed3d.grid1H.addCoords();
     Ed3d.grid1K.addCoords();
   }

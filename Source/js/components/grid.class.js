@@ -46,16 +46,28 @@ var Grid = {
         // Distance over which lines fade to nothing. Scaled off the spacing so
         // the fine grid disappears before it can turn into a haze, while the
         // coarse one stays visible much further out.
-        uFade:  { value: size * 900 }
+        uFade:  { value: size * 900 },
+        //-- Kept on a multiple of the cell size, so moving it never shifts
+        //   where the lines fall.
+        uOrigin: { value: new THREE.Vector2(0, 0) }
       },
       transparent: true,
       depthWrite: false,
       side: THREE.DoubleSide,
       vertexShader: [
         'varying vec3 vWorld;',
+        'varying vec2 vGrid;',
+        'uniform vec2 uOrigin;',
         'void main() {',
         '  vec4 wp = modelMatrix * vec4(position, 1.0);',
         '  vWorld = wp.xyz;',
+        // Grid coordinates are carried relative to a snapped origin rather
+        // than as raw world position. The plane spans two million units, and
+        // a fragment shader's floats run out of mantissa long before that —
+        // at a few thousand ly out the pattern visibly shimmered as the
+        // camera moved. Subtracting the origin here, in the vertex stage,
+        // keeps the numbers the fragment stage sees small.
+        '  vGrid = wp.xz - uOrigin;',
         '  gl_Position = projectionMatrix * viewMatrix * wp;',
         '}'
       ].join('\n'),
@@ -64,9 +76,11 @@ var Grid = {
         'uniform vec3  uColor;',
         'uniform float uFade;',
         'varying vec3 vWorld;',
+        'varying vec2 vGrid;',
         'void main() {',
-        // Grid coordinates in units of one cell. Lines sit on the integers.
-        '  vec2 c = vWorld.xz / uSize;',
+        // Grid coordinates in units of one cell, measured from the snapped
+        // origin. Lines sit on the integers.
+        '  vec2 c = vGrid / uSize;',
         // Distance to the nearest line, divided by how much c changes across
         // one pixel: the result is "pixels from the line", so the line keeps a
         // constant on-screen width at any zoom.
@@ -163,6 +177,26 @@ var Grid = {
     scene.add(this.obj);
 
     return this;
+  },
+
+  /**
+   * Keep the shader's origin near the camera so its coordinates stay small.
+   *
+   * Snapped to whole cells, so the lines land in exactly the same world
+   * positions however often this moves.
+   */
+
+  'updateOrigin' : function() {
+
+    if (this.obj == null || !this.obj.material || !this.obj.material.uniforms) return;
+    var u = this.obj.material.uniforms.uOrigin;
+    if (u == undefined || typeof controls === 'undefined' || !controls) return;
+
+    var step = this.size * 64;
+    var ox = Math.round(controls.target.x / step) * step;
+    var oz = Math.round(controls.target.z / step) * step;
+    if (u.value.x !== ox || u.value.y !== oz) u.value.set(ox, oz);
+
   },
 
   'addCoords' : function() {

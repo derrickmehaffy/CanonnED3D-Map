@@ -86,6 +86,7 @@
       // logo, which orbits. The segments meet at 300, so the hand-off is
       // invisible and the loader never shows an empty frame.
       var ASSEMBLE = [110, 400], SUSTAIN = [300, 400];
+
       var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       try {
         anim = window.bodymovin.loadAnimation({
@@ -351,6 +352,7 @@
   var sel = null, selSite = 0, panel = 'layers';
   var extraRoutes = [];                    // systems added from a dropped journal
   var sysQuery = '', sysSort = 'name';     // systems panel: filter text and order
+  var lastScrolledTo = null;               // system the list last jumped to
   /* Most pages title themselves "CanonnED3D - Maps", so the title is no use as
      a name. The catalogue built from the nav has the real one for every map,
      query string included — that is what the nav displayed. */
@@ -392,6 +394,53 @@
   }
 
   function on(i)  { return CATS[i] ? CATS[i].on : true; }
+  /* System "infos" is authored HTML — the data files put <br>, thumbnails and
+     Signals links in it, and Ed3d's own HUD always rendered it as markup.
+     Escaping it showed the tags as text; dropping it straight into innerHTML
+     trusts remote APIs (codex and GEC fill this field from the network). So
+     render an allowlisted subset: structure and links survive, scripts,
+     handlers and javascript: URLs do not. */
+  var HTML_OK = { A:1, B:1, BR:1, DIV:1, EM:1, I:1, IMG:1, LI:1, OL:1, P:1,
+                  SMALL:1, SPAN:1, STRONG:1, U:1, UL:1 };
+  var ATTR_OK = { A: ['href', 'title'], IMG: ['src', 'alt', 'title'] };
+
+  function safeHtml(html) {
+    var doc;
+    try {
+      doc = new DOMParser().parseFromString('<body>' + (html || '') + '</body>', 'text/html');
+    } catch (e) {
+      return esc(html);
+    }
+    (function walk(node) {
+      var children = Array.prototype.slice.call(node.childNodes);
+      children.forEach(function (child) {
+        if (child.nodeType === 3) return;                       // text is fine
+        if (child.nodeType !== 1 || !HTML_OK[child.tagName]) {
+          // Keep what it said, lose the element itself.
+          if (child.nodeType === 1) {
+            walk(child);
+            while (child.firstChild) child.parentNode.insertBefore(child.firstChild, child);
+          }
+          child.parentNode.removeChild(child);
+          return;
+        }
+        var keep = ATTR_OK[child.tagName] || [];
+        Array.prototype.slice.call(child.attributes).forEach(function (a) {
+          var ok = keep.indexOf(a.name.toLowerCase()) > -1;
+          if (ok && /^(href|src)$/i.test(a.name) &&
+              /^\s*(javascript|data(?!:image\/)):/i.test(a.value)) ok = false;
+          if (!ok) child.removeAttribute(a.name);
+        });
+        if (child.tagName === 'A') {
+          child.setAttribute('target', '_blank');
+          child.setAttribute('rel', 'noopener noreferrer');
+        }
+        walk(child);
+      });
+    })(doc.body);
+    return doc.body.innerHTML;
+  }
+
   function col(i) { return (CATS[i] && CATS[i].color) || '#FF9D00'; }
 
   /* Ed3d builds a real HUD of category filters in #filters, hidden by
@@ -512,10 +561,10 @@
     controls.update();
     syncCamera();
 
-    // The galaxy region labels are drawn at galaxy scale. On a tight dataset
-    // (Beacons spans a few hundred ly) a single label fills the screen, so
-    // default them off and leave the Display panel to bring them back.
-    if (!frameAll && radius < 2000 && disp.galaxy) doDisplay('galaxy', false);
+    // Region labels used to be switched off automatically on a tight dataset,
+    // on the grounds that one label can fill the view. In practice that just
+    // looked like a broken toggle — they are wanted by default, and the
+    // Display panel is there for anyone who disagrees.
     var z = $('zfit');
     if (z) z.title = frameAll ? 'Frame the main cluster' : 'Frame everything';
   }
@@ -694,8 +743,15 @@
         f.oninput = function () { sysQuery = this.value; renderPanel(); $('sysfilter').focus(); };
         if (sysQuery) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
       }
+      // Only chase the selection when it has actually changed. The panel
+      // re-renders whenever the data does, and scrolling on every render
+      // dragged the list away from wherever the reader had put it.
       var cur = host.querySelector('.sysrow.on');
-      if (cur) cur.scrollIntoView({ block: 'nearest' });
+      if (cur && sel && sel.n !== lastScrolledTo) {
+        lastScrolledTo = sel.n;
+        cur.scrollIntoView({ block: 'nearest' });
+      }
+      if (!sel) lastScrolledTo = null;
     }
   }
 
@@ -874,7 +930,12 @@
     // The clamp has to do two jobs: keep flares modest up close, and keep systems
     // visible against the starfield when zoomed right out. [20,500] was too big
     // at distance; [8,28] made them vanish. Scale the ceiling off the base.
-    Ed3d.effectScaleSystem = [Math.max(4, sysSize * 0.5), Math.min(240, sysSize * 10)];
+    // 20 is the slider's midpoint and reproduces the engine's own sizing, so
+    // the control reads as "bigger/smaller than default" rather than as an
+    // absolute. The clamp stays wide: it is there to stop flares swallowing
+    // the screen at extreme zoom, not to do the scaling.
+    Ed3d.systemSizeScale = sysSize / 20;
+    Ed3d.effectScaleSystem = [Math.max(2, sysSize * 0.25), 400];
     if (typeof Action !== 'undefined') Action.prevScale = null;  // force recompute
     System.scaleSize = sysSize;
   }
@@ -1001,7 +1062,7 @@
       return '<div class="site' + (i === selSite ? ' on' : '') + '" data-i="' + i + '" role="button" tabindex="0">' +
         '<span class="sw" style="background:' + col(si[0]) + '"></span>' +
         '<span class="ty">' + esc(catName(si[0])) + '</span>' +
-        '<span class="bd">' + (si[1] ? esc(si[1]) : '—') + '</span></div>';
+        '<span class="bd">' + (si[1] ? safeHtml(si[1]) : '—') + '</span></div>';
     }).join('');
     var link = '';
     if (CFG.panel === 'star' && s.s[0][2]) {

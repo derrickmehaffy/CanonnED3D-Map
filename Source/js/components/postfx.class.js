@@ -41,7 +41,12 @@ var PostFX = {
   //   gr-data.html, so the change is confined to the bright end, which is
   //   where the headroom was missing. Bloom is the part still open to taste.
   'exposure': 1.30,
-  'strength': 0.7,
+  //-- Zero by default. On a sparse map bloom reads well, but the landing map
+  //   plots thousands of systems in tight clusters and the halos merge into
+  //   one another — the tone mapping is what was actually wanted there, and it
+  //   works without any bloom at all. The slider is still here for the maps
+  //   where it helps.
+  'strength': 0,
   'radius': 0.5,
   'threshold': 0.85,
 
@@ -63,6 +68,9 @@ var PostFX = {
     this.composer = new EffectComposer(renderer, target);
     this.composer.addPass(new RenderPass(scene, camera));
     this.bloom = new UnrealBloomPass(size, this.strength, this.radius, this.threshold);
+    //-- A zero-strength bloom still costs its blur passes every frame, so it is
+    //   switched off rather than merely turned down.
+    this.bloom.enabled = this.strength > 0;
     this.composer.addPass(this.bloom);
     //-- OutputPass applies the tone mapping and the sRGB conversion.
     this.composer.addPass(new OutputPass());
@@ -138,6 +146,7 @@ var PostFX = {
       this.bloom.strength = this.strength;
       this.bloom.threshold = this.threshold;
       this.bloom.radius = this.radius;
+      this.bloom.enabled = this.strength > 0;
     }
   },
 
