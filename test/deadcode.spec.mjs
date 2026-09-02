@@ -31,10 +31,10 @@ test('nav renders without contacting w3schools', async ({ page }) => {
   });
 
   await stubDataHosts(page);
-  // NOT the reference page: voyager.html has moved to the console, which
-  // replaces include/nav.html. Any page still on the old chrome will do, and
-  // this test retires with the last of them.
-  await page.goto('/gr-data.html', { waitUntil: 'load' });
+  // Every page linked from the nav is now on the console, which replaces
+  // include/nav.html. The pages lcunfool unlinked still carry it, so one of
+  // those is what keeps this assertion alive; it retires with them.
+  await page.goto('/dcoh.html', { waitUntil: 'load' });
 
   // nav.html contains <div id="cssmenu">.
   await expect(page.locator('#cssmenu')).toBeAttached({ timeout: 30_000 });

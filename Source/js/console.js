@@ -38,7 +38,7 @@
      data layer, so the fade lives in an observer here rather than in the 35
      callers, and no data file has to change.                                */
   var Boot = (function () {
-    var el, anim, dismissed = false;
+    var el, anim, dismissed = false, done = false;
 
     function say(txt, accent) {
       var m = $('bootmsg');
@@ -46,10 +46,18 @@
     }
 
     function finish() {
-      if (!el) return;
+      if (!el || done) return;
+      done = true;
       if (anim) { try { anim.destroy(); } catch (e) {} anim = null; }
-      if (el.parentNode) el.parentNode.removeChild(el);
-      el = null;
+      // Hidden, not removed. The data layer dismisses the overlay with
+      //   document.getElementById('loading').style.display = 'none'
+      // and some maps only get there long after the scene is up — a slow or
+      // failed fetch, or an error path. Removing the node makes that call
+      // throw on null and take Ed3d.init() down with it. display:none is
+      // enough: it stops the overlay covering the canvas and swallowing
+      // clicks, and the contract keeps working however late the call comes.
+      el.innerHTML = '';
+      el.style.display = 'none';
     }
 
     function dismiss() {
@@ -347,12 +355,20 @@
      a name. The catalogue built from the nav has the real one for every map,
      query string included — that is what the nav displayed. */
   var MAPNAME = (function () {
+    // Several catalogue entries can match one URL, because they are the same
+    // page with progressively more parameters: codex.html?hud_category=Biology
+    // is "Horizons Biology", and that same page with &english_name=Bark+Mounds
+    // is "Bark Mounds". Both match, so take the one that matched on the most
+    // parameters rather than the first one found.
+    var best = null, bestScore = -1;
     for (var i = 0; i < CATALOGUE.length; i++) {
       var items = CATALOGUE[i].items;
       for (var j = 0; j < items.length; j++) {
-        if (isCurrentPage(items[j].u)) return items[j].n;
+        var score = pageMatchScore(items[j].u);
+        if (score > bestScore) { bestScore = score; best = items[j].n; }
       }
     }
+    if (best !== null) return best;
     var t = (document.title || '').replace(/^\s*CanonnED3D\s*[-–—]\s*/i, '').trim();
     return (!t || /^maps?$/i.test(t)) ? 'Canonn map' : t;
   })();
@@ -399,6 +415,13 @@
       });
     });
     return out;
+  }
+
+  function refreshCatCounts() {
+    if (!window.Ed3d) return;
+    CATS.forEach(function (c) {
+      c.count = (Ed3d.catObjs[c.id] && Ed3d.catObjs[c.id].length) || 0;
+    });
   }
 
   /* Toggling proxies the click straight back to Ed3d's own anchor. That keeps
@@ -498,8 +521,23 @@
   }
 
   /* ── status strip, polled off Ed3d's own camera ───────────────────────── */
+  var lastPointCount = -1;
+
   function tick() {
     if (typeof controls === 'undefined' || !controls) return;
+
+    // Ed3d keeps appending points after it first reports the data complete —
+    // codex.html finishes at 3,422 having been readable at 500 — so the panel
+    // and the counts have to follow rather than being rendered once.
+    if (window.System && System.points && System.points.length !== lastPointCount) {
+      lastPointCount = System.points.length;
+      invalidateSystems();
+      refreshCatCounts();
+      updateShown();
+      if (panel === 'layers' || panel === 'systems') renderPanel();
+      setFeed('live', SYSLIST().length + ' systems');
+    }
+
     var t = controls.target;
     applyDisplay();
     $('st-pos').textContent = Math.round(t.x) + ' · ' + Math.round(t.y) + ' · ' + Math.round(-t.z);
@@ -1053,15 +1091,20 @@
   /* The nav linked the same page under many names — codex.html alone served 48
      entries, separated only by query string — so "am I on this one?" has to
      compare the parameters too, not just the filename. */
-  function isCurrentPage(u) {
-    if (!u) return false;
+  function isCurrentPage(u) { return pageMatchScore(u) >= 0; }
+
+  /* -1 when the URL is not this page at all; otherwise how many query
+     parameters it pinned down, so the most specific match can win. */
+  function pageMatchScore(u) {
+    if (!u) return -1;
     var a = new URL(u, location.href);
-    if (a.pathname !== location.pathname) return false;
+    if (a.pathname !== location.pathname) return -1;
     var mine = new URLSearchParams(location.search), theirs = new URLSearchParams(a.search);
     var keys = [];
     theirs.forEach(function (v, k) { keys.push(k); });
-    if (!keys.length) return !mine.toString();
-    return keys.every(function (k) { return mine.get(k) === theirs.get(k); });
+    if (!keys.length) return mine.toString() ? -1 : 0;
+    var all = keys.every(function (k) { return mine.get(k) === theirs.get(k); });
+    return all ? keys.length : -1;
   }
 
   $('switcher').onclick = openIndex;
@@ -1189,6 +1232,9 @@
     hoverType = catName(0);
     $('mapname').textContent = MAPNAME;
     $('st-map').textContent = MAPNAME;
+    // Most pages are titled "CanonnED3D - Maps", so every codex entry shared one
+    // name in the tab bar, in history and in bookmarks. Name them properly.
+    document.title = MAPNAME + ' — CanonnED3D';
     setFeed('live', SYSLIST().length + ' systems');
 
     renderPanel();

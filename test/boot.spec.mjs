@@ -47,13 +47,37 @@ test('the console boot screen mounts the R&D logo', async ({ page }) => {
   await expect(page.locator('#bootmsg')).toContainText(/\S/);
 });
 
-test('the console boot screen removes itself once the map is up', async ({ page }) => {
+test('the console boot screen gets out of the way once the map is up', async ({ page }) => {
   await stubDataHosts(page);
   await page.goto(CONSOLE_PAGE, { waitUntil: 'domcontentloaded' });
 
-  // It must not merely fade: the overlay covers the canvas at z-index 40 and
-  // would swallow every click on the map if it stayed in the DOM.
-  await expect(page.locator('#loading')).toHaveCount(0, { timeout: 60_000 });
+  // Hidden rather than removed: the overlay covers the canvas at z-index 40, so
+  // it must stop capturing clicks — but the node has to survive, because the
+  // data layer dismisses it by id and some maps get there very late.
+  await expect(page.locator('#loading')).toBeHidden({ timeout: 60_000 });
+  await expect(page.locator('#loading')).toHaveCount(1);
+});
+
+/* A map whose fetch is slow or fails reaches
+     document.getElementById('loading').style.display = 'none'
+   long after the console has already dismissed the boot screen. Removing the
+   node made that throw on null and took Ed3d.init() down with it, leaving a
+   blank page — which is how ts-msg_3305survey.html broke. */
+test('a late dismissal from the data layer does not throw', async ({ page }) => {
+  const crashes = [];
+  page.on('pageerror', (e) => crashes.push(String(e)));
+  await stubDataHosts(page);
+  await page.goto(CONSOLE_PAGE, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#loading')).toBeHidden({ timeout: 60_000 });
+
+  const threw = await page.evaluate(() => {
+    try {
+      document.getElementById('loading').style.display = 'none';
+      return null;
+    } catch (e) { return String(e); }
+  });
+  expect(threw).toBeNull();
+  expect(crashes).toEqual([]);
 });
 
 test('the boot screen falls back to a wordmark without the Lottie player', async ({ page }) => {
@@ -66,5 +90,5 @@ test('the boot screen falls back to a wordmark without the Lottie player', async
   await expect(page.locator('#bootfallback')).toBeVisible({ timeout: 15_000 });
   await expect(page.locator('#bootlogo')).toBeHidden();
   // ...and it still gets out of the way.
-  await expect(page.locator('#loading')).toHaveCount(0, { timeout: 60_000 });
+  await expect(page.locator('#loading')).toBeHidden({ timeout: 60_000 });
 });

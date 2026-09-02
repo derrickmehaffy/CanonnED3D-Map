@@ -119,7 +119,7 @@
      2. Because those files hide it abruptly, the fade lives in an observer
         rather than in the callers — nothing in data/ needs to change.        */
   var Boot = (function () {
-    var el, anim, dismissed = false;
+    var el, anim, dismissed = false, done = false;
 
     function say(txt, accent) {
       var m = $('bootmsg');
@@ -127,10 +127,18 @@
     }
 
     function finish() {
-      if (!el) return;
+      if (!el || done) return;
+      done = true;
       if (anim) { try { anim.destroy(); } catch (e) {} anim = null; }
-      el.parentNode && el.parentNode.removeChild(el);
-      el = null;
+      // Hidden, not removed. The data layer dismisses the overlay with
+      //   document.getElementById('loading').style.display = 'none'
+      // and some maps only get there long after the scene is up — a slow or
+      // failed fetch, or an error path. Removing the node makes that call
+      // throw on null and take Ed3d.init() down with it. display:none is
+      // enough: it stops the overlay covering the canvas and swallowing
+      // clicks, and the contract keeps working however late the call comes.
+      el.innerHTML = '';
+      el.style.display = 'none';
     }
 
     function dismiss() {
