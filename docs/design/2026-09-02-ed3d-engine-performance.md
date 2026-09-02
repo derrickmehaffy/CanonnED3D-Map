@@ -104,3 +104,87 @@ properly, rather than driving it from scroll events.
 
 Re-measure on real hardware before and after; these numbers are only good for
 ranking.
+
+---
+
+# The "wow" side: the pipeline is the thing holding the look back
+
+Same session, prototyped live on `gec.html` and `voyager.html`.
+
+## Why it currently looks milky
+
+The scene is built almost entirely from **additive blending with no headroom**:
+
+| | count | size | blending |
+|---|---|---|---|
+| Galaxy point cloud | 26,212 | 500 | additive |
+| Galaxy core cloud | 1,817 | 2,000 | additive |
+| System flares | per map | 200 | additive |
+| Region labels | ~98 | — | additive |
+| Grid | 88k verts | — | normal |
+
+Every one of those writes into an **8-bit LDR buffer that clamps at 1.0**. In
+the galactic plane, dozens of size-500 sprites overlap, the sum blows straight
+past white, and the result clips flat. That is the entire reason the map reads
+as a washed-out haze rather than stars — it is not the textures or the colours,
+it is that the r75-era pipeline has nowhere to put values above 1.
+
+## What modern three.js changes
+
+Render into a **half-float target** so additive blending can accumulate past
+1.0, then **tone map** on the way out instead of clipping:
+
+```js
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.75;
+
+const composer = new EffectComposer(renderer,
+  new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType }));
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.7, 0.5, 0.85));
+composer.addPass(new OutputPass());
+```
+
+Prototyped and captured: dense overlap compresses into bright cores with
+coloured falloff instead of a white sheet, and systems read as individual glowing
+stars against dark space — the Elite galaxy-map look.
+
+**Bloom only works once HDR is in place.** Tried first on the existing pipeline
+and it blew the whole frame out at any useful threshold, because nothing in an
+LDR scene is brighter than anything else once it has clipped. Threshold above
+1.0 then does nothing at all. Order matters: HDR and tone mapping first, bloom
+second.
+
+Selective bloom (bloom the data, not the backdrop, via a second composer and a
+mix pass) was also prototyped. Worth keeping in reserve, but it is a workaround
+for missing headroom; with HDR the plain bloom pass is enough and much simpler.
+
+**Open tuning question:** at exposure 0.75 the Milky Way recedes further than it
+should — the stars look great, the galaxy nearly vanishes. Exposure, bloom
+threshold and the galaxy sprite brightness need balancing together. That is a
+dial-turning exercise with a person looking at it, not something to guess.
+
+## Related: colour management is currently off
+
+`ColorManagement.enabled = false` is set deliberately (Phase 2b) so the legacy
+hex colours render as authored. That pins the renderer to the old
+non-colour-managed path, and it is the same decision that keeps tone mapping
+out. Turning both on together shifts every colour on the site, so it is a
+deliberate re-look at the palette rather than a flag flip — but it is the door
+to the whole modern pipeline.
+
+## Also worth having
+
+**Thick route lines.** Route and pulsar lines use `LineBasicMaterial`, whose
+`linewidth` is a documented no-op in WebGL — every line is a 1px hairline
+regardless of setting. `Line2` / `LineMaterial` from three's addons draws lines
+as camera-facing quads with real width, joins and dashes. For the route maps
+(Voyager pulsars, UIA, Adamastor) this is a large visual upgrade for a small,
+contained change, and it is independent of the HDR work.
+
+## Suggested order for the visual work
+
+1. HDR target + ACES tone mapping — the unlock; everything else depends on it
+2. Bloom, tuned together with exposure and galaxy brightness, with a person watching
+3. `Line2` route lines — independent, self-contained, big payoff on route maps
+4. Revisit colour management and the palette as one deliberate pass
