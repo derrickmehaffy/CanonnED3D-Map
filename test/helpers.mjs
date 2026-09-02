@@ -17,21 +17,17 @@ export const DATA_HOSTS = [
 ];
 
 // Hosts the offline suite is allowed to actually contact: assets only.
+// www.w3schools.com is deliberately absent: all 50 pages used to load
+// lib/w3data.js from there for the w3IncludeHTML() nav include, but that has
+// been replaced with a local Source/js/nav-include.js (see test/deadcode.spec.mjs
+// "nav renders without contacting w3schools"), so nothing should reach that
+// host anymore. Leaving it here would silently weaken that assertion.
 export const ALLOWED_EXTERNAL = [
   'cdnjs.cloudflare.com',
   'cdn.jsdelivr.net',
   'fonts.googleapis.com',
   'fonts.gstatic.com',
-  'maxcdn.bootstrapcdn.com',
-  // Serves lib/w3data.js, the w3IncludeHTML() library every one of the 50
-  // pages uses to inject its shared nav bar (<div w3-include-html="...">).
-  // It is a static script, not a Canonn data endpoint — confirmed by
-  // stubbing it as a DATA_HOST: the fulfilled "[]" body loads without a
-  // network error, but w3IncludeHTML() is then undefined, and every page's
-  // own inline `<script>w3IncludeHTML();</script>` throws
-  // "ReferenceError: w3IncludeHTML is not defined", which fails the
-  // suite's crash assertion. It belongs here, not in DATA_HOSTS.
-  'www.w3schools.com'
+  'maxcdn.bootstrapcdn.com'
 ];
 
 // voyager.html is the reference page for engine-level tests: a single local

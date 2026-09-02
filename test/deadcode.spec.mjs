@@ -23,3 +23,17 @@ test('no dead vendor file is requested', async ({ page }) => {
 
   expect(requested).toEqual([]);
 });
+
+test('nav renders without contacting w3schools', async ({ page }) => {
+  const thirdParty = [];
+  page.on('request', (r) => {
+    if (new URL(r.url()).hostname.endsWith('w3schools.com')) thirdParty.push(r.url());
+  });
+
+  await stubDataHosts(page);
+  await page.goto(REFERENCE_PAGE, { waitUntil: 'load' });
+
+  // nav.html contains <div id="cssmenu">; voyager.html includes it.
+  await expect(page.locator('#cssmenu')).toBeAttached({ timeout: 30_000 });
+  expect(thirdParty, 'no request reached w3schools.com').toEqual([]);
+});
