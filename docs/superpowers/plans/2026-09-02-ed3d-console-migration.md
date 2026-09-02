@@ -194,9 +194,75 @@ It keeps `MapData-multifaction.js` and its `history.replaceState` default of `?f
 - [ ] 35 of 35 `MapData-*.js` files unmodified by this plan
 - [ ] `npm test` green
 
+---
+
+## Redirects: mostly unnecessary
+
+Measured against the live nav: **96 links resolve to only 29 distinct HTML files.**
+62 of the 91 internal links are the same page with different query parameters —
+`codex.html` alone serves **51** nav entries (every Biology, Geology and Cloud
+species). `multifaction.html` serves 6, the combos 3 each.
+
+So the site is already "one page, many params" for the bulk of its surface. Since
+every page keeps its filename in this plan, **no redirects are needed**. If a page
+is retired later, a three-line `<meta http-equiv="refresh">` shim at the old
+filename is enough, and can be added per page as the need arises.
+
+---
+
+## Data fetching: one map dominates everything
+
+Measured on the live site, 2026-09-02, on the default map:
+
+| | Cold | Warm HTTP cache |
+|---|---|---|
+| `factions.json.gz` response | 882 ms | 178 ms |
+| Data ready | 5,574 ms | 3,289 ms |
+| **Decompress + parse + build** | **4,692 ms** | **3,111 ms** |
+
+The dump is **16.6 MB gzipped**, fetched on every visit to the landing page to
+render 4,147 systems for two factions. Total page weight is **16.8 MB**; the next
+largest asset is a 247 KB texture.
+
+**The download is not the bottleneck.** Spansh already sends
+`cache-control: max-age=86400` with an ETag, and the fetch does not bust it, so
+repeat visits are served from cache — and still cost **3.1 seconds**, because the
+client decompresses and parses the whole dump every single load.
+
+Why the whole dump: it is needed twice over — to filter to the requested factions,
+and to build `allFactionNames` for the sidebar's faction-search autocomplete.
+Fetching one faction is therefore not a drop-in fix.
+
+There is no per-faction endpoint on Canonn's cloud functions today (`/query/factions`
+returns 400), and `elitebgs.app` timed out when tested, so a server-side fix needs
+new work in Canonn-GCloud — LCU No Fool Like One's domain, not this plan's.
+
+**What this plan can do client-side**, in order of payoff:
+
+1. **Cache the derived result, not the response.** Store the filtered systems and
+   the faction-name list in IndexedDB keyed by the dump's ETag. A warm visit then
+   costs ~0 ms instead of 3.1 s. This is the single biggest win available.
+2. **Defer the autocomplete list.** `allFactionNames` is only needed when the
+   faction search box is focused. Building it on demand removes it from the
+   critical path.
+3. **Reconsider the landing page.** Every first-time visitor to map.canonn.tech
+   pays this cost before seeing anything. Worth asking whether multifaction should
+   be the default at all — see Open Questions.
+
 ## Open questions for Derrick
 
-1. **Does the console replace `include/nav.html`, or coexist with it?** The plan assumes replace — the map switcher and ⌘K make the 102-link hover menu redundant, and it is the thing the redesign set out to remove. But that is a visible change on every page and is your call.
+1. **Does the console replace `include/nav.html`, or coexist with it?** The plan
+   assumes replace. The nav is a two-row bar of 10 top-level items with three
+   levels of hover cascade beneath — 96 links, 1,300 px tall when fully expanded.
+   The map switcher and ⌘K cover the same ground without the cascade, and it is
+   what the redesign set out to remove. Still a visible change on every page, so
+   it is your call.
 2. **Do the combo pages survive?** `aliens-combo`, `guardians-combo`, `thargoids-combo` load two data files each. They work, but the layer panel's group headers may make them redundant now.
 3. **`dcoh_headless.html`** exists to be embedded in an iframe. Should it get the chrome at all, or stay bare?
-4. **Ordering:** roll out group by group behind the live site, or convert everything on the branch and merge once? The plan assumes the latter.
+4. **Should multifaction stay the landing page?** It costs every first-time
+   visitor 5.6 s (3.1 s even warm) before anything renders, because of the 16.6 MB
+   Spansh dump. A lighter default would make the site feel dramatically faster;
+   keeping it means fixing the caching first.
+
+**Settled:** full conversion, all pages at once on the branch (not staged behind
+the live site). No redirects needed — see above.
