@@ -284,6 +284,34 @@ The animation is a 15 s build-and-fade, so it needs driving rather than looping
 from the top: frame 0 is empty, the atom assembles by ~300, and it fades at
 ~440. The console plays the assembly once and then loops the formed logo.
 
+---
+
+## Worth a look later: DarkSession's rewrite
+
+https://github.com/DarkSession/CanonnED3D-Map-DCoH-v2
+
+Not a GitHub fork — a standalone TypeScript + webpack rewrite of Ed3d,
+published to npm as `canonned3d-map` v0.1.8. Nine commits, all in January 2023,
+dormant since. Same class structure as ours but **fewer** features (no Route,
+Grid, Heatmap or Ico), and on three 0.148 where we are on 0.185.
+
+Adopting it wholesale would mean a build step, which was declined on purpose,
+so this is a source of ideas rather than code.
+
+**The idea worth taking: its event bus.** `ED3DMap` emits `init`, `render`,
+`enableFarView`, `disableFarView` and `systemHoverChanged` through `emittery`,
+and components subscribe. That is directly relevant here — `js/console.js`
+polls the engine instead, on a 250 ms interval for the status strip and another
+for `Action.selectedPoint`. Events would replace both polls, and the idea ports
+without any of the TypeScript. Good candidate for after the rollout.
+
+It also carries `src/dcoh_historical.html`, a historical DCoH map we do not have.
+
+It does **not** fix the selection-cursor artifact: its cursor is the same
+ring-and-cone build as `action.class.js:583`, an outer cone and an inner black
+cone 0.2 apart with no depth bias. Ours is 20 / 20.2, theirs 12.5 / 12.7 — the
+same latent z-fighting, so there is nothing to copy for that one.
+
 ## Open questions for Derrick
 
 1. **Does the console replace `include/nav.html`, or coexist with it?** The plan
