@@ -29,6 +29,24 @@ Plus targeted tests for the Phase 0 performance fixes (`perf.spec.mjs`), the
 dead-code removals (`deadcode.spec.mjs`), and the test hook itself
 (`hook.spec.mjs`).
 
+## Engine architecture
+
+The engine is ES modules running on three.js r75. `Source/js/main.js` is the
+entry point: every page loads the four vendor classic scripts (OrbitControls,
+FontUtils, the typeface, Tween) and then `main.js` as
+`<script type="module">`, which imports the engine modules — including
+`Source/js/ed3dmap.js` — and publishes the compat globals (`Ed3d`,
+`canonnEd3d_*`, `__ed3dTestState`, etc.) that the rest of the page relies on.
+
+The 30 `Source/data/MapData-*.js` files are deliberately still classic
+scripts: they read those engine globals off `window` rather than importing
+them, so they stay untouched by this migration. Each page loads its data file
+with `defer` and calls its `canonnEd3d_X.init()` from inside a
+`DOMContentLoaded` listener — `<script type="module">` and `<script defer>`
+both run after parsing, in document order, and `DOMContentLoaded` fires after
+both, so the module always publishes its globals before the data file runs
+and before init is called.
+
 ## How it works
 
 `test/server.mjs` serves `Source/` as the web root — required, because 49 pages
