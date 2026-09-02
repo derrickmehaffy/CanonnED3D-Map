@@ -7,7 +7,7 @@ import * as THREE from 'three';
 // extensible" — it is not a plain object you can bolt new keys onto. Every
 // engine module that constructs OrbitControls or loads a font therefore
 // imports the addon itself, same as it imports 'three' itself (see the
-// module-evaluation-order note in the class comment above Ed3d.material).
+// module-evaluation-order note above the ColorManagement line below).
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { Grid } from './components/grid.class.js';
@@ -83,6 +83,23 @@ document.addEventListener('keyup', function (e) {
   flyCam.keys[e.code] = false;
 });
 
+
+//-- Preserve the r75 colour pipeline.
+//
+// MUST be set here, not in main.js. ES modules evaluate every static import
+// before the importing module's own body runs, so by the time main.js's body
+// executes, this file has already been evaluated — including the Ed3d.material
+// object literal below, which constructs ~9 materials and bakes a THREE.Color
+// into each. r152+ converts hex input from sRGB into the linear working space
+// at construction time, and that conversion is permanent: flipping the flag
+// afterwards does not undo it. Setting it here, as the first statement of this
+// module's body, is before Ed3d.material is evaluated and therefore before any
+// Color exists.
+//
+// Leaving conversion on turns #16292B into #020606 (the grid coordinate text
+// goes near-black) and #0DFFFF into #01FFFF (the selection cursor). Revisiting
+// colour management properly is a separate, deliberate decision.
+THREE.ColorManagement.enabled = false;
 
 var Ed3d = {
 

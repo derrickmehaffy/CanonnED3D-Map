@@ -23,11 +23,11 @@ import { System } from './components/system.class.js';
 import { Galaxy } from './components/galaxy.class.js';
 import { Heatmap } from './components/heat.class.js';
 
-// Preserve the r75 colour pipeline. r152+ would otherwise convert every hex
-// colour into a linear working space and output sRGB, changing how the whole
-// map looks. This migration is "same picture, newer engine"; revisiting colour
-// management is a separate, deliberate decision.
-THREE.ColorManagement.enabled = false;
+// NOTE: THREE.ColorManagement.enabled is deliberately NOT set here. It lives at
+// the top of ed3dmap.js's body instead, because that module's Ed3d.material
+// literal bakes THREE.Colors at module-evaluation time — which happens while
+// this file's imports are being resolved, i.e. before any of this body runs.
+// Setting it here would be too late and silently shift every colour.
 
 // The four data files that build three.js objects (Permit, multifaction,
 // landscape, UIA) are classic scripts and reference THREE as a global. None

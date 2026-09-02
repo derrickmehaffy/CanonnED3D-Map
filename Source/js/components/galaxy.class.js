@@ -120,8 +120,18 @@ var Galaxy = {
       // race — which would otherwise mean every addText() call below no-ops
       // and these labels never appear for the rest of the page's life.
       // Retrying the whole population once the font shows up avoids that.
+      var fontWaits = 0;
       function populate() {
-        if (!Ed3d.font) { setTimeout(populate, 50); return; }
+        // Bounded: if the font genuinely fails to load (404, network), give up
+        // after ~5s rather than retrying every 50ms for the life of the page.
+        if (!Ed3d.font) {
+          if (fontWaits++ > 100) {
+            console.warn('galaxy: font never loaded, skipping region labels');
+            return;
+          }
+          setTimeout(populate, 50);
+          return;
+        }
 
         $.each(data.quadrants, function(key, val) {
 
