@@ -522,7 +522,15 @@
     if (typeof Galaxy !== 'undefined') {
       if (disp.galaxy) Galaxy.infosShow(); else Galaxy.infosHide();
     }
-    if (Ed3d.starfield) Ed3d.starfield.visible = disp.stars;
+    // Two different things read as "stars": Ed3d.starfield up close, and the
+    // Galaxy milkyway particle clouds once far view engages. enableFarView()
+    // hides the former and shows the latter, so toggling only starfield did
+    // nothing at the zoom level where you can actually see them.
+    if (Ed3d.starfield) Ed3d.starfield.visible = disp.stars && !far;
+    if (typeof Galaxy !== 'undefined' && Galaxy.milkyway) {
+      Galaxy.milkyway.forEach(function (m) { if (m) m.visible = disp.stars && far; });
+      if (Galaxy.milkyway2D) Galaxy.milkyway2D.visible = disp.stars && far;
+    }
   }
 
   function applySize() {
@@ -622,11 +630,17 @@
   setInterval(function () {
     if (typeof Action === 'undefined' || !Action.selectedPoint) return;
     var p = Action.selectedPoint;
-    if (sel && sel.name === p.name) return;
+    // Grouped records key the system name as `n`, not `name`. Comparing the
+    // wrong field meant this guard never matched, so the card was rebuilt and
+    // selSite reset to 0 five times a second — which is why the card's site
+    // rows snapped back to the first and the left panel's hover kept being
+    // dragged back to the selected site's type.
+    if (sel && sel.n === p.name) return;
     var rec = null;
     for (var i = 0; i < DATA.sys.length; i++) if (DATA.sys[i].n === p.name) { rec = DATA.sys[i]; break; }
     if (!rec) return;
     sel = rec; selSite = 0; renderCard();
+    if (CFG.templates) showTemplate(TYPES[rec.s[0][0]]);
   }, 200);
 
   function renderCard() {
@@ -677,7 +691,9 @@
     Array.prototype.forEach.call(c.querySelectorAll('.site'), function (el) {
       el.onclick = function () { selSite = +el.dataset.i; renderCard(); if (CFG.templates) showTemplate(TYPES[s.s[selSite][0]]); };
     });
-    if (CFG.templates) showTemplate(ty);
+    // Deliberately NOT calling showTemplate() here. renderCard() runs on every
+    // card refresh, and doing so yanked the left panel's highlight away from
+    // whatever the pointer was hovering.
   }
 
   /* ── map index: the browsable alternative to searching ────────────────── */
@@ -781,6 +797,7 @@
     if (r.k === 'tool') { window.open(r.u, '_blank', 'noopener'); closePal(); return; }
     if (r.k === 'sys') {
       closePal(); sel = r.s; selSite = 0; renderCard();
+      if (CFG.templates) showTemplate(TYPES[r.s.s[0][0]]);
       controls.target.set(r.s.x, r.s.y, -r.s.z);
       moveTo({ x: r.s.x - 120, y: r.s.y + 90, z: -r.s.z + 120 });
       return;
