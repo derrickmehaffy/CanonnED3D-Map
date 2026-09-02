@@ -13,7 +13,7 @@ page requires nothing but a text editor and a push.
 
 | Command | What it does |
 |---|---|
-| `npm test` | The whole suite across all 50 pages. Deterministic, offline, ~18s. |
+| `npm test` | The whole suite across all 36 pages. Deterministic, offline, ~18s. |
 | `npm run serve` | Serve `Source/` on http://localhost:4173 for manual poking. |
 
 ## What it checks
@@ -55,18 +55,18 @@ no `?factions=` parameter is present, so no scene is created.
 
 ## Skipped pages
 
-17 of the 50 entries in `test/pages.json` carry `"offlineSkip": true`:
+3 of the 36 entries in `test/pages.json` carry `"offlineSkip": true`:
 
-- **14** have their map initialisation commented out in the HTML itself
-  (`<!-- ed3dmap.js disabled: out of order -->`). These are the pages backed by
-  `api.canonn.tech`, which is unreachable. Nothing the test suite does can boot
-  them; they are disabled upstream.
 - **`route_data.html`** — its loader dereferences the stubbed `[]`. Its host is
-  shared by 13 data files with different expected shapes, so a host-level stub
-  override would break the 12 that currently pass.
+  shared by several data files with different expected shapes, so a host-level
+  stub override would break the ones that currently pass.
 - **`index.html`, `multifaction.html`** — both fetch a gzipped Spansh dump and
   pipe it through `DecompressionStream`. The generic stub is not valid gzip.
   Covering them needs a synthetic fixture with at least one fake faction.
+
+The 14 pages backed by `api.canonn.tech` were deleted rather than skipped: that
+API is unreachable and the pages were deliberately retired upstream, not left
+broken. See git history if you need them back.
 
 ## Adding a page
 
