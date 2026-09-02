@@ -1,4 +1,5 @@
-﻿
+﻿import * as THREE from 'three';
+
 var HUD = {
 
   'container': null,
@@ -795,8 +796,7 @@ var HUD = {
               journalRouteVerts.push(s.x, s.y, -s.z);
             });
             var geo = new THREE.BufferGeometry();
-            // r75 spelling; Task 2 renames this to setAttribute.
-            geo.addAttribute('position', new THREE.BufferAttribute(new Float32Array(journalRouteVerts), 3));
+            geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(journalRouteVerts), 3));
             var lineMat = new THREE.LineBasicMaterial({ color: color });
             var line = new THREE.Line(geo, lineMat);
             line.name = name;
@@ -905,8 +905,7 @@ var HUD = {
             spanshRouteVerts.push(jump.x, jump.y, -jump.z);
           });
           var geo = new THREE.BufferGeometry();
-          // r75 spelling; Task 2 renames this to setAttribute.
-          geo.addAttribute('position', new THREE.BufferAttribute(new Float32Array(spanshRouteVerts), 3));
+          geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(spanshRouteVerts), 3));
 
           var lineMat = new THREE.LineBasicMaterial({ color: 0xFF9D00 });
           var line = new THREE.Line(geo, lineMat);
@@ -1496,16 +1495,15 @@ var HUD = {
 
   'addText': function (id, textShow, x, y, z, size, addToObj, isPoint) {
 
+    // r185 dropped THREE.FontUtils; Ed3d.font (loaded once in Ed3d.init())
+    // provides the equivalent synchronous generateShapes(text, size). Guard
+    // in case this runs before the async load has completed.
+    if (!Ed3d.font) return;
+
     if (addToObj == undefined) addToObj = scene;
     if (isPoint == undefined) isPoint = false;
 
-    var textShapes = THREE.FontUtils.generateShapes(textShow, {
-      'font': 'helvetiker',
-      'weight': 'normal',
-      'style': 'normal',
-      'size': size,
-      'curveSegments': 100
-    });
+    var textShapes = Ed3d.font.generateShapes(textShow, size);
 
     var textGeo = new THREE.ShapeGeometry(textShapes);
 

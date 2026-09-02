@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 
 var Grid = {
 
@@ -23,8 +24,16 @@ var Grid = {
 
     this.size = size;
 
-    this.obj = new THREE.GridHelper(1000000, size);
-    this.obj.setColors(color, color);
+    // r75: GridHelper(halfExtent, stepInWorldUnits) drew a grid spanning
+    // +/-1,000,000 with a line every `size` world units, coloured after the
+    // fact via setColors(). r185: GridHelper(fullExtent, divisions,
+    // colorCenterLine, colorGrid) takes the FULL extent and a division
+    // count, and setColors() no longer exists — colour is constructor-only.
+    // To reproduce the same line spacing: full extent is the old half-extent
+    // doubled, and divisions is extent / size (one division per `size`
+    // units, same as before).
+    var extent = 1000000 * 2;
+    this.obj = new THREE.GridHelper(extent, extent / size, color, color);
     this.obj.minDistView = minDistView;
 
     scene.add(this.obj);
@@ -67,8 +76,7 @@ var Grid = {
     }
 
     var geometry = new THREE.BufferGeometry();
-    // r75 spelling; Task 2 renames this to setAttribute.
-    geometry.addAttribute('position', new THREE.BufferAttribute(new Float32Array(gridVerts), 3));
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(gridVerts), 3));
 
     this.obj = new THREE.LineSegments( geometry, material );
     this.obj.position.set(0,0,-20000);
@@ -91,8 +99,7 @@ var Grid = {
     quadrantVerts.push( 0, 0,   size );
 
     var quadrant = new THREE.BufferGeometry();
-    // r75 spelling; Task 2 renames this to setAttribute.
-    quadrant.addAttribute('position', new THREE.BufferAttribute(new Float32Array(quadrantVerts), 3));
+    quadrant.setAttribute('position', new THREE.BufferAttribute(new Float32Array(quadrantVerts), 3));
     var quadrantL = new THREE.LineSegments( quadrant, material );
 
 
@@ -108,14 +115,14 @@ var Grid = {
 
   'addCoords' : function() {
 
+    // r185 dropped THREE.FontUtils; Ed3d.font (a FontLoader result loaded
+    // once in Ed3d.init()) provides the equivalent synchronous
+    // generateShapes(text, size). Guard in case this runs before the async
+    // load has completed.
+    if (!Ed3d.font) return;
+
     var textShow = '0 : 0 : 0';
-    var options = {
-        'font': 'helvetiker',
-        'weight': 'normal',
-        'style': 'normal',
-        'size': this.size/20,
-        'curveSegments': 10
-      };
+    var textSize = this.size/20;
 
     if(this.coordGrid != null) {
 
@@ -139,7 +146,7 @@ var Grid = {
 
       //-- Generate a new text shape
 
-      this.textShapes = THREE.FontUtils.generateShapes( this.coordTxt, options );
+      this.textShapes = Ed3d.font.generateShapes(this.coordTxt, textSize);
       this.textGeo.dispose();
       this.textGeo = new THREE.ShapeGeometry(this.textShapes);
 
@@ -152,7 +159,7 @@ var Grid = {
 
     } else {
 
-      this.textShapes = THREE.FontUtils.generateShapes(textShow, options);
+      this.textShapes = Ed3d.font.generateShapes(textShow, textSize);
       this.textGeo = new THREE.ShapeGeometry(this.textShapes);
       this.coordGrid = new THREE.Mesh(this.textGeo, Ed3d.material.darkblue);
       this.coordGrid.position.set(this.obj.position.x, this.obj.position.y, this.obj.position.z);

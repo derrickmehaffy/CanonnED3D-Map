@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 
 var Heatmap = {
 
@@ -18,7 +19,7 @@ var Heatmap = {
 
     var particleMaterial = new THREE.PointsMaterial({
       map: texSquare,
-      vertexColors: THREE.VertexColors,
+      vertexColors: true,
       size: 800,
       fog: false,
       blending: THREE.AdditiveBlending,
@@ -96,7 +97,11 @@ var Heatmap = {
       var height = Math.abs(prop.y[1] - prop.y[0])*2;
       if(height<100) height = 100;
 
-      var geometry = new THREE.BoxBufferGeometry( 170, height, 170 );
+      // r185 removed BoxBufferGeometry; BoxGeometry is the buffer-geometry
+      // implementation now (not exercised by voyager.html — this page has no
+      // heatmap data — but every other page using Heatmap.create() would hit
+      // "THREE.BoxBufferGeometry is not a constructor" without this).
+      var geometry = new THREE.BoxGeometry( 170, height, 170 );
       var material = new THREE.MeshLambertMaterial( {color: "rgb("+heatColor[sizeColor][0]+", "+heatColor[sizeColor][1]+", "+heatColor[sizeColor][2]+")"} );
 
 
@@ -113,8 +118,8 @@ var Heatmap = {
 
 
 
-    geometry.addAttribute( 'position', new THREE.BufferAttribute( positions, 3 ) );
-    geometry.addAttribute( 'color', new THREE.BufferAttribute( colors, 3 ) );
+    geometry.setAttribute( 'position', new THREE.BufferAttribute( positions, 3 ) );
+    geometry.setAttribute( 'color', new THREE.BufferAttribute( colors, 3 ) );
 
 
     var particles = new THREE.Points(geometry, particleMaterial);

@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 
 var Action = {
 
@@ -112,6 +113,14 @@ var Action = {
     var count = 0;
 
     var raycaster = new THREE.Raycaster(camera.position, camera.position);
+    // r185's Sprite.raycast() dereferences raycaster.camera unconditionally
+    // (needed to compute the camera-facing billboard quad) and throws
+    // "Cannot read properties of null (reading 'matrixWorld')" if it's
+    // unset. The manual Raycaster(origin, direction) constructor — unlike
+    // raycaster.setFromCamera(), which sets this internally — never sets
+    // it, and this raycast hits scene.children, which includes the
+    // Sagittarius A* glow Sprite.
+    raycaster.camera = camera;
     raycaster.params.Points.threshold = 100;
 
     var intersects = raycaster.intersectObjects(scene.children);
@@ -206,6 +215,12 @@ var Action = {
 
     obj.mouseVector.unproject(camera);
     obj.raycaster = new THREE.Raycaster(camera.position, obj.mouseVector.sub(camera.position).normalize());
+    // See the note in highlightAroundCamera(): a manually-constructed
+    // Raycaster doesn't get .camera set the way setFromCamera() would, and
+    // r185's Sprite.raycast() needs it. hitCandidates() is Points-only today
+    // so this isn't currently load-bearing here, but it's one line to stay
+    // correct if that ever changes, and it matches onMouseUp below.
+    obj.raycaster.camera = camera;
     obj.raycaster.params.Points.threshold = obj.pointCastRadius;
 
     // create an array containing all objects in the scene with which the ray intersects
@@ -307,6 +322,11 @@ var Action = {
 
     obj.mouseVector.unproject(camera);
     obj.raycaster = new THREE.Raycaster(camera.position, obj.mouseVector.sub(camera.position).normalize());
+    // See the note in highlightAroundCamera(). This raycast hits
+    // scene.children directly — including the Sagittarius A* glow Sprite —
+    // so without this every click throws
+    // "Cannot read properties of null (reading 'matrixWorld')" in r185.
+    obj.raycaster.camera = camera;
     obj.raycaster.params.Points.threshold = obj.pointCastRadius;
 
 

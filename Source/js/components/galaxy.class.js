@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 
 var Galaxy = {
 
@@ -106,36 +107,54 @@ var Galaxy = {
 
     $.getJSON(Ed3d.basePath + "data/milkyway-ed.json", function(data) {
 
-      $.each(data.quadrants, function(key, val) {
+      // addText() no-ops if Ed3d.font hasn't finished loading yet (see the
+      // guard inside it). Everywhere else that matters (grid coordinate
+      // labels, HUD selection/hover labels) that call is repeated many times
+      // over the page's life, so a missed attempt is invisible — the next
+      // one succeeds once the font is ready. This one is different: the
+      // quadrant/arm/gap/other labels below are only ever populated once,
+      // from this single AJAX success callback. On a real page load the
+      // ~63KB font (fetched via FontLoader) and this ~6KB local JSON file
+      // (fetched via jQuery) are kicked off within a statement of each other
+      // in Ed3d.init()/launchMap(), and the smaller file's fetch can win the
+      // race — which would otherwise mean every addText() call below no-ops
+      // and these labels never appear for the rest of the page's life.
+      // Retrying the whole population once the font shows up avoids that.
+      function populate() {
+        if (!Ed3d.font) { setTimeout(populate, 50); return; }
 
-        obj.addText(key,val.x,-100,val.z,val.rotate);
+        $.each(data.quadrants, function(key, val) {
 
-      });
+          obj.addText(key,val.x,-100,val.z,val.rotate);
 
-      $.each(data.arms, function(key, val) {
-
-        $.each(val, function(keyCh, valCh) {
-          obj.addText(key,valCh.x,0,valCh.z,valCh.rotate,300,true);
         });
 
-      });
+        $.each(data.arms, function(key, val) {
 
-      $.each(data.gaps, function(key, val) {
+          $.each(val, function(keyCh, valCh) {
+            obj.addText(key,valCh.x,0,valCh.z,valCh.rotate,300,true);
+          });
 
-        $.each(val, function(keyCh, valCh) {
-          obj.addText(key,valCh.x,0,valCh.z,valCh.rotate,160,true);
         });
 
-      });
+        $.each(data.gaps, function(key, val) {
 
-      $.each(data.others, function(key, val) {
+          $.each(val, function(keyCh, valCh) {
+            obj.addText(key,valCh.x,0,valCh.z,valCh.rotate,160,true);
+          });
 
-        $.each(val, function(keyCh, valCh) {
-          obj.addText(key,valCh.x,0,valCh.z,valCh.rotate,160,true);
         });
 
-      });
+        $.each(data.others, function(key, val) {
 
+          $.each(val, function(keyCh, valCh) {
+            obj.addText(key,valCh.x,0,valCh.z,valCh.rotate,160,true);
+          });
+
+        });
+      }
+
+      populate();
 
     }).done(function() {
 
@@ -224,17 +243,16 @@ var Galaxy = {
 
   'addText' : function(textShow, x, y, z, rot, size, revert) {
 
+    // r185 dropped THREE.FontUtils; Ed3d.font (loaded once in Ed3d.init())
+    // provides the equivalent synchronous generateShapes(text, size). Guard
+    // in case this runs before the async load has completed.
+    if (!Ed3d.font) return;
+
     if(revert==undefined) revert = false;
     if(size==undefined) size = 450;
     textShow = textShow.toUpperCase();
 
-    var textShapes = THREE.FontUtils.generateShapes(textShow, {
-      'font': 'helvetiker',
-      'weight': 'normal',
-      'style': 'normal',
-      'size': size,
-      'curveSegments': 12
-    });
+    var textShapes = Ed3d.font.generateShapes(textShow, size);
 
     var textGeo = new THREE.ShapeGeometry(textShapes);
 
@@ -254,7 +272,9 @@ var Galaxy = {
     z -= middleTxt;
 
     textMesh.rotation.x = -Math.PI / 2;
-    textMesh.geometry.applyMatrix( new THREE.Matrix4().makeTranslation(-Math.round(textShow.length*size/2), 0, -middleTxt) );
+    // r185 renamed BufferGeometry.applyMatrix to applyMatrix4 (the old name
+    // is gone, not just deprecated).
+    textMesh.geometry.applyMatrix4( new THREE.Matrix4().makeTranslation(-Math.round(textShow.length*size/2), 0, -middleTxt) );
     if(rot != 0) {
       textMesh.rotateOnAxis (new THREE.Vector3( 0, 0, 1 ), Math.PI * (rot) / 180);
     }
@@ -362,15 +382,14 @@ var Galaxy = {
     //-- Create small particles milkyway
 
     var particles = new THREE.BufferGeometry();
-    // r75 spelling; Task 2 renames this to setAttribute.
-    particles.addAttribute('position', new THREE.BufferAttribute(new Float32Array(particleVerts), 3));
-    particles.addAttribute('color', new THREE.BufferAttribute(new Float32Array(particleColorVerts), 3));
+    particles.setAttribute('position', new THREE.BufferAttribute(new Float32Array(particleVerts), 3));
+    particles.setAttribute('color', new THREE.BufferAttribute(new Float32Array(particleColorVerts), 3));
 
     var particleMaterial = new THREE.PointsMaterial({
       map: Ed3d.textures.flare_yellow,
       transparent: true,
       size: 64,
-      vertexColors: THREE.VertexColors,
+      vertexColors: true,
       blending: THREE.AdditiveBlending,
       depthTest: true,
       depthWrite: false
@@ -388,14 +407,13 @@ var Galaxy = {
     //-- Create big particles milkyway
 
     var particlesBig = new THREE.BufferGeometry();
-    // r75 spelling; Task 2 renames this to setAttribute.
-    particlesBig.addAttribute('position', new THREE.BufferAttribute(new Float32Array(particlesBigVerts), 3));
-    particlesBig.addAttribute('color', new THREE.BufferAttribute(new Float32Array(particlesBigColorVerts), 3));
+    particlesBig.setAttribute('position', new THREE.BufferAttribute(new Float32Array(particlesBigVerts), 3));
+    particlesBig.setAttribute('color', new THREE.BufferAttribute(new Float32Array(particlesBigColorVerts), 3));
 
     var particleMaterialBig = new THREE.PointsMaterial({
       map: Ed3d.textures.flare_yellow,
       transparent: true,
-      vertexColors: THREE.VertexColors,
+      vertexColors: true,
       size: 16,
       blending: THREE.AdditiveBlending,
       depthTest: true,

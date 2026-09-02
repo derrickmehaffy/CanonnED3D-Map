@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 
 var System = {
 
@@ -164,13 +165,12 @@ var System = {
     }
 
     var geo = new THREE.BufferGeometry();
-    // r75 spells this addAttribute; Phase 2b renames it to setAttribute.
-    geo.addAttribute('position', new THREE.BufferAttribute(new Float32Array(this.positions), 3));
-    geo.addAttribute('color', new THREE.BufferAttribute(new Float32Array(this.colorValues), 3));
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.positions), 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(this.colorValues), 3));
 
     var particleMaterial = new THREE.PointsMaterial({
       map: Ed3d.textures.flare_yellow,
-      vertexColors: THREE.VertexColors,
+      vertexColors: true,
       size: this.scaleSize,
       fog: false,
       blending: THREE.AdditiveBlending,

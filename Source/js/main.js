@@ -11,6 +11,7 @@
 // This is the same compatibility posture the design doc chose for the data
 // files, applied one layer inward. Phase 2 may tighten it; Phase 1 does not.
 
+import * as THREE from 'three';
 import { Ed3d, Loader, getEngineState, routes, isFarView,
          enableFarView, disableFarView, refresh3dMapSize } from './ed3dmap.js';
 import { Grid } from './components/grid.class.js';
@@ -21,6 +22,20 @@ import { Route } from './components/route.class.js';
 import { System } from './components/system.class.js';
 import { Galaxy } from './components/galaxy.class.js';
 import { Heatmap } from './components/heat.class.js';
+
+// Preserve the r75 colour pipeline. r152+ would otherwise convert every hex
+// colour into a linear working space and output sRGB, changing how the whole
+// map looks. This migration is "same picture, newer engine"; revisiting colour
+// management is a separate, deliberate decision.
+THREE.ColorManagement.enabled = false;
+
+// The four data files that build three.js objects (Permit, multifaction,
+// landscape, UIA) are classic scripts and reference THREE as a global. None
+// of them construct THREE.OrbitControls or use FontLoader/FontUtils, so
+// those two addons do not need to be attached to the THREE global — see the
+// note above ed3dmap.js's own OrbitControls import for why they can't be
+// anyway (an ES module namespace object is frozen).
+window.THREE = THREE;
 
 Object.assign(window, {
   Ed3d: Ed3d,

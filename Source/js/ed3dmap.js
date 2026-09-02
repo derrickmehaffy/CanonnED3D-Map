@@ -1,3 +1,15 @@
+import * as THREE from 'three';
+// Imported directly rather than attached to the THREE global (the way the
+// data files' classic-script objects like new THREE.Vector3(...) resolve
+// THREE off window). An `import * as THREE from 'three'` binding is a
+// frozen ES module namespace object, so `THREE.OrbitControls = OrbitControls`
+// in main.js throws "Cannot add property OrbitControls, object is not
+// extensible" — it is not a plain object you can bolt new keys onto. Every
+// engine module that constructs OrbitControls or loads a font therefore
+// imports the addon itself, same as it imports 'three' itself (see the
+// module-evaluation-order note in the class comment above Ed3d.material).
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { Grid } from './components/grid.class.js';
 import { Ico } from './components/icon.class.js';
 import { HUD } from './components/hud.class.js';
@@ -86,6 +98,13 @@ var Ed3d = {
   'grid1XL': null,
 
   'tween': null,
+
+  // r185 dropped THREE.FontUtils; FontLoader is async, so the font is loaded
+  // once (kicked off from init(), before launchMap() runs) and cached here.
+  // font.generateShapes(text, size) is synchronous once the font is loaded,
+  // so every call site just needs an `if (!Ed3d.font) return;` guard for the
+  // brief window before the load callback fires.
+  'font': null,
 
   'globalView': true,
 
@@ -208,7 +227,16 @@ var Ed3d = {
 
 
     // Dependencies are now static ES module imports in js/main.js; there is
-    // nothing left to load at runtime.
+    // nothing left to load at runtime except the text-label font (below).
+
+    // Kick off the font load before launchMap() runs. It completes
+    // asynchronously — every call site that needs it guards on Ed3d.font
+    // being non-null, same pattern as the texture loads in loadTextures().
+    var fontLoader = new FontLoader();
+    fontLoader.load(Ed3d.basePath + 'vendor/three-js/helvetiker_regular.typeface.json', function (font) {
+      Ed3d.font = font;
+    });
+
     Loader.update('Launch scene');
     Ed3d.launchMap();
     if (typeof options.finished === "function") options.finished();
@@ -424,7 +452,7 @@ var Ed3d = {
     container.appendChild(renderer.domElement);
 
     //controls
-    controls = new THREE.OrbitControls(camera, container);
+    controls = new OrbitControls(camera, container);
     controls.rotateSpeed = 0.6;
     controls.zoomSpeed = 2.0;
     controls.panSpeed = 0.8;
@@ -736,8 +764,7 @@ var Ed3d = {
     }
 
     var particles = new THREE.BufferGeometry();
-    // r75 spelling; Task 2 renames this to setAttribute.
-    particles.addAttribute('position', new THREE.BufferAttribute(new Float32Array(starVerts), 3));
+    particles.setAttribute('position', new THREE.BufferAttribute(new Float32Array(starVerts), 3));
 
     var particleMaterial = new THREE.PointsMaterial({
       color: 0xeeeeee,

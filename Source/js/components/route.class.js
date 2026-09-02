@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 
 var Route = {
 
@@ -107,8 +108,7 @@ var Route = {
 
     //-- Add lines to scene
     var geometryL = new THREE.BufferGeometry();
-    // r75 spelling; Task 2 renames this to setAttribute.
-    geometryL.addAttribute('position', new THREE.BufferAttribute(new Float32Array(routeVerts), 3));
+    geometryL.setAttribute('position', new THREE.BufferAttribute(new Float32Array(routeVerts), 3));
     routes[idRoute] = new THREE.Line(geometryL, colorLine);
 
     //-- Add object for start & end
