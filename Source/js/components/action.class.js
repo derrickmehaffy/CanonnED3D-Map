@@ -127,7 +127,7 @@ var Action = {
         if(intersection.object.clickable) {
 
           var indexPoint = intersection.index;
-          var selPoint = intersection.object.geometry.vertices[indexPoint];
+          var selPoint = System.points[indexPoint];
 
           if(selPoint.visible) {
             var textAdd = selPoint.name;
@@ -217,7 +217,7 @@ var Action = {
         if(intersection.object.clickable) {
 
           var indexPoint = intersection.index;
-          var selPoint = intersection.object.geometry.vertices[indexPoint];
+          var selPoint = System.points[indexPoint];
 
           if(selPoint.visible) {
             Action.hoverOnObj(indexPoint);
@@ -241,7 +241,7 @@ var Action = {
 
     this.objHover = indexPoint;
 
-    var sel = System.particleGeo.vertices[indexPoint];
+    var sel = System.points[indexPoint];
     this.addCursorOnHover(sel);
 
     if(this.selectedPoint !== null) {
@@ -256,7 +256,7 @@ var Action = {
 
   'outOnObj' : function () {
 
-    if(this.objHover === null || System.particleGeo.vertices[this.objHover] == undefined)
+    if(this.objHover === null || System.points[this.objHover] == undefined)
       return;
 
     this.objHover = null;
@@ -319,7 +319,7 @@ var Action = {
         if(intersection.object.clickable) {
 
           var indexPoint = intersection.index;
-          var selPoint = intersection.object.geometry.vertices[indexPoint];
+          var selPoint = System.points[indexPoint];
 
           if(selPoint.visible) {
             $('#hud #infos').html(
@@ -367,10 +367,10 @@ var Action = {
     while(!find) {
 
       //-- If next|previous is undefined, loop to the first|last
-      if (indexPoint < 0) indexPoint = System.particleGeo.vertices.length-1;
-      else if (System.particleGeo.vertices[indexPoint] == undefined) indexPoint = 0;
+      if (indexPoint < 0) indexPoint = System.points.length-1;
+      else if (System.points[indexPoint] == undefined) indexPoint = 0;
 
-      if(System.particleGeo.vertices[indexPoint].visible == true) {
+      if(System.points[indexPoint].visible == true) {
         find = true;
       } else {
         indexPoint += increment
@@ -379,7 +379,7 @@ var Action = {
 
 
     //-- Move to
-    var selPoint = System.particleGeo.vertices[indexPoint];
+    var selPoint = System.points[indexPoint];
     this.moveToObj(indexPoint, selPoint);
 
   },

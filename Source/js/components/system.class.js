@@ -234,6 +234,20 @@ var System = {
 
   'getPoint': function (index) {
     return this.points[index];
+  },
+
+  /**
+   * Set one point's colour. While the store is still a legacy Geometry this
+   * writes both the colour array and the metadata; Task 3 makes it write the
+   * typed array instead. Callers do not change again.
+   */
+  'setColor': function (index, color) {
+    this.particleColor[index] = color;
+    if (this.points[index] !== undefined) this.points[index].color = color;
+    if (this.particleGeo !== null) {
+      this.particleGeo.colors[index] = color;
+      this.particleGeo.colorsNeedUpdate = true;
+    }
   }
 
 }

@@ -240,12 +240,10 @@ var canonnEd3d_route = {
 							var target = null;
 							var targetIndex = -1;
 							var refName = refCoords[idCat].name;
-							for (var vi = 0; vi < System.particleGeo.vertices.length; vi++) {
-								if (System.particleGeo.vertices[vi].name === refName) {
-									target = System.particleGeo.vertices[vi];
-									targetIndex = vi;
-									break;
-								}
+							var vi = System.findByName(refName);
+							if (vi >= 0) {
+								target = System.points[vi];
+								targetIndex = vi;
 							}
 							if (target !== null) {
 								Action.moveToObj(targetIndex, target);

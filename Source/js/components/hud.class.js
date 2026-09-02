@@ -937,10 +937,10 @@ var HUD = {
         $('.map_filter').addClass('disabled');
 
         //-- Toggle systems particles
-        $(System.particleGeo.vertices).each(function (index, point) {
+        System.points.forEach(function (point, index) {
           point.visible = 0;
           point.filtered = 0;
-          System.particleGeo.colors[index] = new THREE.Color('#111111');
+          System.setColor(index, new THREE.Color('#111111'));
           active = 1;
         });
 
@@ -985,16 +985,14 @@ var HUD = {
 
       $(Ed3d.catObjs[idCat]).each(function (key, indexPoint) {
 
-        obj = System.particleGeo.vertices[indexPoint];
+        obj = System.points[indexPoint];
 
-        System.particleGeo.colors[indexPoint] = (active == 1)
+        System.setColor(indexPoint, (active == 1)
           ? obj.color
-          : new THREE.Color('#111111');
+          : new THREE.Color('#111111'));
 
         obj.visible = (active == 1);
         obj.filtered = (active == 1);
-
-        System.particleGeo.colorsNeedUpdate = true;
 
         //-- Sum coords to detect the center & detect the most far point
         if (center == null) {
@@ -1186,7 +1184,7 @@ var HUD = {
       // Check if system already exists on the map (case-insensitive)
       var existingIndex = -1;
       if (System.particleGeo !== null) {
-        var verts = System.particleGeo.vertices;
+        var verts = System.points;
         for (var j = 0; j < verts.length; j++) {
           if (verts[j].name && verts[j].name.toLowerCase() === nameLower) {
             existingIndex = j;
@@ -1200,7 +1198,7 @@ var HUD = {
 
       if (existingIndex >= 0) {
         // System already on map â€” navigate to it
-        var selPoint = System.particleGeo.vertices[existingIndex];
+        var selPoint = System.points[existingIndex];
         if (!selPoint.infos) selPoint.infos = infoHtml;
         Action.moveToObj(existingIndex, selPoint);
       } else {
@@ -1211,8 +1209,8 @@ var HUD = {
           infos: infoHtml
         });
         System.endParticleSystem();
-        var newIndex = System.particleGeo.vertices.length - 1;
-        var newPoint = System.particleGeo.vertices[newIndex];
+        var newIndex = System.points.length - 1;
+        var newPoint = System.points[newIndex];
         Action.moveToObj(newIndex, newPoint);
       }
     }
