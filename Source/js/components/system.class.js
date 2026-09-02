@@ -5,6 +5,8 @@ var System = {
   'particleGeo': null,
   'particleColor': [],
   'particleInfos': [],
+  'points': [],
+  'nameIndex': {},
   'count': 0,
   'scaleSize': 64,
 
@@ -36,6 +38,9 @@ var System = {
       if (val.infos != undefined && this.particleInfos[idSys]) {
         var indexParticle = this.particleInfos[idSys];
         this.particleGeo.vertices[indexParticle].infos += val.infos;
+        if (this.points[indexParticle] !== undefined) {
+          this.points[indexParticle].infos = (this.points[indexParticle].infos || '') + val.infos;
+        }
         if (val.cat != undefined) Ed3d.addObjToCategories(indexParticle, val.cat);
         return;
       }
@@ -73,6 +78,21 @@ var System = {
       this.particleGeo.vertices.push(particle);
 
       this.count++;
+
+      //-- Index-aligned metadata. The GPU only needs position and colour; every
+      //   other per-system property lives here so the geometry can become a
+      //   BufferGeometry without losing it.
+      this.points.push({
+        x: x, y: y, z: z,
+        name: val.name,
+        infos: val.infos,
+        url: val.url,
+        cat: val.cat,
+        visible: true,
+        clickable: true,
+        color: this.particleColor[this.count - 1]
+      });
+      if (val.name !== undefined) this.nameIndex[val.name] = this.points.length - 1;
     }
 
     //--------------------------------------------------------------------------
@@ -188,6 +208,8 @@ var System = {
 
     this.particleColor = [];
     this.particleGeo = null;
+    this.points = [];
+    this.nameIndex = {};
     this.count = 0;
     scene.remove(this.particle);
 
@@ -199,6 +221,19 @@ var System = {
 
   'loadSpectral': function (val) {
 
+  },
+
+  /**
+   * Index of a system by name, or -1. Replaces the linear scans over
+   * particleGeo.vertices that BufferGeometry makes impossible.
+   */
+  'findByName': function (name) {
+    var i = this.nameIndex[name];
+    return (i === undefined) ? -1 : i;
+  },
+
+  'getPoint': function (index) {
+    return this.points[index];
   }
 
 }
