@@ -205,8 +205,6 @@ var Ed3d = {
 
     $.when(
       $.getScript(Ed3d.basePath + "vendor/three-js/OrbitControls.js"),
-      $.getScript(Ed3d.basePath + "vendor/three-js/CSS3DRenderer.js"),
-      $.getScript(Ed3d.basePath + "vendor/three-js/Projector.js"),
       $.getScript(Ed3d.basePath + "vendor/three-js/FontUtils.js"),
       $.Deferred(function (deferred) {
         $(deferred.resolve);

@@ -170,7 +170,6 @@ var System = {
 
     this.particle = new THREE.Points(freshGeo, particleMaterial);
 
-    this.particle.sortParticles = true;
     this.particle.clickable = true;
 
     scene.add(this.particle);

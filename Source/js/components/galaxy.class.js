@@ -370,7 +370,6 @@ var Galaxy = {
     });
 
     var points = new THREE.Points(particles, particleMaterial);
-    points.sortParticles = true;
     particles.center();
 
     obj.milkyway[0] = points;
@@ -394,7 +393,6 @@ var Galaxy = {
     });
 
     var pointsBig = new THREE.Points(particlesBig, particleMaterialBig);
-    pointsBig.sortParticles = true;
     particlesBig.center();
 
     obj.milkyway[1] = pointsBig;
