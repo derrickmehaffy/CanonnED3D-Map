@@ -74,3 +74,57 @@ test('the map index offers every destination the nav had', async ({ page }) => {
   await expect(page.locator('.idx-i.cur')).toContainText('Voyager Pulsars');
   await expect(page.locator('.idx-i[href="gr-data.html"]')).toHaveCount(1);
 });
+
+/* window.CONSOLE is the per-page escape hatch: everything in it has a working
+   default, so no page has to declare anything, but a page that wants its own
+   vocabulary or extra panel content can say so. gr-data.html is the first user
+   — the ruin-type template maps Derrick asked for in the mockup. */
+test('a page can opt in to template maps and its own vocabulary', async ({ page }) => {
+  await stubDataHosts(page);
+  await page.goto('/gr-data.html', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.app .top')).toBeVisible({ timeout: 30_000 });
+
+  // The offline suite never contacts ruins.canonn.tech, so push a known set in
+  // through the engine's own replace path instead of waiting on the network.
+  await page.waitForFunction(() => window.Ed3d && Ed3d.updateSystems, { timeout: 30_000 });
+  await page.evaluate(() => new Promise((res) => Ed3d.updateSystems({
+    categories: { 'Site type': {
+      a: { name: 'Alpha', color: 'FF9D00' },
+      b: { name: 'Beta',  color: '4DE3E1' },
+      g: { name: 'Gamma', color: 'B98CFF' } } },
+    systems: [
+      { name: 'Ruin A', coords: { x: 10, y: 0, z: 10 }, cat: ['a'] },
+      { name: 'Ruin B', coords: { x: 20, y: 0, z: 20 }, cat: ['b'] },
+      { name: 'Ruin G', coords: { x: 30, y: 0, z: 30 }, cat: ['g'] }
+    ]
+  }, res)));
+  await expect(page.locator('#side .layer').first()).toBeVisible({ timeout: 30_000 });
+
+  // "ruins", not the generic "points".
+  await expect(page.locator('#side .s-sub').first()).toContainText('ruins');
+
+  const img = page.locator('#tmpl-img');
+  await expect(img).toBeVisible();
+
+  // Hovering a type swaps the template and its note.
+  await page.locator('#side .layer').nth(1).hover();
+  await expect(page.locator('#tmpl-n')).toHaveText('Beta');
+  await expect(img).toHaveAttribute('src', 'img/ruins/beta.png');
+  await expect(page.locator('#tmpl-f')).toContainText('central spire');
+
+  // The image is real, not a broken reference.
+  const drawn = await img.evaluate((el) => el.naturalWidth > 0);
+  expect(drawn, 'the template image actually loaded').toBe(true);
+
+  await page.locator('#side .layer').nth(0).hover();
+  await expect(page.locator('#tmpl-n')).toHaveText('Alpha');
+});
+
+test('pages that declare nothing still get sane defaults', async ({ page }) => {
+  await stubDataHosts(page);
+  await page.goto('/voyager.html', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#side .layer').first()).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('#side .s-sub').first()).toContainText('points');
+  // voyager declares no window.CONSOLE at all.
+  await expect(page.locator('#tmpl-img')).toHaveCount(0);
+});

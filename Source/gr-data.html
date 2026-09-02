@@ -58,7 +58,28 @@
     </script>
     <script type="module" src="js/main.js?v=7"></script>
     <link href="css/styles.css" rel="stylesheet" type="text/css" />
-    <!-- Lottie player for the R&D animated logo on the boot screen. -->
+    <!-- Per-page console options. Everything here has a working default; this
+       page opts in to the ruin-type template maps and its own vocabulary.
+       Must run before js/console.js. -->
+  <script>
+    window.CONSOLE = {
+      unit: 'ruin',
+      templates: true,
+      note: 'Ruin sites are grouped by their layout. Hover or shift-click a type ' +
+            'to see its template map.'
+    };
+    window.THUMBS = {
+      alpha: 'img/ruins/alpha.png',
+      beta:  'img/ruins/beta.png',
+      gamma: 'img/ruins/gamma.png'
+    };
+    window.TNOTE = {
+      Alpha: 'Six-pointed plan. Obelisks around a raised central dais.',
+      Beta:  'Two long approach corridors meeting at a central spire.',
+      Gamma: 'Broad triangular plan with the widest obelisk spread.'
+    };
+  </script>
+  <!-- Lottie player for the R&D animated logo on the boot screen. -->
     <script defer src="vendor/bodymovin/bodymovin.min.js"></script>
     <!-- Ordered before the map data so the chrome exists when Ed3d sizes itself. -->
     <script defer src="js/console.js"></script>

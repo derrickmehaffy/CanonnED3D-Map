@@ -1279,12 +1279,18 @@
     var haveSystems = window.System && System.points && System.points.length;
     var haveFilters = document.querySelectorAll('#filters .map_filter').length;
     // Every map registers Sagittarius A* first, so "some points exist" fires
-    // almost immediately and long before the data has arrived. Wait for the
-    // engine to say it is done. Some maps genuinely declare no categories, so
-    // neither signal is waited on for ever: after 20 s, use what is there.
+    // almost immediately and long before the data has arrived — wait for the
+    // engine to say it is done instead.
     var done = state ? state.dataComplete : haveSystems > 1;
 
-    if (tries < 200 && (!haveSystems || !done || !haveFilters)) {
+    // Two separate waits. Data gets 20 s, because a slow source is still a
+    // source. Filters only get 3 s after that, because a map with no
+    // categories at all is legitimate and should not sit staring at an empty
+    // panel for the full budget waiting for something that is never coming.
+    if (tries < 200 && (!haveSystems || !done)) {
+      return setTimeout(function () { whenReady(tries + 1); }, 100);
+    }
+    if (!haveFilters && tries < 230) {
       return setTimeout(function () { whenReady(tries + 1); }, 100);
     }
 
