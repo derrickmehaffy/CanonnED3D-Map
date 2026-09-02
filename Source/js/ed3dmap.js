@@ -788,6 +788,22 @@ var Ed3d = {
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
+//-- Cached HUD readout nodes and their last-written values.  These four
+//   readouts previously ran a jQuery selector lookup and a DOM write on every
+//   frame even when the values had not changed.
+var hudReadout = { cx: null, cy: null, cz: null, distsol: null };
+var hudReadoutLast = { cx: null, cy: null, cz: null, distsol: null };
+
+function setHudReadout(id, value) {
+  if (hudReadoutLast[id] === value) return;
+  if (hudReadout[id] === null) {
+    hudReadout[id] = document.getElementById(id);
+    if (hudReadout[id] === null) return;
+  }
+  hudReadout[id].textContent = value;
+  hudReadoutLast[id] = value;
+}
+
 function animate(time) {
 
   //rendererStats.update(renderer);
@@ -891,11 +907,10 @@ function animate(time) {
 
   renderer.render(scene, camera);
 
-  $('#cx').html(Math.round(controls.target.x));
-  $('#cy').html(Math.round(controls.target.y));
-  $('#cz').html(Math.round(-controls.target.z)); // Reverse z coord
-
-  $('#distsol').html(Ed3d.calcDistSol(controls.target));
+  setHudReadout('cx', Math.round(controls.target.x));
+  setHudReadout('cy', Math.round(controls.target.y));
+  setHudReadout('cz', Math.round(-controls.target.z)); // Reverse z coord
+  setHudReadout('distsol', Ed3d.calcDistSol(controls.target));
 
   //-- Move starfield with cam
   Ed3d.starfield.position.set(
