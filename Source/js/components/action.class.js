@@ -13,6 +13,8 @@ var Action = {
 
   'mouseVector' : null,
   'raycaster' : null,
+  'hoverPending' : false,
+  'hoverEvent' : null,
   'oldSel' : null,
   'selectedPoint' : null,
   'objHover' : null,
@@ -163,10 +165,33 @@ var Action = {
 
 
   /**
+   * The only objects a hover raycast can meaningfully hit: the system point
+   * cloud plus any solid spheres.  Previously this walked all of
+   * scene.children on every mousemove.
+   */
+  'hitCandidates' : function() {
+    var targets = [];
+    if (System.particle != null) targets.push(System.particle);
+    return targets;
+  },
+
+  /**
    * Mouse Hover
    */
 
   'onMouseHover' : function (e, obj) {
+
+    //-- Coalesce bursts of mousemove events to one raycast per frame.
+    obj.hoverEvent = e;
+    if (obj.hoverPending) return;
+    obj.hoverPending = true;
+    requestAnimationFrame(function() {
+      obj.hoverPending = false;
+      obj.doMouseHover(obj.hoverEvent, obj);
+    });
+  },
+
+  'doMouseHover' : function (e, obj) {
 
     e.preventDefault();
 
@@ -184,7 +209,7 @@ var Action = {
     obj.raycaster.params.Points.threshold = obj.pointCastRadius;
 
     // create an array containing all objects in the scene with which the ray intersects
-    var intersects = obj.raycaster.intersectObjects(scene.children);
+    var intersects = obj.raycaster.intersectObjects(obj.hitCandidates());
     if (intersects.length > 0) {
 
       for( var i = 0; i < intersects.length; i++ ) {
