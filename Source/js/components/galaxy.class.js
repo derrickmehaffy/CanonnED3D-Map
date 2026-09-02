@@ -274,8 +274,10 @@ var Galaxy = {
 
   'getHeightData' : function(img, obj) {
 
-    var particles = new THREE.Geometry;
-    var particlesBig = new THREE.Geometry;
+    var particleVerts = [];
+    var particleColorVerts = [];
+    var particlesBigVerts = [];
+    var particlesBigColorVerts = [];
 
     //-- Get pixels from milkyway image
 
@@ -324,11 +326,9 @@ var Galaxy = {
         var add = Math.ceil(density/maxDensity*2);
         for (var y = -density; y < density; y = y+add) {
 
-          var particle = new THREE.Vector3(
-            x+((Math.random()-0.5) * 25),
-            (y*10)+((Math.random()-0.5) * 50),
-            z+((Math.random()-0.5) * 25)
-          );
+          var px = x+((Math.random()-0.5) * 25);
+          var py = (y*10)+((Math.random()-0.5) * 50);
+          var pz = z+((Math.random()-0.5) * 25);
 
           //-- Particle color from pixel
 
@@ -340,15 +340,19 @@ var Galaxy = {
           //-- Big particle
 
           if(density>=2 && Math.abs(y)-1==0 &&  Math.random() * 1000 < 200) {
-            particlesBig.vertices.push(particle);
-            colorsBig[nbBig] = new THREE.Color("rgb("+r+", "+g+", "+b+")");
+            particlesBigVerts.push(px, py, pz);
+            var colorBig = new THREE.Color("rgb("+r+", "+g+", "+b+")");
+            colorsBig[nbBig] = colorBig;
+            particlesBigColorVerts.push(colorBig.r, colorBig.g, colorBig.b);
             nbBig++;
 
           //-- Small particle
 
           } else if(density<4 || (Math.random() * 1000 < 400-(density*2))) {
-            particles.vertices.push(particle);
-            obj.colors[nb] = new THREE.Color("rgb("+r+", "+g+", "+b+")");
+            particleVerts.push(px, py, pz);
+            var color = new THREE.Color("rgb("+r+", "+g+", "+b+")");
+            obj.colors[nb] = color;
+            particleColorVerts.push(color.r, color.g, color.b);
             nb++;
           }
         };
@@ -357,7 +361,10 @@ var Galaxy = {
 
     //-- Create small particles milkyway
 
-    particles.colors = obj.colors;
+    var particles = new THREE.BufferGeometry();
+    // r75 spelling; Task 2 renames this to setAttribute.
+    particles.addAttribute('position', new THREE.BufferAttribute(new Float32Array(particleVerts), 3));
+    particles.addAttribute('color', new THREE.BufferAttribute(new Float32Array(particleColorVerts), 3));
 
     var particleMaterial = new THREE.PointsMaterial({
       map: Ed3d.textures.flare_yellow,
@@ -380,7 +387,10 @@ var Galaxy = {
 
     //-- Create big particles milkyway
 
-    particlesBig.colors = colorsBig;
+    var particlesBig = new THREE.BufferGeometry();
+    // r75 spelling; Task 2 renames this to setAttribute.
+    particlesBig.addAttribute('position', new THREE.BufferAttribute(new Float32Array(particlesBigVerts), 3));
+    particlesBig.addAttribute('color', new THREE.BufferAttribute(new Float32Array(particlesBigColorVerts), 3));
 
     var particleMaterialBig = new THREE.PointsMaterial({
       map: Ed3d.textures.flare_yellow,

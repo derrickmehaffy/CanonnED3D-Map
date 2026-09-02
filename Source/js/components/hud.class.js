@@ -790,10 +790,13 @@ var HUD = {
           System.endParticleSystem();
 
           if (systems.length > 1) {
-            var geo = new THREE.Geometry();
+            var journalRouteVerts = [];
             systems.forEach(function (s) {
-              geo.vertices.push(new THREE.Vector3(s.x, s.y, -s.z));
+              journalRouteVerts.push(s.x, s.y, -s.z);
             });
+            var geo = new THREE.BufferGeometry();
+            // r75 spelling; Task 2 renames this to setAttribute.
+            geo.addAttribute('position', new THREE.BufferAttribute(new Float32Array(journalRouteVerts), 3));
             var lineMat = new THREE.LineBasicMaterial({ color: color });
             var line = new THREE.Line(geo, lineMat);
             line.name = name;
@@ -897,10 +900,13 @@ var HUD = {
 
           // Build a line through all jump coordinates.
           // The scene uses negated Z (same convention as System.create).
-          var geo = new THREE.Geometry();
+          var spanshRouteVerts = [];
           jumps.forEach(function (jump) {
-            geo.vertices.push(new THREE.Vector3(jump.x, jump.y, -jump.z));
+            spanshRouteVerts.push(jump.x, jump.y, -jump.z);
           });
+          var geo = new THREE.BufferGeometry();
+          // r75 spelling; Task 2 renames this to setAttribute.
+          geo.addAttribute('position', new THREE.BufferAttribute(new Float32Array(spanshRouteVerts), 3));
 
           var lineMat = new THREE.LineBasicMaterial({ color: 0xFF9D00 });
           var line = new THREE.Line(geo, lineMat);

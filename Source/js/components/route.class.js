@@ -61,7 +61,7 @@ var Route = {
 
   'createRoute' : function(idRoute, route) {
 
-    var geometryL = new THREE.Geometry();
+    var routeVerts = [];
     var nameR = '';
     var first = null;
     var last = null;
@@ -94,9 +94,7 @@ var Route = {
         last = [c[0], c[1], c[2]];
 
         //-- Add line point
-        geometryL.vertices.push(
-          new THREE.Vector3(c[0], c[1], c[2])
-        );
+        routeVerts.push(c[0], c[1], c[2]);
         //Route.addPoint(c[0], c[1], c[2]);
 
 
@@ -108,6 +106,9 @@ var Route = {
     });
 
     //-- Add lines to scene
+    var geometryL = new THREE.BufferGeometry();
+    // r75 spelling; Task 2 renames this to setAttribute.
+    geometryL.addAttribute('position', new THREE.BufferAttribute(new Float32Array(routeVerts), 3));
     routes[idRoute] = new THREE.Line(geometryL, colorLine);
 
     //-- Add object for start & end

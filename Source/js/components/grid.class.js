@@ -47,7 +47,7 @@ var Grid = {
 
     //-- Add global grid
 
-    var geometry = new THREE.Geometry();
+    var gridVerts = [];
     var material = new THREE.LineBasicMaterial( {
       color: 0x555555,
       transparent: true,
@@ -58,20 +58,24 @@ var Grid = {
 
     for ( var i = - size; i <= size; i += step ) {
 
-        geometry.vertices.push( new THREE.Vector3( - size, 0, i ) );
-        geometry.vertices.push( new THREE.Vector3(   size, 0, i ) );
+        gridVerts.push( - size, 0, i );
+        gridVerts.push(   size, 0, i );
 
-        geometry.vertices.push( new THREE.Vector3( i, 0, - size ) );
-        geometry.vertices.push( new THREE.Vector3( i, 0,   size ) );
+        gridVerts.push( i, 0, - size );
+        gridVerts.push( i, 0,   size );
 
     }
+
+    var geometry = new THREE.BufferGeometry();
+    // r75 spelling; Task 2 renames this to setAttribute.
+    geometry.addAttribute('position', new THREE.BufferAttribute(new Float32Array(gridVerts), 3));
 
     this.obj = new THREE.LineSegments( geometry, material );
     this.obj.position.set(0,0,-20000);
 
     //-- Add quadrant
 
-    var quadrant = new THREE.Geometry();
+    var quadrantVerts = [];
     var material = new THREE.LineBasicMaterial( {
       color: 0x888888,
       transparent: true,
@@ -80,11 +84,15 @@ var Grid = {
       depthWrite: false
     } );
 
-    quadrant.vertices.push( new THREE.Vector3( - size, 0, 20000 ) );
-    quadrant.vertices.push( new THREE.Vector3(   size, 0, 20000 ) );
+    quadrantVerts.push( - size, 0, 20000 );
+    quadrantVerts.push(   size, 0, 20000 );
 
-    quadrant.vertices.push( new THREE.Vector3( 0, 0, - size ) );
-    quadrant.vertices.push( new THREE.Vector3( 0, 0,   size ) );
+    quadrantVerts.push( 0, 0, - size );
+    quadrantVerts.push( 0, 0,   size );
+
+    var quadrant = new THREE.BufferGeometry();
+    // r75 spelling; Task 2 renames this to setAttribute.
+    quadrant.addAttribute('position', new THREE.BufferAttribute(new Float32Array(quadrantVerts), 3));
     var quadrantL = new THREE.LineSegments( quadrant, material );
 
 

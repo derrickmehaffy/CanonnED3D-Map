@@ -726,15 +726,18 @@ var Ed3d = {
 
     var sizeStars = 10000;
 
-    var particles = new THREE.Geometry;
+    var starVerts = [];
     for (var p = 0; p < 5; p++) {
-      var particle = new THREE.Vector3(
+      starVerts.push(
         Math.random() * sizeStars - (sizeStars / 2),
         Math.random() * sizeStars - (sizeStars / 2),
         Math.random() * sizeStars - (sizeStars / 2)
       );
-      particles.vertices.push(particle);
     }
+
+    var particles = new THREE.BufferGeometry();
+    // r75 spelling; Task 2 renames this to setAttribute.
+    particles.addAttribute('position', new THREE.BufferAttribute(new Float32Array(starVerts), 3));
 
     var particleMaterial = new THREE.PointsMaterial({
       color: 0xeeeeee,
