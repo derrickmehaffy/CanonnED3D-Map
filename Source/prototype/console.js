@@ -107,6 +107,87 @@
   var sysQuery = '', sysSort = 'name';     // systems panel: filter text and order
 
   function $(id) { return document.getElementById(id); }
+
+  /* ── boot screen ────────────────────────────────────────────────────────
+     The R&D animated logo lcunfool put on the landing page, reused as the
+     console's loader. Two things matter here:
+
+     1. The element keeps id="loading". Every one of the 35 MapData-*.js files
+        ends with document.getElementById('loading').style.display = 'none',
+        including their error paths, so that id is a hard contract with the
+        data layer. Rename it and every map hangs behind a black screen.
+     2. Because those files hide it abruptly, the fade lives in an observer
+        rather than in the callers — nothing in data/ needs to change.        */
+  var Boot = (function () {
+    var el, anim, dismissed = false;
+
+    function say(txt, accent) {
+      var m = $('bootmsg');
+      if (m) m.innerHTML = accent ? esc(txt) + ' <b>' + esc(accent) + '</b>' : esc(txt);
+    }
+
+    function finish() {
+      if (!el) return;
+      if (anim) { try { anim.destroy(); } catch (e) {} anim = null; }
+      el.parentNode && el.parentNode.removeChild(el);
+      el = null;
+    }
+
+    function dismiss() {
+      if (dismissed || !el) return;
+      dismissed = true;
+      el.style.display = '';          // undo the caller's hide so it can fade
+      el.classList.add('done');
+      el.addEventListener('transitionend', finish, { once: true });
+      setTimeout(finish, 800);        // belt and braces if the event is missed
+    }
+
+    function mount() {
+      el = $('loading');
+      if (!el) return;
+
+      // Catch the data layer's style.display='none' and turn it into a fade.
+      new MutationObserver(function () {
+        if (el && el.style.display === 'none') dismiss();
+      }).observe(el, { attributes: true, attributeFilter: ['style'] });
+
+      if (!window.bodymovin) { el.classList.add('nolottie'); return; }
+
+      // rd-banner is a 15 s build-and-fade: frame 0 is empty, limpets fly in and
+      // assemble the atom by ~300, and the whole thing fades out at ~440. Played
+      // from the top on loop it is blank for most of a short load, and dissolves
+      // on a long one. So: run the assembly once, then hold on the formed logo,
+      // which orbits. ASSEMBLE ends where SUSTAIN begins, so the hand-off is
+      // invisible and the loader never shows an empty frame.
+      var ASSEMBLE = [110, 400], SUSTAIN = [300, 400];
+      var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      try {
+        anim = window.bodymovin.loadAnimation({
+          container: $('bootlogo'),
+          renderer: 'svg',
+          loop: false,
+          autoplay: false,
+          rendererSettings: { progressiveLoad: false },
+          path: '../data/rd-banner-v2-1.json'
+        });
+        anim.addEventListener('data_failed', function () { el && el.classList.add('nolottie'); });
+        anim.addEventListener('DOMLoaded', function () {
+          if (!anim) return;
+          if (still) { anim.goToAndStop(SUSTAIN[1], true); return; }
+          anim.addEventListener('complete', function () {
+            if (!anim) return;
+            anim.loop = true;
+            anim.playSegments([SUSTAIN], true);
+          });
+          anim.playSegments([ASSEMBLE], true);
+        });
+      } catch (e) {
+        el.classList.add('nolottie');
+      }
+    }
+
+    return { mount: mount, say: say, dismiss: dismiss };
+  })();
   function esc(s) {
     return String(s).replace(/[&<>"]/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
@@ -166,6 +247,7 @@
 
   function start(sysList, mode) {
     var sites = sysList.reduce(function (a, s) { return a + s.s.length; }, 0);
+    Boot.say('Plotting', sysList.length + ' systems');
     setFeed(mode, mode + ' · ' + sysList.length + ' systems · ' + sites + ' ' + CFG.unit + 's');
     DATA.sys = sysList;
 
@@ -183,8 +265,7 @@
       systemColor: '#FF9D00'
     });
 
-    // Ed3d re-shows this on rebuild; it has done its job.
-    var l = $('loading'); if (l) l.style.display = 'none';
+    Boot.dismiss();
 
     // Open framed on the data. The live maps inherit a fixed cameraPos, which
     // for several of them starts so far out that the systems are invisible —
@@ -201,9 +282,12 @@
   }
 
   (function load() {
+    Boot.mount();
+    Boot.say('Contacting', CFG.name);
     var done = false;
     function fallback() {
       if (done) return; done = true;
+      Boot.say('Using bundled snapshot');
       start(DATA.sys, 'snapshot');
     }
     var timer = setTimeout(fallback, 8000);

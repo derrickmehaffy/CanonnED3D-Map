@@ -143,8 +143,38 @@ input[type=range]{accent-color:var(--amber)}
   background:var(--panel);color:var(--dim);display:grid;place-items:center;
   font-size:12px;cursor:pointer;text-decoration:none}
 #nav-controls .nav-btn:hover{border-color:var(--amber);color:var(--amber)}
-#loading{position:absolute;inset:0;display:grid;place-items:center;z-index:4;
-  font-family:var(--mono);font-size:12px;color:var(--dimmer);pointer-events:none}
+/* Boot screen. Keeps id="loading" because all 35 MapData-*.js files dismiss the
+   overlay themselves with document.getElementById('loading').style.display='none'.
+   A MutationObserver (console.js) turns that abrupt hide into a fade. */
+#loading{position:absolute;inset:0;z-index:40;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:58px;background:var(--void);
+  transition:opacity .5s ease}
+#loading.done{opacity:0}
+/* rd-banner is a 1600x400 banner with the atom centred in a lot of empty
+   canvas, so it reads small at full width. Scaling the SVG up rather than
+   widening the box keeps the limpets' fly-in on screen; the extra gap below
+   leaves room for the overflow. */
+#bootlogo{width:min(760px,72vw);aspect-ratio:4/1;
+  /* clip left/right at the box edge so stray limpets parked out at the banner's
+     far ends are cropped, while letting the scaled atom overflow vertically */
+  clip-path:inset(-100% 0 -100% 0)}
+#bootlogo svg{display:block;width:100%;height:100%;transform:scale(1.55)}
+/* Shown only if bodymovin fails or the JSON 404s */
+#bootfallback{display:none;font-family:var(--cond);font-size:26px;font-weight:600;
+  letter-spacing:.18em;text-transform:uppercase;color:var(--amber)}
+#loading.nolottie #bootlogo{display:none}
+#loading.nolottie #bootfallback{display:block}
+#bootbar{width:min(320px,50vw);height:2px;background:var(--rule);overflow:hidden}
+#bootbar i{display:block;height:100%;width:35%;background:var(--amber);
+  animation:bootsweep 1.15s cubic-bezier(.6,0,.35,1) infinite}
+@keyframes bootsweep{0%{transform:translateX(-100%)}100%{transform:translateX(386%)}}
+#bootmsg{font-family:var(--mono);font-size:11px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--dim);min-height:1em}
+#bootmsg b{color:var(--ion);font-weight:400}
+@media (prefers-reduced-motion:reduce){
+  #loading{transition:none}
+  #bootbar i{animation:none;width:100%}
+}
 .hint{position:absolute;left:14px;bottom:12px;font-family:var(--mono);font-size:10.5px;
   color:var(--dimmer);pointer-events:none;line-height:1.7;z-index:6}
 .viewmode{position:absolute;right:12px;top:12px;display:flex;border:1px solid var(--rule);
@@ -296,7 +326,12 @@ input[type=range]{accent-color:var(--amber)}
     <aside class="side" id="side"></aside>
 
     <div class="stage">
-      <div id="edmap"><div id="loading">building scene&#8230;</div></div>
+      <div id="edmap"><div id="loading" role="status" aria-live="polite">
+        <div id="bootlogo"></div>
+        <div id="bootfallback">Canonn R&amp;D</div>
+        <div id="bootbar"><i></i></div>
+        <p id="bootmsg">Initialising</p>
+      </div></div>
       <div class="viewmode" role="group" aria-label="View mode">
         <button id="v3d" class="on" aria-pressed="true">3D</button>
         <button id="v2d" aria-pressed="false">2D</button>
@@ -350,6 +385,8 @@ input[type=range]{accent-color:var(--amber)}
 }
 </script>
 <script type="module" src="../js/main.js"></script>
+<!-- Lottie player for the R&D animated logo on the boot screen. -->
+<script src="../vendor/bodymovin/bodymovin.min.js"></script>
 <script src="console.js" defer></script>
 </body>
 </html>
