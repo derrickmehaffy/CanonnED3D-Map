@@ -869,7 +869,7 @@ var canonnEd3d_challenge = {
 				z: parseFloat(poi.z),
 			}
 
-			poiSite['infos'] = '<br/><a href="https://www.edsm.net/en/system?systemName=' + poi.system + '" target="_blank" rel="noopener">EDSM</a><br/><a href="https://canonn-science.github.io/canonn-signals/?system=' + poi.system + '" target="_blank" rel="noopener">Signals</a>';
+			poiSite['infos'] = '<a href="https://signals.canonn.tech/?system=' + poi.system + '" target="_blank" rel="noopener">Signals</a>';
 			var otherSite = {};
 			otherSite['name'] = other.system;
 			otherSite['coords'] = {
@@ -878,7 +878,7 @@ var canonnEd3d_challenge = {
 				z: parseFloat(other.z),
 			}
 
-			otherSite['infos'] = '<br/><a href="https://www.edsm.net/en/system?systemName=' + other.system + '" target="_blank" rel="noopener">EDSM</a><br/><a href="https://canonn-science.github.io/canonn-signals/?system=' + other.system + '" target="_blank" rel="noopener">Signals</a>';
+			otherSite['infos'] = '<a href="https://signals.canonn.tech/?system=' + other.system + '" target="_blank" rel="noopener">Signals</a>';
 			var waypointIndex = -1;
 			//Check Site Type and match categories
 			uialoop:
@@ -1057,9 +1057,9 @@ var canonnEd3d_challenge = {
 				var poiSite = {};
 				poiSite['name'] = data[i]["System"];
 
-				poiSite['infos'] = '<br/><a href="https://www.edsm.net/en/system?systemName=' + data[i]["System"] + '" target="_blank" rel="noopener">EDSM</a><br/><a href="https://canonn-science.github.io/canonn-signals/?system=' + data[i]["System"] + '" target="_blank" rel="noopener">Signals</a>';
+				poiSite['infos'] = '<a href="https://signals.canonn.tech/?system=' + data[i]["System"] + '" target="_blank" rel="noopener">Signals</a>';
 
-				//poiSite['url'] = "https://canonn-science.github.io/canonn-signals/?system=" + poiSite['name']
+				//poiSite['url'] = "https://signals.canonn.tech/?system=" + poiSite['name']
 				poiSite['coords'] = {
 					x: parseFloat(data[i]["X"]),
 					y: parseFloat(data[i]["Y"]),
@@ -1227,8 +1227,8 @@ var canonnEd3d_challenge = {
 			if (!measystems[systemName].name || !measystems[systemName].coords) continue;
 			var poiSite = {};
 			poiSite['name'] = measystems[systemName].name;
-			poiSite['infos'] = '<br/><a href="https://www.edsm.net/en/system?systemName=' + poiSite['name'] + '" target="_blank" rel="noopener">EDSM</a><br/><a href="https://canonn-science.github.io/canonn-signals/?system=' + poiSite['name'] + '" target="_blank" rel="noopener">Signals</a>';
-			//poiSite['url'] = "https://canonn-science.github.io/canonn-signals/?system=" + poiSite['name']
+			poiSite['infos'] = '<a href="https://signals.canonn.tech/?system=' + poiSite['name'] + '" target="_blank" rel="noopener">Signals</a>';
+			//poiSite['url'] = "https://signals.canonn.tech/?system=" + poiSite['name']
 			poiSite['coords'] = {
 				x: parseFloat(measystems[systemName].coords.x),
 				y: parseFloat(measystems[systemName].coords.y),

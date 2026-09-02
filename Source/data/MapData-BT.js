@@ -1,5 +1,5 @@
 function signalLink(system, name) {
-	return '<a href="https://canonn-science.github.io/canonn-signals/?system=' + system + '" target="_blank">' + name + '</a><br>'
+	return '<a href="https://signals.canonn.tech/?system=' + system + '" target="_blank">' + name + '</a><br>'
 }
 
 var canonnEd3d_bt = {

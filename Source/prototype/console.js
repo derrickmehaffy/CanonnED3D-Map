@@ -692,9 +692,12 @@
       (th ? '<div class="c-tmpl"><img src="' + th + '" alt="' + ty + ' template">' +
             '<div class="cap">' + ty + ' template — ' + (TNOTE[ty] || '') + '</div></div>' : '') +
       '<div class="c-acts">' +
-        '<a href="https://signals.canonn.tech/?system=' + q + '" target="_blank" rel="noopener">Signals <span class="ax">&#8599;</span></a>' +
+        // Signals is the primary destination: bodies, orbital elements, materials,
+        // signal counts per category, nearest DSSA and nebulae. EDSM was dropped —
+        // per LCU No Fool Like One it is no longer reliable, and Signals already
+        // covers everything the map linked out to it for.
+        '<a class="wide" href="https://signals.canonn.tech/?system=' + q + '" target="_blank" rel="noopener">Open in Signals <span class="ax">&#8599;</span></a>' +
         '<a href="https://ruins.canonn.tech/" target="_blank" rel="noopener">Bifrost <span class="ax">&#8599;</span></a>' +
-        '<a href="https://www.edsm.net/en/search/systems/index/name/' + q + '" target="_blank" rel="noopener">EDSM <span class="ax">&#8599;</span></a>' +
         '<a href="https://inara.cz/elite/starsystem/?search=' + q + '" target="_blank" rel="noopener">Inara <span class="ax">&#8599;</span></a>' +
         '<button id="ccopy">Copy name</button><button id="ccentre">Centre here</button>' +
       '</div>';

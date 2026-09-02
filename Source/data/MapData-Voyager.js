@@ -58,7 +58,7 @@ var canonnEd3d_voyager = {
 
 			var info = row.information ? row.information.trim() : '';
 			var infoHtml = info ? info + '<br>' : '';
-			infoHtml += '<a href="https://canonn-science.github.io/canonn-signals/?system=' + encodeURIComponent(name) + '" target="_blank" rel="noopener">Canonn Signals</a>';
+			infoHtml += '<a href="https://signals.canonn.tech/?system=' + encodeURIComponent(name) + '" target="_blank" rel="noopener">Canonn Signals</a>';
 
 			// Add system marker — white dot, category '0'
 			canonnEd3d_voyager.systemsData.systems.push({

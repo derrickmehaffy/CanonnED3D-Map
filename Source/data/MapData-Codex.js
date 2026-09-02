@@ -53,12 +53,8 @@ let urlParams = {
 	platform: ""
 }
 function signalLink(system, name) {
-	return '<a href="https://canonn-science.github.io/canonn-signals/?system=' + system + '" target="_blank" rel="noopener">' + name + '</a><br/>'
+	return '<a href="https://signals.canonn.tech/?system=' + system + '" target="_blank" rel="noopener">' + name + '</a><br/>'
 }
-function edsmLink(system) {
-	return `<a href="https://www.edsm.net/en/system?systemName=${system}" target="_blank" rel="noopener">EDSM</a><br/>`
-}
-
 const capi = axios.create({
 	baseURL: API_ENDPOINT,
 	headers: {
@@ -327,7 +323,7 @@ var canonnEd3d_codex = {
 			let poiSite = {
 				name: sys.name,
 				coords: sys.coords,
-				infos: edsmLink(sys.name) + signalLink(sys.name, entry.english_name),
+				infos: signalLink(sys.name, entry.english_name),
 				cat: [[entry.english_name]]
 			};
 			batchSystems.push(poiSite);

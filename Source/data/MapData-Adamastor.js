@@ -220,9 +220,9 @@ var canonnEd3d_challenge = {
 				var poiSite = {};
 				poiSite['name'] = data[i].name;
 				if (data[i].infos) {
-					poiSite['infos'] = data[i].infos + '<br/><a href="https://www.edsm.net/en/system?systemName=' + data[i].name + '" target="_blank" rel="noopener">EDSM</a><br/><a href="https://canonn-science.github.io/canonn-signals/?system=' + data[i].name + '" target="_blank" rel="noopener">Signals</a>';
+					poiSite['infos'] = data[i].infos + '<a href="https://signals.canonn.tech/?system=' + data[i].name + '" target="_blank" rel="noopener">Signals</a>';
 				} else {
-					poiSite['infos'] = '<br/><a href="https://www.edsm.net/en/system?systemName=' + data[i].name + '" target="_blank" rel="noopener">EDSM</a><br/><a href="https://canonn-science.github.io/canonn-signals/?system=' + data[i].name + '" target="_blank" rel="noopener">Signals</a>';
+					poiSite['infos'] = '<a href="https://signals.canonn.tech/?system=' + data[i].name + '" target="_blank" rel="noopener">Signals</a>';
 				}
 				//Check Site Type and match categories
 
@@ -235,7 +235,7 @@ var canonnEd3d_challenge = {
 					poiSite['cat'] = [20];
 				}
 
-				poiSite['url'] = "https://canonn-science.github.io/canonn-signals/?system=" + poiSite['name']
+				poiSite['url'] = "https://signals.canonn.tech/?system=" + poiSite['name']
 				poiSite['coords'] = {
 					x: parseFloat(data[i].pos_x),
 					y: parseFloat(data[i].pos_y),
@@ -253,11 +253,11 @@ var canonnEd3d_challenge = {
 				var poiSite = {};
 				poiSite['name'] = data[i].name;
 				if (data[i].infos) {
-					poiSite['infos'] = data[i].infos + '<br/><a href="https://www.edsm.net/en/system?systemName=' + data[i].name + '" target="_blank" rel="noopener">EDSM</a><br/><a href="https://canonn-science.github.io/canonn-signals/?system=' + data[i].name + '" target="_blank" rel="noopener">Signals</a>';
+					poiSite['infos'] = data[i].infos + '<a href="https://signals.canonn.tech/?system=' + data[i].name + '" target="_blank" rel="noopener">Signals</a>';
 				} else {
-					poiSite['infos'] = '<br/><a href="https://www.edsm.net/en/system?systemName=' + data[i].name + '" target="_blank" rel="noopener">EDSM</a><br/><a href="https://canonn-science.github.io/canonn-signals/?system=' + data[i].name + '" target="_blank" rel="noopener">Signals</a>';
+					poiSite['infos'] = '<a href="https://signals.canonn.tech/?system=' + data[i].name + '" target="_blank" rel="noopener">Signals</a>';
 				}
-				poiSite['url'] = "https://canonn-science.github.io/canonn-signals/?system=" + poiSite['name']
+				poiSite['url'] = "https://signals.canonn.tech/?system=" + poiSite['name']
 				poiSite['coords'] = {
 					x: parseFloat(data[i].pos_x),
 					y: parseFloat(data[i].pos_y),

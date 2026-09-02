@@ -100,7 +100,7 @@ var canonnEd3d_challenge = {
 			poiSite['name'] = row[SystemCol];
 			if (canonnEd3d_challenge.systemMasterList[row[SystemCol]]) poiSite['infos'] = "<br/><br/>"
 			else {
-				poiSite['infos'] = '<a href="https://www.edsm.net/en/system?systemName=' + row[SystemCol] + '" target="_blank" rel="noopener">EDSM</a><br/><a href="https://canonn-science.github.io/canonn-signals/?system=' + row[SystemCol] + '" target="_blank" rel="noopener">Signals</a><br/><br/>';
+				poiSite['infos'] = '<a href="https://signals.canonn.tech/?system=' + row[SystemCol] + '" target="_blank" rel="noopener">Signals</a><br/><br/>';
 				canonnEd3d_challenge.systemMasterList[row[SystemCol]] = true
 			}
 
@@ -112,7 +112,7 @@ var canonnEd3d_challenge = {
 			
 			//Check Site Type and match categories
 			poiSite['cat'] = [category];
-			poiSite['url'] = "https://canonn-science.github.io/canonn-signals/?system=" + poiSite['name']
+			poiSite['url'] = "https://signals.canonn.tech/?system=" + poiSite['name']
 			poiSite['coords'] = {
 				x: parseFloat(row[CoordCol+"_X"]),
 				y: parseFloat(row[CoordCol+"_Y"]),
