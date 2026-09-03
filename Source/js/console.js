@@ -230,7 +230,10 @@
      index (Cmd/Ctrl+Shift+M) and the command palette. */
   var CATALOGUE = [
     { g: "CanonnED3D", items: [
-      { n: "CanonnED3D", u: "index.html" }
+      { n: "CanonnED3D", u: "index.html" },
+      // Not from the old nav: the orrery is new, and it is a destination
+      // rather than a map, so it goes at the top with the index.
+      { n: "Orrery", u: "orrery.html" }
     ]},
     { g: "Guardians", items: [
       { n: "Brain Trees", u: "bt-data.html" },

@@ -1,0 +1,61 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/x-icon" href="img/favicon.ico" />
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-Z047QW7Q79"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-Z047QW7Q79');
+  </script>
+
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;450;500&display=swap">
+  <!-- The console's tokens, which the orrery inherits: same amber, same ion,
+       same three Plex faces. It is another room in the same building. -->
+  <link rel="stylesheet" type="text/css" href="css/console.css" />
+  <link rel="stylesheet" type="text/css" href="css/orrery.css" />
+
+  <title>Canonn Orrery</title>
+  <meta name="description" content="Any system Canonn has data for, with its bodies on their real orbits.">
+
+  <style type="text/css">
+    /* No galaxy map on this page, so nothing to lay out around: the orrery is
+       the document. Painted here rather than waiting for the stylesheet so a
+       slow font load never flashes white. */
+    html, body { height: 100%; margin: 0; background: #05070A; }
+  </style>
+</head>
+
+<body>
+  <!-- js/orrery.js reads 'three' through this map, exactly as the map pages do. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.185.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module">
+    import { Orrery } from './js/orrery.js';
+    // ?system=Sol opens straight into it; without one, the search is the page.
+    Orrery.page();
+  </script>
+
+  <noscript>
+    <p style="color:#93A3B1;font:14px system-ui;padding:24px">
+      The orrery draws a system's bodies on their orbits, which needs JavaScript.
+      <a style="color:#FF9D00" href="index.html">The map index</a> lists everything else.
+    </p>
+  </noscript>
+</body>
+
+</html>

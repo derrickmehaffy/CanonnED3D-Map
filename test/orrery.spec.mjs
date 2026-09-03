@@ -347,3 +347,124 @@ test('true distance keeps the ratio between orbits', async ({ page }) => {
   expect(scaled.spread.mid - scaled.spread.near)
     .toBeCloseTo(scaled.spread.far - scaled.spread.mid, 4);
 });
+
+/* ── the orrery as a page of its own ────────────────────────────────────── */
+
+/** The typeahead, answering as the real one does: a prefix search. */
+async function stubSearch(page, rows = [
+  { id64: 99, name: 'Testholm', x: 30, y: 40, z: 0 },
+  { id64: 100, name: 'Testholm Deep', x: 3, y: 4, z: 0 }
+]) {
+  await page.route(API, (route) => {
+    const url = route.request().url();
+    const json = (b) => route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify(b) });
+    if (url.includes('/typeahead')) {
+      const q = decodeURIComponent(new URL(url).searchParams.get('q') || '').toLowerCase();
+      return json({ min_max: rows.filter((r) => r.name.toLowerCase().startsWith(q)) });
+    }
+    return json({ system: SYSTEM });
+  });
+}
+
+test('a link to a system opens that system', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubSearch(page);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+  await expect(page.locator('#orr-name')).toHaveText('Testholm');
+  await expect(page).toHaveTitle('Testholm — Canonn Orrery');
+  // No map behind it, so there is nothing to go back to.
+  await expect(page.locator('.orr-back')).toBeHidden();
+});
+
+test('with no system named, the search is the page', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubSearch(page);
+  await page.goto('/orrery.html', { waitUntil: 'domcontentloaded' });
+
+  await expect(page.locator('.orr-empty h1')).toHaveText('Canonn Orrery', { timeout: 30_000 });
+  // An empty screen is an invitation to act, so it offers real places to start.
+  await expect(page.locator('.orr-seeds button').first()).toHaveText('Sol');
+  await expect(page.locator('.orr-mid')).toBeHidden();
+  await expect(page.locator('.orr-foot')).toBeHidden();
+});
+
+test('searching finds a system and puts it in the address bar', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubSearch(page);
+  await page.goto('/orrery.html', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-empty h1')).toBeVisible({ timeout: 30_000 });
+
+  await page.locator('#orr-q').fill('testh');
+  await expect(page.locator('.orr-res .orr-r')).toHaveCount(2, { timeout: 15_000 });
+  // Distance from Sol comes free with the lookup, so the results say it.
+  await expect(page.locator('.orr-res .orr-r').first()).toContainText('50 ly');
+
+  await page.locator('.orr-res .orr-r').first().click();
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+  // The link is the point: what you are looking at is in the URL.
+  expect(new URL(page.url()).searchParams.get('system')).toBe('Testholm');
+  await expect(page.locator('.orr-empty')).toBeHidden();
+});
+
+test('the body filter keeps a match\'s parents', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+
+  // "1 a" is a moon of "Testholm 1", which is not itself a match — but
+  // dropping it would leave the moon indented under nothing.
+  await page.locator('#orr-filter').fill('1 a');
+  await expect(page.locator('.orr-row .nm')).toHaveText(['Testholm', '1', '1 a']);
+
+  await page.locator('#orr-filter').fill('rocky');       // matches by subtype too
+  await expect(page.locator('.orr-row .nm')).toHaveText(['Testholm', '1', '1 a']);
+
+  await page.locator('#orr-filter').fill('nothing here');
+  await expect(page.locator('.orr-list .orr-none')).toBeVisible();
+});
+
+test('what gets drawn is under the reader\'s control', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+
+  const orbitsDrawn = () => page.evaluate(() =>
+    window.__orrOrbits ? window.__orrOrbits() : null);
+
+  // Three states, because a forty-body system draws forty ellipses and the
+  // planets disappear into their own moons.
+  await expect(page.locator('#orr-orbits')).toHaveText('Orbits: all');
+  await page.locator('#orr-orbits').click();
+  await expect(page.locator('#orr-orbits')).toHaveText('Orbits: planets');
+  await page.locator('#orr-orbits').click();
+  await expect(page.locator('#orr-orbits')).toHaveText('Orbits: none');
+
+  await expect(page.locator('#orr-labels')).not.toHaveClass(/hide/);
+  await page.locator('#orr-labl').click();
+  await expect(page.locator('#orr-labels')).toHaveClass(/hide/);
+});
+
+/* distanceToArrival in light-seconds is what a commander actually asks about a
+   system, and it is the one spatial fact the orbit view cannot show: that
+   draws each body against its own parent. */
+test('the spine places every body by its distance from arrival', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+
+  // The star at 0 Ls, the planet at 499, its moon at 500.
+  await expect(page.locator('.orr-spine .pip')).toHaveCount(3);
+  await expect(page.locator('.orr-spine')).toContainText('500 Ls');
+  await expect(page.locator('.orr-spine .pip.moon')).toHaveCount(1);
+
+  // And it is navigation, not decoration.
+  await page.locator('.orr-spine .pip').last().click();
+  await expect(page.locator('.orr-facts .orr-f-h b')).toHaveText('Testholm 1 a');
+  await expect(page.locator('.orr-spine .pip').last()).toHaveClass(/on/);
+});

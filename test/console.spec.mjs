@@ -69,8 +69,10 @@ test('the map index offers every destination the nav had', async ({ page }) => {
   await ready(page);
   await page.locator('#switcher').click();
   await expect(page.locator('#idxscrim')).toHaveClass(/open/);
-  // The catalogue is generated from include/nav.html, so nothing is lost.
-  await expect(page.locator('#idxsub')).toHaveText(/84 maps/);
+  // The catalogue is generated from include/nav.html, so nothing is lost:
+  // 84 destinations from the nav, plus the orrery, which never was in it.
+  await expect(page.locator('#idxsub')).toHaveText(/85 maps/);
+  await expect(page.locator('.idx-i[href="orrery.html"]')).toHaveCount(1);
   await expect(page.locator('.idx-i.cur')).toContainText('Voyager Pulsars');
   await expect(page.locator('.idx-i[href="gr-data.html"]')).toHaveCount(1);
 });

@@ -294,6 +294,13 @@ const Orrery = (function () {
   let model = null, meshes = [], loop = 0, lastFrame = 0;
   let simDays = 0, rateIx = START_RATE, playing = true;
   let mode3d = true, trueDistance = false, selected = null;
+  /* What to draw, and whether this is a page or an overlay. Orbit paths get
+     three states rather than two: a forty-body system draws forty ellipses,
+     and the trans-Neptunian inclinations alone make a tangle you cannot see
+     the planets through. */
+  let showLabels = true, following = true, orbitMode = 0;   // 0 all, 1 planets, 2 none
+  const ORBIT_LABEL = ['Orbits: all', 'Orbits: planets', 'Orbits: none'];
+  let standalone = false;
   let galaxyWasVisible = null;
   const cache = new Map();
   const tmp = new THREE.Vector3();
@@ -339,29 +346,60 @@ const Orrery = (function () {
 
   function build() {
     panel = document.createElement('div');
-    panel.className = 'orrery';
+    panel.className = 'orrery' + (standalone ? ' orr-page' : '');
     panel.innerHTML = [
       '<div class="orr-top">',
+      // In a map this is an overlay you came from somewhere; on its own page
+      // it is the destination, and what belongs here is a way to find a system.
       '  <button class="orr-back" id="orr-back">&#8592; Back to the map</button>',
+      '  <a class="orr-home" id="orr-home" href="index.html" title="All Canonn maps">',
+      '    <svg viewBox="0 0 40 40" aria-hidden="true">',
+      '      <ellipse cx="20" cy="20" rx="17" ry="7" fill="none" stroke="currentColor" stroke-width="2.6"/>',
+      '      <ellipse cx="20" cy="20" rx="17" ry="7" fill="none" stroke="currentColor" stroke-width="2.6" transform="rotate(60 20 20)"/>',
+      '      <ellipse cx="20" cy="20" rx="17" ry="7" fill="none" stroke="currentColor" stroke-width="2.6" transform="rotate(120 20 20)"/>',
+      '      <circle cx="20" cy="20" r="5" fill="currentColor"/>',
+      '    </svg><span>Orrery</span></a>',
+      '  <span class="orr-wip" title="The orrery is new. Orbits are solved from Canonn\'s own data, but the view and its controls are still being worked on.">Prototype</span>',
+      '  <div class="orr-find" id="orr-find">',
+      '    <input id="orr-q" type="text" autocomplete="off" spellcheck="false"',
+      '           placeholder="Find a system&#8230;" aria-label="Find a system">',
+      '    <div class="orr-res" id="orr-res" role="listbox"></div>',
+      '  </div>',
       '  <div class="orr-title"><b id="orr-name"></b><span id="orr-sub"></span></div>',
       '  <div class="orr-view" role="group" aria-label="View">',
       '    <button id="orr-3d" class="on" aria-pressed="true">3D</button>',
       '    <button id="orr-2d" aria-pressed="false">2D</button>',
       '  </div>',
+      '  <button class="orr-tb" id="orr-link" title="Copy a link straight to this system">Copy link</button>',
       '  <button class="orr-x" id="orr-close" aria-label="Close">&times;</button>',
       '</div>',
+
+      // The spine: every body on a log axis of its distance from where you
+      // drop in. The orbit view shows AU from each parent, which is a
+      // different question from "how far is the fly-out".
+      '<div class="orr-spine" id="orr-spine"></div>',
+
       '<div class="orr-mid">',
       '  <aside class="orr-side orr-left">',
-      '    <div class="orr-s-t">Bodies</div>',
+      '    <div class="orr-s-h">',
+      '      <div class="orr-s-t">Bodies</div>',
+      '      <input id="orr-filter" class="orr-filter" type="text" autocomplete="off"',
+      '             spellcheck="false" placeholder="Filter" aria-label="Filter bodies">',
+      '    </div>',
       '    <div class="orr-list" id="orr-list"></div>',
       '  </aside>',
       '  <div class="orr-stage"><canvas id="orr-canvas"></canvas>',
       '    <div class="orr-labels" id="orr-labels"></div>',
       '    <div class="orr-msg" id="orr-msg">Reading the system dump&#8230;</div>',
+      '    <div class="orr-tools" role="group" aria-label="What to draw">',
+      '      <button id="orr-orbits" title="Orbit paths: all, planets only, none">Orbits: all</button>',
+      '      <button id="orr-labl" class="on" title="Names over the view">Labels</button>',
+      '      <button id="orr-follow" class="on" title="Keep the camera on the selected body">Follow</button>',
+      '      <button id="orr-reset" title="Frame the whole system again">Reset view</button>',
+      '    </div>',
       '    <div class="orr-legend" id="orr-legend"></div>',
       '  </div>',
       '  <aside class="orr-side orr-right">',
-      '    <div class="orr-s-t">Selected</div>',
       '    <div class="orr-facts" id="orr-facts"></div>',
       '  </aside>',
       '</div>',
@@ -378,6 +416,21 @@ const Orrery = (function () {
       '    <button id="orr-spread" class="on" title="Orbits spread on a log scale, so the whole system is legible at once">Spread</button>',
       '    <button id="orr-true" title="Orbits to scale with each other. Bodies stay exaggerated, or they would be invisible">True distance</button>',
       '  </div>',
+      '</div>',
+
+      // Nothing asked for yet. The search is the page, so it moves to the
+      // middle and brings a few real places to start.
+      '<div class="orr-empty" id="orr-empty">',
+      '  <h1>Canonn Orrery</h1>',
+      '  <p>Any system Canonn has data for, with its bodies on their real orbits.',
+      '     Search above, or start somewhere known.</p>',
+      '  <div class="orr-seeds">',
+      '    <button data-sys="Sol">Sol</button>',
+      '    <button data-sys="Merope">Merope</button>',
+      '    <button data-sys="Colonia">Colonia</button>',
+      '    <button data-sys="Sagittarius A*">Sagittarius A*</button>',
+      '    <button data-sys="Betelgeuse">Betelgeuse</button>',
+      '  </div>',
       '</div>'
     ].join('\n');
     document.body.appendChild(panel);
@@ -393,11 +446,179 @@ const Orrery = (function () {
     $('orr-2d').onclick = () => setMode(false);
     $('orr-spread').onclick = () => setScale(false);
     $('orr-true').onclick = () => setScale(true);
+    $('orr-labl').onclick = () => setLabels(!showLabels);
+    $('orr-follow').onclick = () => setFollow(!following);
+    $('orr-reset').onclick = () => { if (model) { frame(); select(model.star, false); } };
+    $('orr-orbits').onclick = () => setOrbits((orbitMode + 1) % 3);
+    $('orr-link').onclick = copyLink;
+    $('orr-filter').addEventListener('input', () => renderList());
+    $('orr-empty').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-sys]');
+      if (b) go(b.dataset.sys);
+    });
+    wireSearch();
 
     document.addEventListener('keydown', onKey);
-    window.addEventListener('resize', resize);
+    window.addEventListener('resize', () => { resize(); drawSpine(); });
     canvas.addEventListener('pointerdown', onPick);
     initGL();
+  }
+
+  /* ── finding a system ─────────────────────────────────────────────────────
+     The same typeahead the card uses to turn a name into an id64 is a prefix
+     search over every system Canonn holds, so it is also the search box. It
+     answers with the id64, which means picking a result costs one fetch, not
+     two. */
+
+  let qTimer = 0, qSel = -1, qRows = [];
+
+  function wireSearch() {
+    const q = panel.querySelector('#orr-q');
+    const res = panel.querySelector('#orr-res');
+
+    q.addEventListener('input', () => {
+      clearTimeout(qTimer);
+      const term = q.value.trim();
+      if (term.length < 2) return closeResults();
+      // Typing is faster than the round trip; only ask once it settles.
+      qTimer = setTimeout(() => search(term), 220);
+    });
+
+    q.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (!qRows.length) return;
+        qSel = (qSel + (e.key === 'ArrowDown' ? 1 : -1) + qRows.length) % qRows.length;
+        paintResults();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const pick = qRows[qSel < 0 ? 0 : qSel];
+        if (pick) { closeResults(); q.blur(); go(pick.name, pick.id64); }
+      } else if (e.key === 'Escape') { closeResults(); q.blur(); }
+    });
+
+    res.addEventListener('mousedown', (e) => {
+      const row = e.target.closest('[data-i]');
+      if (!row) return;
+      e.preventDefault();
+      const pick = qRows[+row.dataset.i];
+      closeResults(); q.blur(); q.value = '';
+      go(pick.name, pick.id64);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (panel && !panel.querySelector('#orr-find').contains(e.target)) closeResults();
+    });
+  }
+
+  async function search(term) {
+    try {
+      const r = await fetch(API + '/typeahead?q=' + encodeURIComponent(term));
+      const j = await r.json();
+      qRows = (j && j.min_max || []).slice(0, 12);
+    } catch (e) { qRows = []; }
+    qSel = -1;
+    paintResults();
+  }
+
+  function paintResults() {
+    const res = panel.querySelector('#orr-res');
+    if (!qRows.length) {
+      res.innerHTML = '<div class="orr-none">Nothing by that name in Canonn\'s data.</div>';
+      res.classList.add('open');
+      return;
+    }
+    res.innerHTML = qRows.map((r, i) => {
+      const ly = Math.round(Math.sqrt(r.x * r.x + r.y * r.y + r.z * r.z)).toLocaleString();
+      return '<div class="orr-r' + (i === qSel ? ' on' : '') + '" data-i="' + i +
+        '" role="option"><span class="nm">' + esc(r.name) + '</span>' +
+        '<span class="ly">' + ly + ' ly</span></div>';
+    }).join('');
+    res.classList.add('open');
+  }
+
+  function closeResults() {
+    qRows = []; qSel = -1;
+    const res = panel && panel.querySelector('#orr-res');
+    if (res) { res.classList.remove('open'); res.innerHTML = ''; }
+  }
+
+  /** Open a system and, on the page, put it in the address bar. */
+  function go(name, id64) {
+    if (standalone) {
+      const u = new URL(location.href);
+      u.searchParams.set('system', name);
+      history.replaceState(null, '', u);
+      document.title = name + ' — Canonn Orrery';
+    }
+    open(name, id64);
+  }
+
+  function copyLink() {
+    const name = model ? model.name : (panel.querySelector('#orr-name').textContent || '');
+    if (!name) return;
+    const u = new URL('orrery.html', location.href);
+    u.searchParams.set('system', name);
+    const btn = panel.querySelector('#orr-link');
+    navigator.clipboard.writeText(u.href).then(() => {
+      btn.textContent = 'Link copied';
+      setTimeout(() => { btn.textContent = 'Copy link'; }, 1400);
+    }).catch(() => { btn.textContent = 'Copy failed'; });
+  }
+
+  /* ── the spine ────────────────────────────────────────────────────────────
+     Distance from the arrival point, in light-seconds, on a log axis. It is
+     the question every commander asks about a system and the one thing the
+     orbit view cannot show: that draws each body against its own parent, so a
+     moon of Neptune and a moon of Earth look alike. Here they do not. */
+
+  function drawSpine() {
+    const host = panel.querySelector('#orr-spine');
+    if (!model) { host.innerHTML = ''; return; }
+
+    /* The arrival star is the origin, so a dump that omits its distance is
+       not missing anything — it is zero by definition, and leaving the star
+       off its own axis would be odd. */
+    const lsOf = (n) => typeof n.raw.distanceToArrival === 'number'
+      ? n.raw.distanceToArrival : (n === model.star ? 0 : null);
+
+    const withLs = model.all.filter((n) => n.drawR > 0 && lsOf(n) !== null);
+    if (withLs.length < 2) { host.innerHTML = ''; host.classList.add('empty'); return; }
+    host.classList.remove('empty');
+
+    const max = Math.max(...withLs.map(lsOf), 1);
+    // Log, with everything under 10 Ls pinned to the star end rather than
+    // running off to minus infinity.
+    const at = (ls) => Math.log10(Math.max(ls, 10) / 10) / Math.log10(max / 10 || 1);
+
+    const ticks = [];
+    for (let p = 1; Math.pow(10, p) <= max; p++) {
+      ticks.push('<span class="tk" style="left:' + (at(Math.pow(10, p)) * 100) + '%">' +
+        (Math.pow(10, p) >= 1000 ? Math.pow(10, p) / 1000 + 'k' : Math.pow(10, p)) + '</span>');
+    }
+
+    host.innerHTML =
+      '<span class="orr-sp-lb">Arrival distance</span>' +
+      '<div class="orr-sp-ax">' + ticks.join('') +
+        withLs.map((n) => {
+          const moon = n.parent && n.parent !== model.star;
+          return '<button class="pip' + (moon ? ' moon' : '') +
+            (selected === n ? ' on' : '') + '" data-id="' + n.id + '" ' +
+            'style="left:' + (at(lsOf(n)) * 100) + '%;--c:' +
+              (n.type === 'Star' ? '#' + starColour().getHexString()
+                                 : '#' + new THREE.Color(tintOf(n.sub)).getHexString()) + '" ' +
+            'title="' + esc(shortName(n)) + ' — ' +
+              Math.round(lsOf(n)).toLocaleString() + ' Ls"></button>';
+        }).join('') +
+      '</div>' +
+      '<span class="orr-sp-max">' + Math.round(max).toLocaleString() + ' Ls</span>';
+
+    host.querySelector('.orr-sp-ax').onclick = (e) => {
+      const pip = e.target.closest('.pip');
+      if (!pip) return;
+      const n = model.all.find((x) => x.id === +pip.dataset.id);
+      if (n) select(n);
+    };
   }
 
   function onKey(e) {
@@ -464,6 +685,10 @@ const Orrery = (function () {
     layout(model, trueDistance);
 
     const starTint = starColour();
+    // The page takes the colour of the star it is showing: the spine's axis
+    // fades out of it, and the disc is painted from the same value.
+    panel.style.setProperty('--star', '#' + starTint.getHexString());
+
     model.all.forEach((n) => {
       const entry = { node: n };
 
@@ -577,6 +802,28 @@ const Orrery = (function () {
     frame();
   }
 
+  function setLabels(on) {
+    showLabels = on;
+    panel.querySelector('#orr-labl').classList.toggle('on', on);
+    panel.querySelector('#orr-labels').classList.toggle('hide', !on);
+  }
+
+  function setFollow(on) {
+    following = on;
+    panel.querySelector('#orr-follow').classList.toggle('on', on);
+  }
+
+  function setOrbits(mode) {
+    orbitMode = mode;
+    panel.querySelector('#orr-orbits').textContent = ORBIT_LABEL[mode];
+    panel.querySelector('#orr-orbits').classList.toggle('on', mode !== 2);
+    meshes.forEach((m) => {
+      if (!m.line) return;
+      const moon = m.node.parent && m.node.parent !== model.star;
+      m.line.visible = mode === 0 || (mode === 1 && !moon);
+    });
+  }
+
   function setScale(isTrue) {
     if (trueDistance === isTrue) return;
     trueDistance = isTrue;
@@ -613,7 +860,7 @@ const Orrery = (function () {
     // Selecting a body is also aiming at it: the camera target eases onto
     // whatever is chosen and then stays with it, which is the only way to
     // watch a moon system without chasing it by hand.
-    if (selected && selected._pos) controls.target.lerp(selected._pos, 0.12);
+    if (following && selected && selected._pos) controls.target.lerp(selected._pos, 0.12);
 
     drawLabels();
     panel.querySelector('#orr-date').textContent = gameDate();
@@ -663,6 +910,9 @@ const Orrery = (function () {
     });
     const row = panel.querySelector('.orr-row.on');
     if (row) row.scrollIntoView({ block: 'nearest' });
+    panel.querySelectorAll('.orr-spine .pip').forEach((el) => {
+      el.classList.toggle('on', +el.dataset.id === node.id);
+    });
     updateFacts();
   }
 
@@ -860,7 +1110,7 @@ const Orrery = (function () {
   }
 
   function drawLabels() {
-    if (!labels.length) return;
+    if (!labels.length || !showLabels) return;
     const cam = mode3d ? cam3 : cam2;
     const w = canvas.clientWidth, h = canvas.clientHeight;
     labels.forEach(({ node, el }) => {
@@ -880,18 +1130,38 @@ const Orrery = (function () {
     return n.name.indexOf(sys) === 0 ? n.name.slice(sys.length) : n.name;
   }
 
-  function buildList() {
+  function renderList() {
     // Depth-first, so moons sit under the planet they belong to.
-    const out = [];
+    const all = [];
     const walk = (n, depth) => {
-      out.push({ n, depth });
+      all.push({ n, depth });
       n.children.slice()
         .sort((a, b) => (a.aAu || 0) - (b.aAu || 0))
         .forEach((c) => walk(c, depth + 1));
     };
     walk(model.star, 0);
 
-    panel.querySelector('#orr-list').innerHTML = out.map(({ n, depth }) =>
+    /* Filtering keeps a match's parents, so a moon never appears orphaned
+       under a planet that got filtered away — the indent would be a lie. */
+    const term = (panel.querySelector('#orr-filter').value || '').trim().toLowerCase();
+    let out = all;
+    if (term) {
+      const hit = (n) => (n.name + ' ' + n.sub).toLowerCase().includes(term);
+      const keep = new Set();
+      all.forEach(({ n }) => {
+        if (!hit(n)) return;
+        for (let p = n; p; p = p.parent) keep.add(p);
+      });
+      out = all.filter(({ n }) => keep.has(n));
+    }
+
+    const list = panel.querySelector('#orr-list');
+    if (!out.length) {
+      list.innerHTML = '<div class="orr-none">No body here matches “' + esc(term) + '”.</div>';
+      return;
+    }
+
+    list.innerHTML = out.map(({ n, depth }) =>
       '<div class="orr-row" data-id="' + n.id + '" style="--depth:' + depth + '" ' +
       'role="button" tabindex="0" title="' + esc(n.name) + '">' +
       '<span class="dot" style="background:' +
@@ -901,6 +1171,10 @@ const Orrery = (function () {
       '<span class="nm">' + esc(shortName(n)) + '</span>' +
       '<span class="ct">' + (n.aAu ? num(n.aAu, n.aAu < 0.1 ? 3 : 2) : '') + '</span></div>'
     ).join('');
+    if (selected) {
+      const row = list.querySelector('.orr-row[data-id="' + selected.id + '"]');
+      if (row) row.classList.add('on');
+    }
 
     panel.querySelector('#orr-list').onclick = (e) => {
       const row = e.target.closest('.orr-row');
@@ -927,6 +1201,8 @@ const Orrery = (function () {
     panel.querySelector('#orr-sub').textContent = '';
     panel.querySelector('#orr-msg').textContent = 'Reading the system dump…';
     panel.querySelector('#orr-msg').className = 'orr-msg';
+    panel.classList.add('has-system');
+    panel.querySelector('#orr-spine').innerHTML = '';
 
     // The galaxy map keeps its camera and its data; its animate() already
     // skips everything when the scene is switched off, so this costs nothing
@@ -966,8 +1242,10 @@ const Orrery = (function () {
       (model.all.filter((n) => n.type === 'Star').length > 1 ? 's' : '');
 
     buildScene();
-    buildList();
+    renderList();
     buildLabels();
+    drawSpine();
+    setOrbits(orbitMode);
     select(model.star);
     cancelAnimationFrame(loop);
     loop = requestAnimationFrame(animate);
@@ -977,6 +1255,21 @@ const Orrery = (function () {
     if (!panel) return;
     cancelAnimationFrame(loop);
     loop = 0;
+    // On its own page there is nowhere to go back to, so closing a system
+    // returns to the search rather than leaving a blank screen.
+    if (standalone) {
+      model = null;
+      panel.classList.remove('has-system');
+      panel.querySelector('#orr-spine').innerHTML = '';
+      panel.querySelector('#orr-name').textContent = '';
+      panel.querySelector('#orr-sub').textContent = '';
+      const u = new URL(location.href);
+      u.searchParams.delete('system');
+      history.replaceState(null, '', u);
+      document.title = 'Canonn Orrery';
+      panel.querySelector('#orr-q').focus();
+      return;
+    }
     panel.classList.remove('open');
     document.body.classList.remove('orrery-open');
     if (window.scene && galaxyWasVisible !== null) {
@@ -985,7 +1278,26 @@ const Orrery = (function () {
     }
   }
 
-  return { open, close, isOpen };
+  /* The page, rather than the overlay. Same everything; what changes is that
+     there is no map behind it, the search is in the header, and the system
+     lives in the address bar so a link to one is a link to one. */
+  function page() {
+    standalone = true;
+    if (!panel) build();
+    panel.classList.add('open');
+    document.body.classList.add('orrery-open');
+    const wanted = new URLSearchParams(location.search).get('system');
+    if (wanted) go(wanted);
+    else panel.querySelector('#orr-q').focus();
+
+    // Back and forward through the systems someone has looked at.
+    window.addEventListener('popstate', () => {
+      const n = new URLSearchParams(location.search).get('system');
+      if (n && (!model || model.name !== n)) open(n);
+    });
+  }
+
+  return { open, close, isOpen, page };
 })();
 
 window.Orrery = Orrery;
