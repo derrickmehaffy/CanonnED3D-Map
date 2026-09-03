@@ -10,12 +10,23 @@ async function loaded(page) {
     .toBe(true);
 }
 
+/* Region labels are built from a font loaded asynchronously — addText() returns
+   early until Ed3d.font arrives — so tests about them have to wait for the
+   labels themselves, not just for the data. */
+async function labelsReady(page) {
+  await expect
+    .poll(() => page.evaluate(() =>
+      (window.Galaxy && Galaxy.infos && Galaxy.infos.children.length) || 0), { timeout: 60_000 })
+    .toBeGreaterThan(20);
+}
+
 /* Galaxy.addText() used to allocate a MeshBasicMaterial per region label — ~98
    of them — and infosUpdateCallback walked every mesh to change opacity. Labels
    come in two opacity bands (the `revert` flag), so two shared materials cover
    every case and the opacity update became two assignments. */
 test('region labels share two materials rather than one each', async ({ page }) => {
   await loaded(page);
+  await labelsReady(page);
   const r = await page.evaluate(() => {
     // Region labels are the children of Galaxy.infos. Scoping to that matters:
     // the cursor cones and the 2D galaxy floor are MeshBasicMaterial too.
@@ -32,6 +43,7 @@ test('region labels share two materials rather than one each', async ({ page }) 
 
 test('both label opacity bands still respond to the distance callback', async ({ page }) => {
   await loaded(page);
+  await labelsReady(page);
   const r = await page.evaluate(() => {
     // infosUpdateCallback returns early when labels are off, and the console's
     // display timer flips that flag as the camera crosses into far view — so

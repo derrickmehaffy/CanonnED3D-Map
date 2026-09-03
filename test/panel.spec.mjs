@@ -103,3 +103,81 @@ test('a collapsed panel stays collapsed, and the rail does not', async ({ page }
   await expect(page.locator('#side')).toBeHidden();
   await expect(page.locator('.rail')).toBeVisible();
 });
+
+/* ── layer selection ────────────────────────────────────────────────────── */
+
+async function threeTypes(page) {
+  await stubDataHosts(page);
+  await page.goto('/gr-data.html', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.app .top')).toBeVisible({ timeout: 30_000 });
+  await page.waitForFunction(() => window.Ed3d && Ed3d.updateSystems, { timeout: 30_000 });
+  await page.evaluate(() => new Promise((res) => Ed3d.updateSystems({
+    categories: { 'Site type': {
+      a: { name: 'Alpha', color: 'FF9D00' },
+      b: { name: 'Beta',  color: '4DE3E1' },
+      g: { name: 'Gamma', color: 'B98CFF' } } },
+    systems: ['a', 'b', 'g'].flatMap((c, ci) =>
+      Array.from({ length: 10 }, (_, i) => ({
+        name: c.toUpperCase() + i, coords: { x: ci * 50 + i, y: 0, z: i }, cat: [c]
+      })))
+  }, res)));
+  await expect(page.locator('#side .layer').first()).toBeVisible({ timeout: 30_000 });
+}
+
+const hiddenPoints = (page) => page.evaluate(() => {
+  const a = System.particleGeo.getAttribute('aVisible');
+  let n = 0;
+  for (let i = 0; i < a.count; i++) if (!a.array[i]) n++;
+  return n;
+});
+
+test('select all and clear act on every layer at once', async ({ page }) => {
+  await threeTypes(page);
+  const shown = page.locator('#st-shown');
+  await expect(shown).toContainText('30 / 30');
+
+  await page.locator('[data-all="0"]').click();
+  await expect(shown).toContainText('0 / 30');
+  // Clear is disabled once nothing is selected, and Select all becomes live.
+  await expect(page.locator('[data-all="0"]')).toBeDisabled();
+  await expect(page.locator('[data-all="1"]')).toBeEnabled();
+
+  await page.locator('[data-all="1"]').click();
+  await expect(shown).toContainText('30 / 30');
+  await expect(page.locator('[data-all="1"]')).toBeDisabled();
+});
+
+/* Ed3d dims a filtered system to #111111. That is nearly black alone, but the
+   cloud blends additively, so in a dense cluster hundreds of "off" points sum
+   into a grey haze that reads as data. Hiding drops them from the draw. */
+test('deselected systems can be removed from the draw entirely', async ({ page }) => {
+  await threeTypes(page);
+  await expect(page.locator('#hidefilt')).toBeChecked();   // on by default
+
+  expect(await hiddenPoints(page), 'nothing hidden while all layers are on').toBe(0);
+  await page.locator('#side .layer').nth(0).click();
+  await expect.poll(() => hiddenPoints(page)).toBe(10);
+
+  // Unchecking hands the job back to Ed3d's dimming.
+  await page.locator('#hidefilt').uncheck();
+  await expect.poll(() => hiddenPoints(page)).toBe(0);
+  await expect(page.locator('#st-shown')).toContainText('20 / 30');
+});
+
+test('the hide preference is remembered across maps', async ({ page }) => {
+  await threeTypes(page);
+  await page.locator('#hidefilt').uncheck();
+  await page.goto('/voyager.html', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#side .layer').first()).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('#hidefilt')).not.toBeChecked();
+});
+
+test('HDR is on by default', async ({ page }) => {
+  await stubDataHosts(page);
+  await page.goto('/voyager.html', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#side .layer').first()).toBeVisible({ timeout: 60_000 });
+  await expect.poll(() => page.evaluate(() => window.PostFX && PostFX.enabled), { timeout: 20_000 })
+    .toBe(true);
+  await page.locator('.rail button[data-p="display"]').click();
+  await expect(page.locator('[data-sw="hdr"]')).toHaveClass(/on/);
+});

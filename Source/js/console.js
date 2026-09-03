@@ -506,6 +506,21 @@
     c.on = active;
     if (window.jQuery) jQuery(c.el).trigger('click');
     else c.el.click();
+    syncFilteredVisibility();
+  }
+
+  /* Ed3d dims a filtered-out system to #111111 rather than removing it. On a
+     sparse map that reads as "off"; on a dense one hundreds of them blend
+     additively into a grey haze that is hard to tell from real data. This
+     pushes the state into the point cloud, which drops them from the draw. */
+  function syncFilteredVisibility() {
+    if (window.System && System.applyVisibility) System.applyVisibility(hideFiltered);
+  }
+
+  function setAllCats(active) {
+    CATS.forEach(function (c, i) { setCatVisible(i, active); });
+    renderPanel();
+    updateShown();
   }
 
   /* The systems the console lists and frames. Ed3d's System.points is the
@@ -662,8 +677,14 @@
       if (Object.keys(t).length > 1) mixed++;
     });
     var sites = c.reduce(function (a, b) { return a + b; }, 0);
+    var allOn = CATS.every(function (c) { return c.on; });
+    var allOff = CATS.every(function (c) { return !c.on; });
     var h = '<div class="s-t">' + (CFG.panel === 'star' ? 'Primary star' : 'Site type') + '</div>' +
-      '<div class="s-sub"><b>' + SYSLIST().length + '</b> systems · <b>' + sites + '</b> ' + CFG.unit + 's</div>';
+      '<div class="s-sub"><b>' + SYSLIST().length + '</b> systems · <b>' + sites + '</b> ' + CFG.unit + 's</div>' +
+      '<div class="selrow">' +
+      '<button data-all="1"' + (allOn ? ' disabled' : '') + '>Select all</button>' +
+      '<button data-all="0"' + (allOff ? ' disabled' : '') + '>Clear</button>' +
+      '</div>';
     CATS.forEach(function (cat, i) {
       var t = cat.name;
       if (!c[i]) return;
@@ -676,6 +697,8 @@
     var note = esc(CFG.note) +
       (multi ? (CFG.note ? '<br><br>' : '') + '<b>' + multi + '</b> systems hold more than one, <b>' +
         mixed + '</b> mixing types.' : '');
+    h += '<label class="hidechk"><input type="checkbox" id="hidefilt"' +
+      (hideFiltered ? ' checked' : '') + '> Hide deselected entirely</label>';
     if (note) h += '<div class="note">' + note + '</div>';
     if (CFG.templates) {
       h += '<div class="tmpl"><div class="tmpl-h"><span>Template map</span><b id="tmpl-n"></b></div>' +
@@ -833,6 +856,8 @@
       }
       return;
     }
+    var all = e.target.closest('[data-all]');
+    if (all) { setAllCats(all.dataset.all === '1'); return; }
     var srt = e.target.closest('[data-sort]');
     if (srt) resetSysList();
     if (srt) { sysSort = srt.dataset.sort; renderPanel(); return; }
@@ -900,6 +925,12 @@
       camera.position.copy(t.clone().add(dir.multiplyScalar(d)));
       $('camdist').textContent = d.toLocaleString() + ' ly';
     }
+    if (e.target.id === 'hidefilt') {
+      hideFiltered = e.target.checked;
+      remember('hideFiltered', hideFiltered ? '1' : '0');
+      syncFilteredVisibility();
+      return;
+    }
     if (e.target.id === 'sizerange') {
       sysSize = +e.target.value;
       remember('sysSize', sysSize);
@@ -929,8 +960,9 @@
     grid:   recallBool('disp.grid', true),
     galaxy: recallBool('disp.galaxy', true),
     stars:  recallBool('disp.stars', true),
-    hdr:    recallBool('disp.hdr', false)
+    hdr:    recallBool('disp.hdr', true)
   };
+  var hideFiltered = recallBool('hideFiltered', true);
   var sysSize = recallNum('sysSize', 20);  // flares got huge on zoom-out at 64
 
   function applyDisplay() {
@@ -1523,6 +1555,7 @@
         if (disp.hdr) PostFX.enable();
       }
       frameData(); applySize(); applyDisplay(); syncDisplay();
+      syncFilteredVisibility();
     }, 300);
   })();
 })();

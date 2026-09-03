@@ -169,6 +169,14 @@ var System = {
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.positions), 3));
     geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(this.colorValues), 3));
 
+    //-- Per-point visibility. Filtering dims a system to #111111, which is
+    //   nearly black on its own — but the cloud blends additively, so in a
+    //   dense cluster hundreds of "off" points still sum to a visible grey
+    //   haze. Scaling the point size to zero is what actually removes them.
+    var vis = new Float32Array(this.count);
+    vis.fill(1);
+    geo.setAttribute('aVisible', new THREE.BufferAttribute(vis, 1));
+
     //-- The material is identical on every flush, and this runs once per
     //   500-system batch. Building a new one each time (and only ever
     //   disposing the geometry, just above) leaked ceil(N/500)-1 materials per
@@ -184,6 +192,21 @@ var System = {
         depthTest: true,
         depthWrite: false
       });
+
+      //-- PointsMaterial has no per-point size, so the attribute is patched
+      //   into its shader rather than hand-writing a whole material.
+      //   The hook has to sit after gl_PointSize has been assigned and after
+      //   size attenuation has scaled it, which is why it goes in at
+      //   logdepthbuf_vertex rather than the more obvious begin_vertex —
+      //   anything earlier is simply overwritten.
+      this.particleMaterial.onBeforeCompile = function (shader) {
+        shader.vertexShader = 'attribute float aVisible;\n' + shader.vertexShader;
+        shader.vertexShader = shader.vertexShader.replace(
+          '#include <logdepthbuf_vertex>',
+          'if ( aVisible < 0.5 ) gl_PointSize = 0.0;\n\t#include <logdepthbuf_vertex>'
+        );
+      };
+      this.particleMaterial.customProgramCacheKey = function () { return 'ed3d-visible'; };
     }
 
     this.particle = new THREE.Points(geo, this.particleMaterial);
@@ -214,6 +237,31 @@ var System = {
     this.nameIndex = {};
     this.count = 0;
     scene.remove(this.particle);
+
+  },
+
+  /**
+   * Push each point's filtered state into the geometry.
+   *
+   * `hide` false restores everything to visible and leaves the dimming to do
+   * its usual job; `hide` true removes filtered systems from the draw
+   * entirely, which is what dense maps need — see the note in
+   * endParticleSystem().
+   */
+
+  'applyVisibility': function (hide) {
+
+    if (this.particleGeo == null) return;
+    var attr = this.particleGeo.getAttribute('aVisible');
+    if (attr == undefined) return;
+
+    for (var i = 0; i < attr.count; i++) {
+      var p = this.points[i];
+      var on = 1;
+      if (hide && p && p.filtered === false) on = 0;
+      attr.array[i] = on;
+    }
+    attr.needsUpdate = true;
 
   },
 

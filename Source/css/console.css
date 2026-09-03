@@ -368,3 +368,15 @@ input[type=range]{accent-color:var(--amber)}
 .side-grip:hover::after{background:var(--amber)}
 body.resizing{cursor:col-resize;user-select:none}
 body.resizing .side-grip::after{background:var(--amber)}
+
+/* Layers panel: bulk selection and the hide-vs-dim choice. */
+.selrow{display:flex;gap:6px;margin:0 0 10px}
+.selrow button{flex:1;font-family:var(--cond);font-size:11px;font-weight:600;
+  letter-spacing:.05em;padding:5px 0;background:var(--panel-2);color:var(--dim);
+  border:1px solid var(--rule);cursor:pointer}
+.selrow button:hover:not(:disabled){color:var(--amber);border-color:var(--amber)}
+.selrow button:disabled{opacity:.4;cursor:default}
+.hidechk{display:flex;align-items:center;gap:8px;margin:10px 0 4px;
+  font-family:var(--cond);font-size:11.5px;color:var(--dim);cursor:pointer}
+.hidechk input{accent-color:var(--amber);cursor:pointer}
+.hidechk:hover{color:var(--text)}

@@ -27,7 +27,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
  */
 var PostFX = {
 
-  'enabled': false,
+  'enabled': false,   // set by the console, which defaults it on
   'composer': null,
   'bloom': null,
   'origRender': null,
