@@ -729,7 +729,12 @@
       '<div class="selrow">' +
       '<button data-all="1"' + (allOn ? ' disabled' : '') + '>Select all</button>' +
       '<button data-all="0"' + (allOff ? ' disabled' : '') + '>Clear</button>' +
-      '</div>';
+      '</div>' +
+      // Part of the same control as the two buttons above: they say which
+      // types are on, this says what "off" looks like. It belongs with them
+      // rather than trailing the rows they act on.
+      '<label class="hidechk"><input type="checkbox" id="hidefilt"' +
+      (hideFiltered ? ' checked' : '') + '> Hide deselected entirely</label>';
     var lastGroup = null;
     CATS.forEach(function (cat, i) {
       var t = cat.name;
@@ -748,11 +753,6 @@
       (multi ? (CFG.note ? '<br><br>' : '') + '<b>' + multi + '</b> systems hold more than one, <b>' +
         mixed + '</b> mixing types.' : '');
     if (note) h += '<div class="note">' + note + '</div>';
-    // Last in the filter block, under Select all / Clear and under the type
-    // rows it acts on: it decides what happens to the types already switched
-    // off, so it only reads correctly after them.
-    h += '<label class="hidechk"><input type="checkbox" id="hidefilt"' +
-      (hideFiltered ? ' checked' : '') + '> Hide deselected entirely</label>';
     if (CFG.templates) {
       h += '<div class="s-t sec">Site plan</div>';
       h += '<div class="tmplpick">' + CATS.map(function (cat, i) {
@@ -1201,6 +1201,17 @@
     var TTL = 30 * 24 * 3600 * 1000;
     var mem = {}, inflight = {};
 
+    /* data/spectral-colors.json has been in this repo the whole time with
+       nothing reading it. This is its consumer: in Elite a star's colour is
+       how the game says what class it is, so the card paints the real one
+       rather than inventing an accent. 293 bytes from our own origin, asked
+       for once, and a failure only leaves the disc unlit. */
+    var SPECTRAL = null;
+    fetch('data/spectral-colors.json')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { if (j) SPECTRAL = j; })
+      .catch(function () {});
+
     /* undefined: not asked yet. null: asked, nothing to show. */
     function cached(name) {
       if (mem[name] !== undefined) return mem[name];
@@ -1270,6 +1281,20 @@
     }
 
     return {
+      /** '#rrggbb' for a spectral class, or '' when the table cannot place it —
+       *  which is honest: an unlit disc means unclassified, not "no star". */
+      colour: function (cls) {
+        if (!SPECTRAL || !cls) return '';
+        var c = String(cls).toUpperCase();
+        // "K3" is K, "DA" is D. Two-letter keys (WR) get first refusal.
+        var key = SPECTRAL[c] ? c
+                : SPECTRAL[c.slice(0, 2)] ? c.slice(0, 2)
+                : SPECTRAL[c.charAt(0)] ? c.charAt(0) : '';
+        if (!key) return '';
+        // Wolf-Rayet carries two colours; the first is the one to draw.
+        return '#' + String(SPECTRAL[key]).split(',')[0].replace(/^#/, '');
+      },
+
       /** cb(summary | null). Called immediately when the answer is known. */
       get: function (name, cb) {
         var known = cached(name);
@@ -1290,29 +1315,99 @@
 
   function num(v, dp) { return v.toFixed(dp).replace(/\.?0+$/, '') || '0'; }
 
+  /* How big to draw the disc. Radius in solar radii, on a flattened curve so a
+     red dwarf still reads as a dot and a blue giant does not fill the card. */
+  function discPx(rad) {
+    if (!rad) return 12;
+    return Math.round(Math.max(9, Math.min(24, 12 * Math.pow(rad, 0.4))));
+  }
+
+  /* One measurement: what it is, the number, and the unit — three jobs that
+     used to share one undifferentiated mono run. The number is the datum and
+     is set large and bright; the unit is a footnote beside it; the label sits
+     above in condensed caps and gets out of the way. */
+  function measure(label, value, unit) {
+    return '<div><dt>' + label + '</dt><dd>' + value +
+           (unit ? '<em>' + unit + '</em>' : '') + '</dd></div>';
+  }
+
   function starHtml(d) {
     if (!d) return '';
-    var facts = [];
-    if (d.k)    facts.push(Math.round(d.k).toLocaleString() + ' K');
-    if (d.mass) facts.push(num(d.mass, 2) + ' M&#9737;');
-    if (d.rad)  facts.push(num(d.rad, 2) + ' R&#9737;');
-    if (d.age)  facts.push(d.age >= 1000 ? num(d.age / 1000, 1) + ' Gyr' : d.age + ' Myr');
 
-    var foot = [];
-    if (d.bodies) foot.push(d.bodies + ' bod' + (d.bodies > 1 ? 'ies' : 'y'));
-    if (d.stars > 1) foot.push(d.stars + ' stars');
-    if (d.land) foot.push(d.land + ' landable');
-    foot.push(d.scoop ? 'scoopable' : 'not scoopable');
+    /* Sol is the reference every commander already has, so say so in words.
+       "M☉" and "Gyr" are correct and unreadable; this is the same fact.
 
+       Except where Sol is the wrong ruler. A neutron star is about 20 km
+       across, which is 0.00003 solar radii and rounds to a flat "0 × Sun" —
+       the card stating that a star has no size. Below a hundredth of Sol the
+       measurement changes unit rather than losing the number: kilometres for
+       radius, Jupiters for the brown dwarfs, which is how both are actually
+       described. */
+    var mass = !d.mass ? ['&#8212;', '']
+      : d.mass < 0.02 ? [num(d.mass * 1047.57, 1), '&times; Jupiter']
+      : [num(d.mass, 2), '&times; Sun'];
+    var rad = !d.rad ? ['&#8212;', '']
+      : d.rad < 0.01 ? [Math.round(d.rad * 696340).toLocaleString(), 'km']
+      : [num(d.rad, 2), '&times; Sun'];
+
+    var cells =
+      measure('Surface temp', d.k ? Math.round(d.k).toLocaleString() : '&#8212;', d.k ? 'K' : '') +
+      measure('Mass', mass[0], mass[1]) +
+      measure('Radius', rad[0], rad[1]) +
+      measure('Age',
+        d.age ? (d.age >= 1000 ? num(d.age / 1000, 1) : d.age.toLocaleString()) : '&#8212;',
+        d.age ? (d.age >= 1000 ? 'bn years' : 'm years') : '');
+
+    var counts = [];
+    if (d.bodies) counts.push(d.bodies + ' bod' + (d.bodies > 1 ? 'ies' : 'y'));
+    if (d.stars > 1) counts.push(d.stars + ' stars');
+    if (d.land) counts.push(d.land + ' landable');
+
+    var colour = Star.colour(d.cls);
     var cls = (d.cls + ' ' + d.lum).trim();
-    return '<div class="c-star">' +
-      '<div class="c-star-h"><span>Primary star</span>' +
-        (cls ? '<b>' + esc(cls) + '</b>' : '') + '</div>' +
+    return '<div class="c-star"' + (colour ? ' style="--star:' + colour + '"' : '') + '>' +
+      '<div class="c-star-h">' +
+        '<span class="c-star-disc" style="--d:' + discPx(d.rad) + 'px"></span>' +
+        '<span class="c-star-lb">Primary star</span>' +
+        (cls ? '<b>' + esc(cls) + '</b>' : '') +
+      '</div>' +
       (d.sub ? '<div class="c-star-n">' +
         (d.lab ? '<i>' + esc(d.lab) + '</i>' : '') + esc(d.sub) + '</div>' : '') +
-      (facts.length ? '<div class="c-star-g">' +
-        facts.map(function (f) { return '<span>' + f + '</span>'; }).join('') + '</div>' : '') +
-      '<div class="c-star-f">' + esc(foot.join(' · ')) + '</div>' +
+      '<dl class="c-star-m">' + cells + '</dl>' +
+      // Whether you can refuel is the one fact here you act on, so it gets its
+      // own line and the colour the console uses for live data.
+      '<div class="c-star-f">' +
+        '<span class="c-star-scoop ' + (d.scoop ? 'yes' : 'no') + '">' +
+          (d.scoop ? 'Fuel scoopable' : 'No fuel here') + '</span>' +
+        (counts.length ? '<span class="c-star-c">' + esc(counts.join(' · ')) + '</span>' : '') +
+      '</div>' +
+    '</div>';
+  }
+
+  /* The same block with the numbers not in yet.
+
+     It has to be the same *shape*, not a shorter placeholder: the two-line
+     "looking up…" it replaces was 130px shorter than the answer, so the ruins
+     list and every button jumped down the moment the lookup returned. The
+     labels are known before the data is, so they are simply present, and the
+     disc — unlit, searching — carries the fact that something is happening. */
+  function starWaitHtml() {
+    var cell = function (label) {
+      return '<div><dt>' + label + '</dt><dd><span class="bar"></span></dd></div>';
+    };
+    return '<div class="c-star wait">' +
+      '<div class="c-star-h">' +
+        '<span class="c-star-disc"></span>' +
+        '<span class="c-star-lb">Primary star</span></div>' +
+      '<div class="c-star-n">Reading the system dump&#8230;</div>' +
+      '<dl class="c-star-m">' + cell('Surface temp') + cell('Mass') +
+        cell('Radius') + cell('Age') + '</dl>' +
+      // Both footer lines are held open too, so the block is exactly as tall
+      // waiting as it is answered and nothing below it moves.
+      '<div class="c-star-f">' +
+        '<span class="c-star-scoop"><span class="bar" style="width:46%"></span></span>' +
+        '<span class="c-star-c"><span class="bar" style="width:70%"></span></span>' +
+      '</div>' +
     '</div>';
   }
 
@@ -1427,9 +1522,7 @@
         var slot = $('cstar');
         if (slot) slot.innerHTML = starHtml(d);
       });
-      if (!answered) $('cstar').innerHTML =
-        '<div class="c-star wait"><div class="c-star-h"><span>Primary star</span></div>' +
-        '<div class="c-star-f">looking up&#8230;</div></div>';
+      if (!answered) $('cstar').innerHTML = starWaitHtml();
     })();
 
     $('card-x').onclick = closeCard;

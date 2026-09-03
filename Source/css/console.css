@@ -383,13 +383,14 @@ body.resizing{cursor:col-resize;user-select:none}
 body.resizing .side-grip::after{background:var(--amber)}
 
 /* Layers panel: bulk selection and the hide-vs-dim choice. */
-.selrow{display:flex;gap:6px;margin:0 0 10px}
+.selrow{display:flex;gap:6px;margin:0 0 8px}
 .selrow button{flex:1;font-family:var(--cond);font-size:11px;font-weight:600;
   letter-spacing:.05em;padding:5px 0;background:var(--panel-2);color:var(--dim);
   border:1px solid var(--rule);cursor:pointer}
 .selrow button:hover:not(:disabled){color:var(--amber);border-color:var(--amber)}
 .selrow button:disabled{opacity:.4;cursor:default}
-.hidechk{display:flex;align-items:center;gap:8px;margin:10px 0 4px;
+.hidechk{display:flex;align-items:center;gap:8px;margin:0 0 12px;padding-bottom:11px;
+  border-bottom:1px solid var(--rule);
   font-family:var(--cond);font-size:11.5px;color:var(--dim);cursor:pointer}
 .hidechk input{accent-color:var(--amber);cursor:pointer}
 .hidechk:hover{color:var(--text)}
@@ -429,23 +430,85 @@ body.card-dragging{user-select:none;cursor:grabbing}
 .tchip .sw{width:8px;height:8px;border-radius:1px;display:block}
 .tchip:hover{color:var(--text)}
 .tchip.on{border-color:var(--amber);color:var(--amber)}
-/* The primary star: what you actually arrive at, from the system dump
-   Signals reads. Physical facts on one line, system facts on the next. */
-.c-star{padding:9px 13px 10px;border-bottom:1px solid var(--rule)}
-.c-star-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;
-  font-family:var(--cond);font-size:10px;letter-spacing:.15em;text-transform:uppercase;
-  color:var(--dimmer)}
+/* ── the primary star ───────────────────────────────────────────────────────
+   What you actually arrive at, from the system dump Signals reads.
+
+   --star is the star's own colour, out of data/spectral-colors.json, set per
+   card from the spectral class. It paints the disc and the rule under the
+   header and nothing else: half that table is dark (Y-class browns are
+   #5d347e) and would fail contrast as text, so type stays on the console's
+   own palette and the colour stays where it is safe and truthful. */
+.c-star{padding:10px 13px 11px;border-bottom:1px solid var(--rule);--star:var(--dim)}
+.c-star-h{display:flex;align-items:center;gap:9px;min-height:16px}
+.c-star-lb{flex:1;min-width:0;font-family:var(--cond);font-size:9.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--dimmer)}
 .c-star-h b{font-family:var(--mono);font-size:11px;letter-spacing:.06em;
-  font-weight:500;color:var(--amber);text-transform:none}
-.c-star-n{margin-top:5px;font-family:var(--cond);font-size:12.5px;color:var(--text)}
+  font-weight:500;color:var(--amber)}
+
+/* The star itself: its real colour, at a size that follows its radius. The one
+   thing on this card that is the object rather than a description of it. */
+.c-star-disc{flex:none;width:var(--d,12px);height:var(--d,12px);border-radius:50%;
+  background:var(--star);box-shadow:0 0 11px -1px var(--star)}
+
+.c-star-n{margin:7px 0 0;font-family:var(--cond);font-size:12.5px;color:var(--text)}
 /* Which star, when there is more than one: "A", "B"… */
 .c-star-n i{font-family:var(--mono);font-style:normal;font-size:11px;color:var(--dim);
   margin-right:7px}
-.c-star-g{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:5px;
-  font-family:var(--mono);font-size:10.5px;color:var(--ion);
-  font-variant-numeric:tabular-nums}
-.c-star-f{margin-top:5px;font-family:var(--mono);font-size:10px;color:var(--dimmer)}
-.c-star.wait .c-star-f{color:var(--dimmer);font-style:italic}
+
+/* Four measurements on hairlines, the way an instrument would show them. The
+   1px gap over a --rule ground is the rule: no doubled borders to reconcile. */
+.c-star-m{display:grid;grid-template-columns:1fr 1fr;gap:1px;margin:9px 0 0;
+  background:var(--rule);border:1px solid var(--rule)}
+.c-star-m > div{background:var(--panel);padding:7px 9px 8px;min-width:0}
+.c-star-m dt{font-family:var(--cond);font-size:9px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--dimmer);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+/* The number is the datum: large, bright, tabular so the two rows line up.
+   The unit is a footnote and is sized and coloured like one. */
+.c-star-m dd{margin:3px 0 0;display:flex;align-items:baseline;gap:5px;
+  font-family:var(--mono);font-size:14.5px;line-height:17px;height:20px;
+  color:var(--text);font-variant-numeric:tabular-nums}
+.c-star-m dd em{font-style:normal;font-size:9.5px;color:var(--dimmer);
+  letter-spacing:.02em;white-space:nowrap}
+
+.c-star-f{margin-top:9px}
+/* Refuelling is the one fact here you act on, so it leads and takes the
+   colour the console uses for live data. */
+.c-star-scoop{display:block;font-family:var(--cond);font-size:11.5px;
+  font-weight:600;line-height:16px}
+.c-star-scoop.yes{color:var(--ion)}
+/* transform, not vertical-align: nudging an inline ::before up by its
+   baseline grows the line box, and this line has to stay exactly 16px whether
+   it holds the diamond or the waiting bar. */
+.c-star-scoop.yes::before{content:'\25C6';margin-right:6px;font-size:8px;
+  display:inline-block;line-height:1;transform:translateY(-1px)}
+.c-star-scoop.no{color:var(--dimmer)}
+.c-star-c{display:block;margin-top:2px;font-family:var(--mono);font-size:10px;
+  line-height:15px;color:var(--dimmer);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Waiting. Same block, same height — the point of it. The disc searches
+   rather than shining, and the numbers are held open by bars. */
+.c-star.wait .c-star-disc{width:12px;height:12px;background:transparent;
+  box-shadow:inset 0 0 0 1.5px var(--dim);animation:starseek 1.5s ease-in-out infinite}
+.c-star.wait .c-star-n{color:var(--dimmer)}
+.c-star .bar{display:inline-block;vertical-align:middle;background:var(--panel-2);
+  animation:starbar 1.5s ease-in-out infinite}
+.c-star-m .bar{height:11px;align-self:center}
+.c-star-f .bar{height:9px}
+.c-star-m > div:nth-child(1) .bar{width:66%}
+.c-star-m > div:nth-child(2) .bar{width:44%;animation-delay:.12s}
+.c-star-m > div:nth-child(3) .bar{width:50%;animation-delay:.24s}
+.c-star-m > div:nth-child(4) .bar{width:60%;animation-delay:.36s}
+@keyframes starseek{
+  0%,100%{box-shadow:inset 0 0 0 1.5px var(--rule)}
+  50%{box-shadow:inset 0 0 0 1.5px var(--dim),0 0 8px -2px var(--dim)}
+}
+@keyframes starbar{0%,100%{opacity:.45}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){
+  .c-star.wait .c-star-disc,.c-star .bar{animation:none}
+  .c-star.wait .c-star-disc{box-shadow:inset 0 0 0 1.5px var(--dim)}
+}
 
 .c-body{padding:2px 13px 10px;font-family:var(--mono);font-size:10.5px;
   line-height:1.75;color:var(--dim);border-bottom:1px solid var(--rule)}

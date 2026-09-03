@@ -95,16 +95,16 @@ test('the card resizes from its bottom-left corner', async ({ page }) => {
   expect(after.left).toBe(before.left - 120);
 });
 
-/* Hide-deselected acts on the types above it, so it belongs under both the
-   bulk buttons and the rows themselves. */
-test('the layers panel orders its controls before its options', async ({ page }) => {
+/* Select all, Clear and Hide deselected are one control: the first two say
+   which types are on, the third says what "off" looks like. They sit together
+   above the rows they act on. */
+test('the layers panel groups its controls above the type rows', async ({ page }) => {
   await map(page);
   const order = await page.evaluate(() =>
     Array.from(document.querySelectorAll('#side .selrow, #side .layer, #side .hidechk'))
       .map((e) => e.className.split(' ')[0]));
-  expect(order[0]).toBe('selrow');
-  expect(order.at(-1)).toBe('hidechk');
-  expect(order.filter((c) => c === 'layer')).toHaveLength(3);
+  expect(order.slice(0, 2)).toEqual(['selrow', 'hidechk']);
+  expect(order.slice(2)).toEqual(['layer', 'layer', 'layer']);
 });
 
 /* ── the primary star ───────────────────────────────────────────────────────
@@ -151,13 +151,87 @@ test('the card reads the primary star out of the system dump', async ({ page }) 
   await expect(star.locator('.c-star-h b')).toHaveText('K3 Va');
   // Which star you actually drop out at, not just what is in the system.
   await expect(star.locator('.c-star-n')).toHaveText('AK (Yellow-Orange) Star');
-  await expect(star.locator('.c-star-g')).toContainText('4,670 K');
-  await expect(star.locator('.c-star-g')).toContainText('0.68 M');
-  await expect(star.locator('.c-star-g')).toContainText('10.6 Gyr');
-  // bodyCount from the system, landable counted from the bodies, and K is a
-  // class a fuel scoop can use.
-  await expect(star.locator('.c-star-f'))
-    .toHaveText('12 bodies · 2 stars · 1 landable · scoopable');
+
+  // Each measurement says what it is, then the number, then the unit — the
+  // three jobs that used to share one undifferentiated run of mono.
+  const cells = star.locator('.c-star-m > div');
+  await expect(cells.locator('dt'))
+    .toHaveText(['Surface temp', 'Mass', 'Radius', 'Age']);
+  await expect(cells.locator('dd')).toHaveText([
+    '4,670K', '0.68× Sun', '0.85× Sun', '10.6bn years'
+  ]);
+
+  // Refuelling leads, because it is the fact you act on.
+  await expect(star.locator('.c-star-scoop')).toHaveText('Fuel scoopable');
+  await expect(star.locator('.c-star-c')).toHaveText('12 bodies · 2 stars · 1 landable');
+
+  // The disc takes the star's real colour out of data/spectral-colors.json:
+  // K is ffe4cf there. It is the one thing on the card that is the object
+  // rather than a description of it.
+  await expect.poll(() => page.evaluate(() =>
+    getComputedStyle(document.querySelector('#cstar .c-star-disc')).backgroundColor))
+    .toBe('rgb(255, 228, 207)');
+});
+
+/* The whole point of the waiting state's shape. The two-line "looking up…" it
+   replaced was 130px shorter than the answer, so the ruins list and every
+   button jumped down the moment the lookup returned. */
+test('nothing moves when the star lookup answers', async ({ page }) => {
+  await map(page);
+
+  // The answering handler goes on first: Playwright runs the most recently
+  // registered route first, so the gate below has to be the outer one to be
+  // able to fall back to it.
+  const calls = [];
+  await fakeStarApi(page, calls);
+  let release;
+  const held = new Promise((r) => { release = r; });
+  await page.route(API, async (route) => {
+    await held;
+    await route.fallback();
+  });
+
+  const geometry = () => page.evaluate(() => ({
+    star: Math.round(document.querySelector('#cstar .c-star').getBoundingClientRect().height),
+    buttons: Math.round(document.querySelector('#card .c-acts').getBoundingClientRect().top)
+  }));
+
+  await pickFromList(page, 'B3');
+  await expect(page.locator('#cstar .c-star.wait')).toBeVisible();
+  // The labels are known before the data is, so they are already there.
+  await expect(page.locator('#cstar .c-star-m dt'))
+    .toHaveText(['Surface temp', 'Mass', 'Radius', 'Age']);
+  const waiting = await geometry();
+
+  release();
+  await expect(page.locator('#cstar .c-star-h b')).toHaveText('K3 Va');
+  expect(await geometry()).toEqual(waiting);
+});
+
+/* Sol is the wrong ruler at both ends: a neutron star is 0.00003 solar radii,
+   which rounds to a flat "0 × Sun" — the card claiming a star has no size. */
+test('a measurement changes unit rather than rounding away', async ({ page }) => {
+  await map(page);
+  await page.route(API, (route) => {
+    const url = route.request().url();
+    const json = (body) => route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+    if (url.includes('/typeahead')) return json({ min_max: [{ id64: 7, name: 'B3' }] });
+    return json({ system: { name: 'B3', bodyCount: 6, bodies: [{
+      type: 'Star', name: 'B3', mainStar: true, subType: 'Neutron Star',
+      spectralClass: 'N', luminosity: 'VII',
+      surfaceTemperature: 1e6, solarMasses: 0.0078, solarRadius: 0.00003, age: 12000
+    }] } });
+  });
+  await pickFromList(page, 'B3');
+
+  await expect(page.locator('#cstar .c-star-m > div').nth(2).locator('dd'))
+    .toHaveText('21km');
+  // And a brown-dwarf mass is described in Jupiters, which is how it is
+  // described everywhere else.
+  await expect(page.locator('#cstar .c-star-m > div').nth(1).locator('dd'))
+    .toHaveText('8.2× Jupiter');
+  await expect(page.locator('#cstar .c-star-scoop')).toHaveText('No fuel here');
 });
 
 test('a system is looked up once and then remembered', async ({ page }) => {
