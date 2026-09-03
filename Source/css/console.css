@@ -248,6 +248,13 @@ body.bare .top, body.bare .strip{display:none}
   font-weight:600;justify-content:flex-start}
 .c-acts a.wide:hover{background:var(--amber);color:#0B0700;border-color:var(--amber)}
 .c-acts a.wide .ax{color:inherit}
+/* Two wide actions that are not the same kind of thing: the orrery stays on
+   this page and takes the console's data colour; Signals leaves for another
+   site and keeps the amber. */
+.c-acts .wide.alt{grid-column:1/-1;border-color:#2E6E6D;color:var(--ion)}
+.c-acts .wide.alt:hover{background:var(--ion);color:#04100F;border-color:var(--ion)}
+.c-acts .wide.alt .ax{color:inherit;font-size:11px}
+.c-acts .wide.alt[hidden]{display:none}
 
 /* strip */
 .strip{display:flex;align-items:stretch;border-top:1px solid var(--rule);

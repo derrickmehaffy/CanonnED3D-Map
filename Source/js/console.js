@@ -1206,6 +1206,24 @@
        how the game says what class it is, so the card paints the real one
        rather than inventing an accent. 293 bytes from our own origin, asked
        for once, and a failure only leaves the disc unlit. */
+    /* The dump the digest was built from, kept whole for the rest of the
+       session.
+
+       The card reads four fields out of a response that runs to a couple of
+       hundred kilobytes and used to drop the rest on the floor — and then the
+       orrery, which wants exactly that response, asked for it again a click
+       later. Now the second ask is free.
+
+       Three deep: these are megabytes once parsed, and a reader moves between
+       a handful of systems, not a hundred. */
+    var dumps = [];
+    function keepDump(name, sys) {
+      if (!name || !sys) return;
+      dumps = dumps.filter(function (d) { return d.name !== name; });
+      dumps.unshift({ name: name, sys: sys });
+      dumps = dumps.slice(0, 3);
+    }
+
     var SPECTRAL = null;
     fetch('data/spectral-colors.json')
       .then(function (r) { return r.ok ? r.json() : null; })
@@ -1247,6 +1265,11 @@
       var label = (main.name || '').indexOf((sys.name || '') + ' ') === 0
         ? main.name.slice((sys.name || '').length + 1) : '';
       return {
+        // The system's id64, so anything else that wants this system's dump —
+        // the orrery does — can ask for it directly instead of resolving the
+        // name again. Entries cached before this field existed simply lack it,
+        // and the orrery falls back to its own lookup.
+        id: sys.id64 || 0,
         n: main.name || '',
         lab: label,
         sub: main.subType || '',
@@ -1277,10 +1300,18 @@
       // start with what was asked. Only an exact match is this system.
       if (!row || row.name !== name || !row.id64) return null;
       var dump = await get(API + '/codex/dump?id=' + row.id64 + '&caller=CanonnED3D');
+      keepDump(name, dump && dump.system);
       return digest(dump && dump.system);
     }
 
     return {
+      /** The whole dump for a system, if this session already has it. */
+      dump: function (name) {
+        var hit = dumps.filter(function (d) { return d.name === name; })[0];
+        return hit ? hit.sys : null;
+      },
+      keep: keepDump,
+
       /** '#rrggbb' for a spectral class, or '' when the table cannot place it —
        *  which is honest: an unlit disc means unclassified, not "no star". */
       colour: function (cls) {
@@ -1444,6 +1475,52 @@
     if (Action.moveGridTo) Action.moveGridTo(pt.x, pt.y, pt.z);
   }
 
+  /* The orrery is a second WebGL context and a few hundred lines that most
+     sessions never open, so it is fetched when it is first asked for. It is a
+     module: the page's own import map is what resolves 'three' for it, which
+     is why it can be injected from this plain script. */
+  var orreryLoading = null;
+  function loadOrrery() {
+    if (window.Orrery) return Promise.resolve(window.Orrery);
+    if (orreryLoading) return orreryLoading;
+    orreryLoading = new Promise(function (resolve, reject) {
+      var css = document.createElement('link');
+      css.rel = 'stylesheet';
+      css.href = 'css/orrery.css';
+      document.head.appendChild(css);
+      var js = document.createElement('script');
+      js.type = 'module';
+      js.src = 'js/orrery.js';
+      js.onload = function () {
+        window.Orrery ? resolve(window.Orrery) : reject(new Error('no Orrery'));
+      };
+      js.onerror = function () { reject(new Error('orrery failed to load')); };
+      document.head.appendChild(js);
+    });
+    return orreryLoading;
+  }
+
+  function openOrrery(btn, name, id64) {
+    var label = btn.innerHTML;
+    btn.disabled = true;
+    btn.textContent = 'Opening\u2026';
+    loadOrrery().then(function (O) {
+      btn.disabled = false; btn.innerHTML = label;
+      O.open(name, id64);
+    }).catch(function () {
+      btn.disabled = false; btn.textContent = 'Orrery unavailable';
+    });
+  }
+
+  /* The orrery paints the star in its real colour and reads the table from
+     here rather than fetching it a second time. */
+  window.CanonnConsole = window.CanonnConsole || {};
+  window.CanonnConsole.starColour = function (cls) { return Star.colour(cls); };
+  // One fetch, two readers: the card has already pulled this system's dump to
+  // find its star, and the orrery wants the same bytes.
+  window.CanonnConsole.systemDump = function (name) { return Star.dump(name); };
+  window.CanonnConsole.keepSystemDump = function (name, sys) { Star.keep(name, sys); };
+
   function renderCard() {
     var s = sel, q = encodeURIComponent(s.n);
 
@@ -1503,6 +1580,10 @@
         // Signals is the destination for everything about a system — bodies,
         // orbital elements, materials, signal counts — and carries its own
         // links out to the other tools, so the map does not duplicate them.
+        // Revealed only once the star lookup lands: the orrery reads the same
+        // dump, so a system with no star in it has nothing to model, and a
+        // button that always fails is worse than no button.
+        '<button class="wide alt" id="correry" hidden>Open the orrery <span class="ax">&#9678;</span></button>' +
         '<a class="wide" href="https://signals.canonn.tech/?system=' + q + '" target="_blank" rel="noopener">Open in Signals <span class="ax">&#8599;</span></a>' +
         '<button id="ccopy">Copy name</button><button id="ccentre">Centre here</button>' +
       '</div>' +
@@ -1521,6 +1602,11 @@
         if (!sel || sel.n !== want) return;
         var slot = $('cstar');
         if (slot) slot.innerHTML = starHtml(d);
+        var orr = $('correry');
+        if (orr && d) {
+          orr.hidden = false;
+          orr.onclick = function () { openOrrery(orr, want, d.id); };
+        }
       });
       if (!answered) $('cstar').innerHTML = starWaitHtml();
     })();
