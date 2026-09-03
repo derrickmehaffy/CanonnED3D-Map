@@ -128,3 +128,81 @@ test('pages that declare nothing still get sane defaults', async ({ page }) => {
   // voyager declares no window.CONSOLE at all.
   await expect(page.locator('#tmpl-img')).toHaveCount(0);
 });
+
+/* Several ruins in one system share its coordinates, so Ed3d merges them into
+   a single point and concatenates their info blocks. Each block therefore
+   carries its own Bifrost link — a system with five ruins gets five, not one
+   link to the site index. */
+test('each site links to itself, and Inara is gone', async ({ page }) => {
+  await stubDataHosts(page);
+  await page.goto('/gr-data.html', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.app .top')).toBeVisible({ timeout: 30_000 });
+  await page.waitForFunction(() => window.Ed3d && Ed3d.updateSystems, { timeout: 30_000 });
+
+  await page.evaluate(() => new Promise((res) => Ed3d.updateSystems({
+    categories: { 'Site type': { a: { name: 'Alpha', color: 'FF9D00' } } },
+    systems: [
+      { name: 'Twin Ruins', coords: { x: 5, y: 5, z: 5 }, cat: ['a'],
+        infos: '<a href="https://ruins.canonn.tech/#GR6">Ancient Ruins (Alpha)</a><br>' },
+      { name: 'Twin Ruins', coords: { x: 5, y: 5, z: 5 }, cat: ['a'],
+        infos: '<a href="https://ruins.canonn.tech/#GR7">Ancient Ruins (Beta)</a><br>' }
+    ]
+  }, res)));
+  await expect(page.locator('#side .layer').first()).toBeVisible({ timeout: 30_000 });
+
+  await page.evaluate(() => {
+    Action.selectedPoint = System.points[System.findByName('Twin Ruins')];
+  });
+  const card = page.locator('#card');
+  await expect(card).toBeVisible({ timeout: 15_000 });
+
+  // One link per site, each to its own page.
+  const hrefs = await card.locator('.bd a').evaluateAll((els) => els.map((e) => e.getAttribute('href')));
+  expect(hrefs).toEqual(['https://ruins.canonn.tech/#GR6', 'https://ruins.canonn.tech/#GR7']);
+
+  // Signals covers everything the other tools did and links out itself.
+  const actions = await card.locator('.c-acts a').evaluateAll((els) => els.map((e) => e.textContent));
+  expect(actions.join(' ')).toContain('Signals');
+  expect(actions.join(' ')).not.toContain('Inara');
+});
+
+test('the card stays clear of the zoom controls and can be moved', async ({ page }) => {
+  await stubDataHosts(page);
+  await page.goto('/voyager.html', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#side .layer').first()).toBeVisible({ timeout: 60_000 });
+  await page.evaluate(() => { Action.selectedPoint = System.points[System.findByName('Sol')]; });
+  await expect(page.locator('#card')).toBeVisible({ timeout: 15_000 });
+
+  const clear = await page.evaluate(() => {
+    const c = document.getElementById('card').getBoundingClientRect();
+    const nav = document.getElementById('nav-controls').getBoundingClientRect();
+    return !(c.bottom > nav.top && c.right > nav.left);
+  });
+  expect(clear, 'the card must not cover the zoom and pan arrows').toBe(true);
+
+  // Dragging the header moves it, and the position is remembered.
+  await page.evaluate(() => {
+    const h = document.querySelector('#card .c-h');
+    const r = h.getBoundingClientRect();
+    h.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: r.x + 40, clientY: r.y + 8, pointerId: 1 }));
+    h.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: r.x - 160, clientY: r.y + 60, pointerId: 1 }));
+    h.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1 }));
+  });
+  await expect(page.locator('#card')).toHaveClass(/moved/);
+  expect(await page.evaluate(() => localStorage.getItem('canonn.console.cardBox'))).toBeTruthy();
+});
+
+test('searching for a system this map does not have offers a way out', async ({ page }) => {
+  await stubDataHosts(page);
+  await page.goto('/voyager.html', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#side .layer').first()).toBeVisible({ timeout: 60_000 });
+
+  await page.locator('#findbtn').click();
+  await page.locator('#pq').fill('Shinrarta Dezhra');       // real system, not on this map
+  await expect(page.locator('#pres')).toContainText('Not on this map');
+  await expect(page.locator('#pres .pr .nm')).toContainText('Shinrarta Dezhra');
+
+  // A local match must not be pushed aside by the fallback.
+  await page.locator('#pq').fill('Sol');
+  await expect(page.locator('#pres')).toContainText('Systems on this map');
+});

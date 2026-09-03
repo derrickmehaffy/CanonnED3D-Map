@@ -201,7 +201,9 @@ input[type=range]{accent-color:var(--amber)}
 /* card */
 .card{position:absolute;right:12px;top:46px;width:280px;background:var(--panel);
   border:1px solid var(--rule);box-shadow:0 8px 28px rgba(0,0,0,.6);z-index:9;
-  max-height:calc(100% - 170px);overflow-y:auto}
+  /* Stops clear of the zoom/pan cluster below it, which is about 160px tall
+     and sits 44px off the bottom. */
+  max-height:calc(100% - 275px);overflow-y:auto;resize:none}
 .card.hidden{display:none}
 .c-h{padding:11px 13px;border-bottom:1px solid var(--rule);display:flex;
   justify-content:space-between;align-items:flex-start;gap:8px}
@@ -380,3 +382,25 @@ body.resizing .side-grip::after{background:var(--amber)}
   font-family:var(--cond);font-size:11.5px;color:var(--dim);cursor:pointer}
 .hidechk input{accent-color:var(--amber);cursor:pointer}
 .hidechk:hover{color:var(--text)}
+
+
+/* ── system card: sizing, moving, and per-site thumbnails ───────────────── */
+
+/* Each site's own "infos" carries a thumbnail, and a system with three ruins
+   was stacking three full-width images plus the template map — which is what
+   made the card run the height of the screen. The per-site ones are shown as
+   small stamps; the selected site's template map below stays full width. */
+.card .site .bd img{max-width:64px;margin:4px 0 2px}
+
+.card.moved{right:auto;top:auto}
+.c-h{cursor:grab;user-select:none}
+.c-h:active{cursor:grabbing}
+.card .c-grip{position:absolute;right:0;bottom:0;width:16px;height:16px;
+  cursor:nwse-resize;z-index:2;touch-action:none}
+.card .c-grip::after{content:'';position:absolute;right:3px;bottom:3px;
+  width:7px;height:7px;border-right:2px solid var(--rule);border-bottom:2px solid var(--rule)}
+.card .c-grip:hover::after{border-color:var(--amber)}
+.card .c-reset{font-family:var(--mono);font-size:9.5px;color:var(--dimmer);
+  background:none;border:0;cursor:pointer;padding:0 13px 9px}
+.card .c-reset:hover{color:var(--amber)}
+body.card-dragging{user-select:none;cursor:grabbing}

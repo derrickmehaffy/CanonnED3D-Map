@@ -41,10 +41,18 @@ var canonnEd3d_gr = {
 			let thumb = typeMap[type]
 				? '<br><img src="' + thumbBase + type.toLowerCase() + '-thumbnail.png">'
 				: '';
+			// Several ruins in one system share its coordinates, so Ed3d merges
+			// them into a single point and concatenates these blocks. Each one
+			// therefore carries its own Bifrost link — a system with three ruins
+			// gets three, rather than one link to the site index.
+			let title = 'Ancient Ruins (' + type + ')';
+			let heading = s["SiteId"]
+				? '<a href="https://ruins.canonn.tech/#GR' + s["SiteId"] + '">' + title + ' &#8599;</a>'
+				: title;
 			canonnEd3d_gr.systemsData.systems.push({
 				name: name,
 				coords: { x: x, y: y, z: z },
-				infos: 'Ancient Ruins (' + type + ')' + thumb + (s["Body Name"] ? '<br>' + s["Body Name"] : '') + '<br>',
+				infos: heading + (s["Body Name"] ? ' &middot; ' + s["Body Name"] : '') + thumb + '<br>',
 				cat: [cat],
 			});
 		}

@@ -555,8 +555,9 @@
         rec = byName[p.name] = { n: p.name, x: p.x, y: p.y, z: -p.z, s: [], idx: idx };
         out.push(rec);
       }
-      if (!cats.length) rec.s.push([0, p.infos || '', '', idx]);
-      else cats.forEach(function (c) { rec.s.push([catIndexOf(c), p.infos || '', '', idx]); });
+      // [category, infos, per-site link, point index]
+      if (!cats.length) rec.s.push([0, p.infos || '', p.url || '', idx]);
+      else cats.forEach(function (c) { rec.s.push([catIndexOf(c), p.infos || '', p.url || '', idx]); });
     });
     _sysCache = out;
     _sysCacheLen = System.points.length;
@@ -717,9 +718,8 @@
       '<div class="row" style="margin-top:14px"><span class="lb">Distance</span>' +
       '<span class="vv" id="camdist">—</span></div>' +
       '<input type="range" id="camrange" min="200" max="30000" step="100" style="width:100%">' +
-      '<div class="note">Top down sets <b>Ed3d.isTopView</b>, the same flag the 3D/2D ' +
-      'buttons use. Zoom and pan live in the arrow cluster bottom-right — those are ' +
-      'the existing controls, kept as they were.</div>';
+      '<div class="note">Top down is the same view as the 2D button. Zoom and pan ' +
+      'are the arrows in the bottom-right corner.</div>';
   }
 
   function panelRoutes() {
@@ -735,8 +735,9 @@
       });
       h += '</div>';
     }
-    h += '<div class="note">Reads <b>FSDJump</b> entries and pushes them onto the live map with ' +
-      '<b>Ed3d.addBatch()</b>. Nothing leaves your machine — the file is parsed in the browser.</div>';
+    h += '<div class="note">Your journal files are read in the browser and never ' +
+      'uploaded — nothing leaves your machine. Every system you have jumped to is ' +
+      'added to the map.</div>';
     return h;
   }
 
@@ -753,8 +754,8 @@
       '<div class="row" style="margin-top:10px"><span class="lb">System size</span>' +
       '<span class="vv" id="szval">—</span></div>' +
       '<input type="range" id="sizerange" min="6" max="70" step="2" style="width:100%">' +
-      '<div class="note">Each toggle calls the engine directly — <b>Grid.toggleGrid()</b>, ' +
-      '<b>Galaxy.infosShow/Hide()</b>, and the point material\'s own size.</div>' +
+      '<div class="note">Turn off whatever gets in the way. System size makes the ' +
+      'stars larger or smaller without changing what is shown.</div>' +
       '<div class="s-t" style="margin-top:18px">Lighting</div>' +
       '<div class="s-sub">Experimental</div>' +
       sw('hdr', 'HDR + bloom', disp.hdr) +
@@ -764,11 +765,10 @@
       '<div class="row" style="margin-top:10px"><span class="lb">Bloom</span>' +
       '<span class="vv" id="bloomval">—</span></div>' +
       '<input type="range" id="bloomrange" min="0" max="200" step="5" style="width:100%">' +
-      '<div class="note">The scene is almost all additive blending, and the default ' +
-      '8-bit buffer clamps at 1.0 — so in the galactic plane the overlaps blow past ' +
-      'white and clip flat. This renders to a <b>half-float</b> target and tone maps ' +
-      'on the way out, which is what gives bloom anything to work with. Exposure and ' +
-      'bloom trade against how present the Milky Way is.</div>';
+      '<div class="note">Keeps dense regions from washing out to white, so ' +
+      'crowded clusters stay readable. Exposure sets the overall brightness; ' +
+      'bloom adds a glow around the brightest systems — it suits sparse maps ' +
+      'and tends to smear crowded ones, so it starts at zero.</div>';
   }
 
   function renderPanel() {
@@ -1128,6 +1128,15 @@
   function renderCard() {
     var s = sel, q = encodeURIComponent(s.n);
     var site = s.s[selSite], ty = catName(site[0]), th = CFG.templates ? THUMBS[ty.toLowerCase()] : null;
+
+    // A link to the selected site itself, where the data gives one. Maps that
+    // set no url get no button rather than a generic one that lands on a front
+    // page — and a system with three ruins links to whichever is selected.
+    var siteLink = '';
+    if (site && site[2]) {
+      siteLink = '<a class="wide" href="' + esc(site[2]) + '" target="_blank" rel="noopener">' +
+        esc(CFG.siteLinkLabel || 'View site') + ' <span class="ax">&#8599;</span></a>';
+    }
     var tally = {}; s.s.forEach(function (x) { tally[x[0]] = (tally[x[0]] || 0) + 1; });
     var sum = Object.keys(tally).map(function (k) { return tally[k] + ' ' + catName(k); }).join(' · ');
     var rows = s.s.map(function (si, i) {
@@ -1157,12 +1166,17 @@
         // signal counts per category, nearest DSSA and nebulae. EDSM was dropped —
         // per LCU No Fool Like One it is no longer reliable, and Signals already
         // covers everything the map linked out to it for.
+        // Signals is the destination for everything about a system — bodies,
+        // orbital elements, materials, signal counts — and carries its own
+        // links out to the other tools, so the map does not duplicate them.
         '<a class="wide" href="https://signals.canonn.tech/?system=' + q + '" target="_blank" rel="noopener">Open in Signals <span class="ax">&#8599;</span></a>' +
-        '<a href="https://ruins.canonn.tech/" target="_blank" rel="noopener">Bifrost <span class="ax">&#8599;</span></a>' +
-        '<a href="https://inara.cz/elite/starsystem/?search=' + q + '" target="_blank" rel="noopener">Inara <span class="ax">&#8599;</span></a>' +
+        siteLink +
         '<button id="ccopy">Copy name</button><button id="ccentre">Centre here</button>' +
-      '</div>';
+      '</div>' +
+      '<button class="c-reset" id="creset">Reset position</button>';
+    $('creset').onclick = resetCardBox;
     $('cx').onclick = function () { sel = null; c.className = 'card hidden'; };
+    makeCardMovable(c);
     $('ccopy').onclick = function () {
       var b = this;
       navigator.clipboard.writeText(s.n).then(function () {
@@ -1392,14 +1406,30 @@
       grp('Canonn tools', TOOLS.filter(function (t) { return !lo || t[0].toLowerCase().indexOf(lo) > -1; })
         .map(function (t) { return { k: 'tool', t: t[0], m: t[1], u: t[2] }; }));
     }
+    var localHits = 0;
     if (!only && lo.length > 0) {
-      grp('Systems on this map', SYSLIST().filter(function (s) {
-        return s.n.toLowerCase().indexOf(lo) > -1;
-      }).slice(0, 8).map(function (s) {
+      var hits = SYSLIST().filter(function (s) { return s.n.toLowerCase().indexOf(lo) > -1; });
+      localHits = hits.length;
+      grp('Systems on this map', hits.slice(0, 8).map(function (s) {
         var t = {}; s.s.forEach(function (x) { t[x[0]] = 1; });
         return { k: 'sys', t: s.n, m: Object.keys(t).map(function (k) { return catName(k); }).join(' · '), s: s };
-      }));
+      }), hits.length > 8 ? hits.length + ' matches' : '');
     }
+
+    // Each map only holds its own systems, so searching one for Sol finds
+    // nothing — which read as the search being broken rather than the system
+    // being absent. Signals knows every system, so offer it as a way out
+    // instead of a dead end. Only when nothing local matched, so it never gets
+    // in the way of the results that are actually here.
+    if (!only && lo.length > 1 && localHits === 0) {
+      grp('Not on this map', [{
+        k: 'tool',
+        t: 'Look up "' + term + '" in Signals',
+        m: 'every system',
+        u: 'https://signals.canonn.tech/?system=' + encodeURIComponent(term)
+      }]);
+    }
+
     $('pres').innerHTML = h || '<div class="pal-empty">No match.</div>';
   }
   function palMove(d) {
@@ -1437,6 +1467,92 @@
     else if ((e.metaKey || e.ctrlKey) && k === 'k') { e.preventDefault(); openPal(''); }
     else if (e.key === 'Escape') { closePal(); $('idxscrim').classList.remove('open'); }
   });
+
+  /* ── the system card can be moved and resized ───────────────────────────
+     It sits over the map, so where it sits is a matter of what you are looking
+     at. Position and size are remembered like the other preferences; the
+     header drags, the bottom-right corner resizes, and "Reset position" puts
+     it back. Both are clamped to the stage so it can never be dragged out of
+     reach. */
+
+  function clampCard(c, left, top, w, h) {
+    var stage = c.parentNode.getBoundingClientRect();
+    var width = Math.max(240, Math.min(w, stage.width - 20));
+    var height = Math.max(160, Math.min(h, stage.height - 20));
+    return {
+      left: Math.max(0, Math.min(left, stage.width - width)),
+      top: Math.max(0, Math.min(top, stage.height - height)),
+      w: width, h: height
+    };
+  }
+
+  function applyCardBox(c, box) {
+    c.classList.add('moved');
+    c.style.left = box.left + 'px';
+    c.style.top = box.top + 'px';
+    c.style.width = box.w + 'px';
+    c.style.height = box.h + 'px';
+    c.style.maxHeight = 'none';
+  }
+
+  function makeCardMovable(c) {
+    if (c.querySelector('.c-grip')) return;   // survives every re-render
+
+    var stored = recall('cardBox');
+    if (stored) {
+      var v = stored.split(',').map(Number);
+      if (v.length === 4 && v.every(function (n) { return !isNaN(n); })) {
+        applyCardBox(c, clampCard(c, v[0], v[1], v[2], v[3]));
+      }
+    }
+
+    var grip = document.createElement('div');
+    grip.className = 'c-grip';
+    grip.title = 'Drag to resize';
+    c.appendChild(grip);
+
+    function remember_box() {
+      var b = c.getBoundingClientRect(), st = c.parentNode.getBoundingClientRect();
+      remember('cardBox', [Math.round(b.left - st.left), Math.round(b.top - st.top),
+                           Math.round(b.width), Math.round(b.height)].join(','));
+    }
+
+    function drag(el, onMove, cls) {
+      el.addEventListener('pointerdown', function (e) {
+        if (e.target.closest('button, a')) return;
+        e.preventDefault();
+        el.setPointerCapture(e.pointerId);
+        document.body.classList.add(cls);
+        var b = c.getBoundingClientRect(), st = c.parentNode.getBoundingClientRect();
+        var start = { x: e.clientX, y: e.clientY,
+                      left: b.left - st.left, top: b.top - st.top, w: b.width, h: b.height };
+        function move(ev) { onMove(start, ev.clientX - start.x, ev.clientY - start.y); }
+        function up() {
+          el.removeEventListener('pointermove', move);
+          el.removeEventListener('pointerup', up);
+          document.body.classList.remove(cls);
+          remember_box();
+        }
+        el.addEventListener('pointermove', move);
+        el.addEventListener('pointerup', up);
+      });
+    }
+
+    drag(c.querySelector('.c-h'), function (s0, dx, dy) {
+      applyCardBox(c, clampCard(c, s0.left + dx, s0.top + dy, s0.w, s0.h));
+    }, 'card-dragging');
+
+    drag(grip, function (s0, dx, dy) {
+      applyCardBox(c, clampCard(c, s0.left, s0.top, s0.w + dx, s0.h + dy));
+    }, 'card-dragging');
+  }
+
+  function resetCardBox() {
+    var c = $('card');
+    c.classList.remove('moved');
+    c.style.left = c.style.top = c.style.width = c.style.height = c.style.maxHeight = '';
+    remember('cardBox', '');
+  }
 
   /* ── side panel: paging, resize and collapse ──────────────────────────── */
 
