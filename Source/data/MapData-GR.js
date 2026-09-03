@@ -27,9 +27,6 @@ var canonnEd3d_gr = {
 
 	formatRuins: function (data) {
 		const typeMap = { 'Alpha': 201, 'Beta': 202, 'Gamma': 203 };
-		// The local vector plans rather than Bifrost's bitmaps: same three
-		// drawings, sharp at any size, and no cross-site request per row.
-		const thumbBase = 'img/ruins/';
 		for (let i = 0; i < data.length; i++) {
 			let s = data[i];
 			let name = s["System Name"];
@@ -40,21 +37,19 @@ var canonnEd3d_gr = {
 			if (isNaN(x) || isNaN(y) || isNaN(z)) continue;
 			let cat = typeMap[s["Site Type"]] || 214;
 			let type = s["Site Type"] || 'Unknown';
-			let thumb = typeMap[type]
-				? '<br><img src="' + thumbBase + type.toLowerCase() + '.svg">'
-				: '';
-			// Several ruins in one system share its coordinates, so Ed3d merges
-			// them into a single point and concatenates these blocks. Each one
-			// therefore carries its own Bifrost link — a system with three ruins
-			// gets three, rather than one link to the site index.
-			let title = 'Ancient Ruins (' + type + ')';
+			// One block per ruin. Several in a system share its coordinates, so
+			// Ed3d merges them into one point and concatenates these — which is
+			// why each carries its own site number and Bifrost link rather than
+			// the system carrying one.
+			let label = s["SiteId"] ? 'Ruin #' + s["SiteId"] : 'Ruin';
 			let heading = s["SiteId"]
-				? '<a href="https://ruins.canonn.tech/#GR' + s["SiteId"] + '">' + title + ' &#8599;</a>'
-				: title;
+				? '<a href="https://ruins.canonn.tech/#GR' + s["SiteId"] + '">' + label + ' &#8599;</a>'
+				: label;
+			let where = s["Body Name"] ? ' &middot; ' + s["Body Name"] : '';
 			canonnEd3d_gr.systemsData.systems.push({
 				name: name,
 				coords: { x: x, y: y, z: z },
-				infos: heading + (s["Body Name"] ? ' &middot; ' + s["Body Name"] : '') + thumb + '<br>',
+				infos: heading + ' &middot; ' + type + where + '<br>',
 				cat: [cat],
 			});
 		}

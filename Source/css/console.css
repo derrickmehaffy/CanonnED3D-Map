@@ -421,8 +421,6 @@ body.card-dragging{user-select:none;cursor:grabbing}
   line-height:1.75;color:var(--dim);border-bottom:1px solid var(--rule)}
 .c-body a{color:var(--ion);text-decoration:none}
 .c-body a:hover{color:var(--amber);text-decoration:underline}
-.c-body img{max-width:78px;display:block;margin:4px 0 8px;
-  border:1px solid var(--rule);background:#080C10}
 
 
 /* The site plans are drawn in a dark navy that all but disappears against the
@@ -430,4 +428,4 @@ body.card-dragging{user-select:none;cursor:grabbing}
    there is nothing to restyle from here — brightening the rendered image is
    both simpler and easier to tune. Kept well short of washing out: the lines
    should read as blueprint, not glow. */
-#tmpl-img, .c-body img{filter:brightness(1.8) saturate(1.2)}
+#tmpl-img{filter:brightness(1.8) saturate(1.2)}
