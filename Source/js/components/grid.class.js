@@ -50,9 +50,8 @@ var Grid = {
         //-- Kept on a multiple of the cell size, so moving it never shifts
         //   where the lines fall.
         uOrigin: { value: new THREE.Vector2(0, 0) },
-        //-- How far off edge-on the view is: height over distance, which is
-        //   the sine of the elevation angle. Near zero the plane is edge-on
-        //   and there is nothing a filter can resolve.
+        //-- Kept for the tests and for anything that wants to know how
+        //   side-on the view is overall; the shader fades per pixel.
         uHeight: { value: 1.0 }
       },
       transparent: true,
@@ -79,7 +78,6 @@ var Grid = {
         'uniform float uSize;',
         'uniform vec3  uColor;',
         'uniform float uFade;',
-        'uniform float uHeight;',
         'varying vec3 vWorld;',
         'varying vec2 vGrid;',
         'void main() {',
@@ -103,9 +101,15 @@ var Grid = {
         //   is why the tearing got worse the lower the camera went.
         '  float density = max(w.x, w.y);',
         '  a *= 1.0 - smoothstep(0.18, 0.55, density);',
-        //-- And let go as the view comes level with the plane, where it is
-        //   edge-on and there is genuinely nothing to draw.
-        '  a *= smoothstep(0.0, 1.0, uHeight);',
+        //-- And let go where the surface runs edge-on to the eye. This has to
+        //   be per pixel, not one value from the camera: looking down from
+        //   close up, the ground under the camera is square-on and crisp while
+        //   the same surface a few thousand units away is nearly edge-on. A
+        //   single uniform cannot say both, which is why zooming in brought
+        //   the tearing back — the near view said "not edge-on" and the far
+        //   half of the frame tore anyway.
+        '  vec3 view = normalize(cameraPosition - vWorld);',
+        '  a *= smoothstep(0.015, 0.14, abs(view.y));',
         '  if (a <= 0.002) discard;',
         '  float d = distance(cameraPosition, vWorld);',
         '  a *= 1.0 - smoothstep(uFade * 0.25, uFade, d);',

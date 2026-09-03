@@ -341,3 +341,49 @@ test('the grid does not tear into a band at any viewing angle', async ({ page })
     ).toBeLessThan(r.width * 0.12);
   }
 });
+
+/* The region labels are flat text lying on the galactic plane. Seen edge-on
+   every glyph collapses into sub-pixel slivers and tears into a band of white
+   dashes along the horizon — which is what the grid kept getting blamed for.
+
+   The second opacity band is what made it stubborn: opacityMiddle is
+   1.1 - opacity, so exactly when the normal labels have faded out the "revert"
+   ones are at full strength, leaving opaque flat text lying edge-on. */
+test('region labels fade when the view goes edge-on to their plane', async ({ page }) => {
+  await loaded(page);
+  await labelsReady(page);
+
+  const opacityAt = (elevation) => page.evaluate((y) => {
+    controls.target.set(0, 0, 0);
+    camera.position.set(-900, y, 900);
+    controls.update();
+    Ed3d.showGalaxyInfos = true;
+    Galaxy.infosUpdateCallback(camera.position.distanceTo(controls.target) / 200);
+    return {
+      normal: Galaxy.textMaterials.normal.opacity,
+      revert: Galaxy.textMaterials.revert.opacity
+    };
+  }, elevation);
+
+  const overhead = await opacityAt(3000);
+  const grazing = await opacityAt(120);
+
+  expect(overhead.revert, 'labels read normally from a sensible angle').toBeGreaterThan(0.8);
+  expect(grazing.revert, 'and all but vanish edge-on').toBeLessThan(0.3);
+
+  // The early-out used to key on scale alone, so swinging the camera from
+  // overhead to side-on at the same distance never updated anything.
+  const sameDistance = await page.evaluate(() => {
+    const r = 1200;
+    const read = (y) => {
+      controls.target.set(0, 0, 0);
+      const h = Math.sqrt(Math.max(r * r - y * y, 1));
+      camera.position.set(h / Math.SQRT2, y, h / Math.SQRT2);
+      controls.update();
+      Galaxy.infosUpdateCallback(camera.position.distanceTo(controls.target) / 200);
+      return Galaxy.textMaterials.revert.opacity;
+    };
+    return { high: read(1000), low: read(60) };
+  });
+  expect(sameDistance.high).not.toBeCloseTo(sameDistance.low, 2);
+});

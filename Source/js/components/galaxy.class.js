@@ -239,19 +239,46 @@ var Galaxy = {
     var opacity = Math.round(scale/10)/10;
     if(opacity<0) opacity = 0;
     if(opacity>0.8) opacity = 0.8;
-    if(this.infos.previousOpacity == opacity) return;
+    // Keyed on the viewing angle as well as the scale: the camera can swing
+    // from overhead to side-on without its distance changing at all, and the
+    // edge-on fade below has to follow that.
+    var angleKey = 0;
+    if (typeof camera !== 'undefined' && camera && typeof controls !== 'undefined' && controls) {
+      angleKey = Math.round(
+        (Math.abs(camera.position.y - this.y) /
+         Math.max(camera.position.distanceTo(controls.target), 1e-6)) * 50);
+    }
+    var stateKey = opacity + ':' + angleKey;
+    if (this.infos.previousOpacity === stateKey) return;
 
     var opacityMiddle = 1.1-opacity;
     if(opacityMiddle<=0.4) opacityMiddle = 0.2;
 
+    // Fade the labels out as the view comes level with the plane they lie on.
+    // They are flat text, so edge-on every glyph collapses into sub-pixel
+    // slivers and tears into a band of white dashes along the horizon — the
+    // artifact the grid kept getting blamed for.
+    //
+    // The second band is the one that shows it: opacityMiddle is 1.1 - opacity,
+    // so exactly when the normal labels have faded to nothing the "revert"
+    // ones are at full strength. Zoomed in at a low angle that leaves opaque
+    // flat text lying edge-on across the view.
+    var edgeOn = 1;
+    if (typeof camera !== 'undefined' && camera && typeof controls !== 'undefined' && controls) {
+      var height = Math.abs(camera.position.y - this.y);
+      var dist = Math.max(camera.position.distanceTo(controls.target), 1e-6);
+      edgeOn = Math.min((height / dist) / 0.45, 1);
+      edgeOn = edgeOn * edgeOn * (3 - 2 * edgeOn);          // smoothstep
+    }
+
     // Two shared materials cover every label, so this is two assignments
     // rather than a walk over ~98 meshes.
     if (this.textMaterials !== null) {
-      this.textMaterials.normal.opacity = opacity;
-      this.textMaterials.revert.opacity = opacityMiddle;
+      this.textMaterials.normal.opacity = opacity * edgeOn;
+      this.textMaterials.revert.opacity = opacityMiddle * edgeOn;
     }
 
-    this.infos.previousOpacity = opacity;
+    this.infos.previousOpacity = stateKey;
 
   },
 
