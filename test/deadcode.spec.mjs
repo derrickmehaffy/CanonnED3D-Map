@@ -33,8 +33,9 @@ test('nav renders without contacting w3schools', async ({ page }) => {
   await stubDataHosts(page);
   // Every page linked from the nav is now on the console, which replaces
   // include/nav.html. The pages lcunfool unlinked still carry it, so one of
-  // those is what keeps this assertion alive; it retires with them.
-  await page.goto('/dcoh.html', { waitUntil: 'load' });
+  // those is what keeps this assertion alive; it retires with them. dcoh.html
+  // used to be that page and is on the console now.
+  await page.goto('/cmdr.html', { waitUntil: 'load' });
 
   // nav.html contains <div id="cssmenu">.
   await expect(page.locator('#cssmenu')).toBeAttached({ timeout: 30_000 });

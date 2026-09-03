@@ -217,3 +217,22 @@ test('searching for a system this map does not have offers a way out', async ({ 
   await page.locator('#pq').fill('Sol');
   await expect(page.locator('#pres')).toContainText('Systems on this map');
 });
+
+/* dcoh_headless.html exists to be framed by dcoh.watch, so it declares
+   bare:true. The map's own controls stay; this site's furniture goes. */
+test('an embedded page keeps the controls and drops the site chrome', async ({ page }) => {
+  await stubDataHosts(page);
+  await page.goto('/dcoh_headless.html', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#side .layer').first()).toBeVisible({ timeout: 60_000 });
+
+  await expect(page.locator('.app .top')).toBeHidden();
+  await expect(page.locator('.app .strip')).toBeHidden();
+  await expect(page.locator('.rail')).toBeVisible();
+  await expect(page.locator('#side')).toBeVisible();
+  await expect(page.locator('#ed3dmap canvas')).toBeVisible();
+
+  // The full-chrome twin is the same map with the bar back.
+  await page.goto('/dcoh.html', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.app .top')).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('#mapname')).toHaveText('DCoH Overwatch');
+});

@@ -216,6 +216,7 @@
     var slot = $('console-stage-slot');
     slot.parentNode.replaceChild(map, slot);
     document.body.classList.add('console');
+    if (window.CONSOLE && window.CONSOLE.bare) document.body.classList.add('bare');
     return true;
   }
 
@@ -384,6 +385,11 @@
   CFG.note      = CFG.note || '';
   CFG.panel     = CFG.panel || 'type';
   CFG.templates = !!CFG.templates;
+  /* A page that is meant to be embedded in someone else's site — dcoh.watch
+     iframes one — sets bare:true. It keeps the panels and the card, which are
+     the map's own controls, and drops the Canonn top bar and status strip,
+     which are this site's furniture and have no business inside a frame. */
+  CFG.bare      = !!CFG.bare;
   var THUMBS = window.THUMBS || {};
   var TNOTE  = window.TNOTE  || {};
 

@@ -36,6 +36,10 @@ body{margin:0;background:var(--void);color:var(--text);font-family:var(--sans);
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 input[type=range]{accent-color:var(--amber)}
 .app{display:grid;grid-template-rows:44px 1fr 30px;height:100vh}
+/* Embedded in another site (window.CONSOLE = { bare: true }): the map's own
+   controls stay, this site's furniture goes. dcoh.watch frames one of these. */
+body.bare .app{grid-template-rows:1fr}
+body.bare .top, body.bare .strip{display:none}
 
 /* top */
 .top{display:flex;align-items:center;gap:12px;padding:0 12px;
