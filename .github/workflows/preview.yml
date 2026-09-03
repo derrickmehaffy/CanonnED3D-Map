@@ -1,0 +1,73 @@
+# Preview builds, for showing work to people before it becomes a pull request.
+#
+# Deliberately NOT the deploy in mainl.yml. That one writes
+#     echo "map.canonn.tech" > CNAME
+# into the published tree, which is right for canonn-science/CanonnED3D-Map and
+# actively dangerous anywhere else: a fork publishing that CNAME asks GitHub to
+# bind the live map's domain to the fork's Pages site. Unless the domain is
+# verified on the owning org, that can break — or take over — the real site.
+#
+# So this workflow publishes no CNAME at all. A preview lives at
+# https://<owner>.github.io/<repo>/ and nowhere else.
+#
+# It also never runs on its own: workflow_dispatch only, so nothing is
+# published by the act of pushing a branch.
+name: Preview build
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or SHA to publish
+        required: true
+        default: phase0-safety-net-and-quick-wins
+
+# One preview at a time; a newer run replaces an older one rather than racing it.
+concurrency:
+  group: pages-preview
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      # Belt and braces: fail loudly rather than publish a domain claim, even
+      # if someone later adds a CNAME under Source/.
+      - name: Refuse to publish a custom domain
+        run: |
+          if [ -e Source/CNAME ]; then
+            echo "Source/CNAME exists — a preview must not claim a custom domain." >&2
+            exit 1
+          fi
+
+      # Through env, not interpolated into the command: a dispatch input is
+      # still someone's text, and text does not belong in a shell line.
+      - name: Say which build this is
+        env:
+          REF: ${{ inputs.ref }}
+          SHA: ${{ github.sha }}
+        run: |
+          printf '%s\n' \
+            "Preview build" \
+            "ref:    $REF" \
+            "commit: $SHA" \
+            "built:  $(date -u +'%Y-%m-%d %H:%M UTC')" > Source/PREVIEW.txt
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./Source
+      - id: deploy
+        uses: actions/deploy-pages@v4
