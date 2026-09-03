@@ -628,6 +628,21 @@
      announce itself. */
   var consoleReady = false;
 
+  /* A map may draw a cached snapshot first and refresh underneath rather than
+     hold an empty screen — the landing page does, because parsing the Spansh
+     dump takes about three seconds even when the bytes come from cache. The
+     status light says which of the two is on screen. */
+  var showingSnapshot = false;
+  function feedNow() {
+    var n = SYSLIST().length + ' systems';
+    setFeed(showingSnapshot ? 'snapshot' : 'live',
+            showingSnapshot ? n + ' · refreshing' : n);
+  }
+  if (window.Ed3d && Ed3d.on) Ed3d.on('dataSnapshot', function () {
+    showingSnapshot = true;
+    if (consoleReady) feedNow();
+  });
+
   function syncToData() {
     if (!window.System || !System.points) return;
     // 'systemsChanged' fires from loadDatasComplete, which runs before
@@ -639,11 +654,16 @@
     if (!consoleReady) return;
     lastPointCount = System.points.length;
     invalidateSystems();
-    if (arguments.length && arguments[0] && arguments[0].replaced) CATS = readCats();
+    if (arguments.length && arguments[0] && arguments[0].replaced) {
+      CATS = readCats();
+      // A replacement is the refreshed dataset landing, so whatever snapshot
+      // was on screen is no longer what is being shown.
+      showingSnapshot = false;
+    }
     refreshCatCounts();
     updateShown();
     if (panel === 'layers' || panel === 'systems') renderPanel();
-    setFeed('live', SYSLIST().length + ' systems');
+    feedNow();
   }
 
   if (window.Ed3d && Ed3d.on) Ed3d.on('systemsChanged', syncToData);
@@ -1878,7 +1898,7 @@
     // Most pages are titled "CanonnED3D - Maps", so every codex entry shared one
     // name in the tab bar, in history and in bookmarks. Name them properly.
     document.title = MAPNAME + ' — CanonnED3D';
-    setFeed('live', SYSLIST().length + ' systems');
+    feedNow();
 
     renderPanel();
     updateShown();

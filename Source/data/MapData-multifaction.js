@@ -91,6 +91,33 @@ var canonnEd3d_multifaction = {
 			});
 		},
 
+		/** The one entry under `prefix`, whatever dump it was built from.
+		 *  put() keeps a single entry per prefix, so there is at most one —
+		 *  which is what lets a visit draw the last snapshot before it knows
+		 *  whether a newer dump exists. */
+		first: async function (prefix) {
+			var db = await this.open();
+			if (!db) return null;
+			return new Promise(function (resolve) {
+				try {
+					var store = db.transaction('derived', 'readonly').objectStore('derived');
+					var keys = store.getAllKeys();
+					keys.onsuccess = function () {
+						var k = (keys.result || []).filter(function (x) {
+							return String(x).indexOf(prefix) === 0;
+						})[0];
+						if (k === undefined) return resolve(null);
+						var r = store.get(k);
+						r.onsuccess = function () {
+							resolve(r.result ? { key: String(k), value: r.result } : null);
+						};
+						r.onerror = function () { resolve(null); };
+					};
+					keys.onerror = function () { resolve(null); };
+				} catch (e) { resolve(null); }
+			});
+		},
+
 		/** Store under `key` and drop every other entry sharing `prefix`, so a
 		 *  new dump replaces the old one instead of accumulating. */
 		put: async function (prefix, key, value) {
@@ -196,31 +223,71 @@ var canonnEd3d_multifaction = {
 			});
 		}
 
-		let cacheKey = null;
+		/* Swap a freshly built dataset in under a map that is already drawn.
+		   updateSystems() empties #filters to rebuild the categories, which
+		   takes the faction search box with it, so that goes back afterwards —
+		   rebuilt rather than restored, because a new dump can name factions
+		   the old one did not. */
+		function refresh() {
+			Ed3d.updateSystems(canonnEd3d_multifaction.systemsData, function () {
+				canonnEd3d_multifaction.addSearchUI();
+				console.log('multifaction: refreshed to the current dump,',
+					canonnEd3d_multifaction.systemsData.systems.length, 'systems');
+			});
+		}
+
+		/* Take on a dataset built during some earlier visit. */
+		function adopt(hit) {
+			canonnEd3d_multifaction.systemsData = hit.systemsData;
+			canonnEd3d_multifaction.allFactionNames = hit.allFactionNames || [];
+			canonnEd3d_multifaction.systemFactionIndex = hit.systemFactionIndex || null;
+			// The full dump is deliberately not cached — it is the 16.6 MB we
+			// are avoiding. The two click-time scans that use it already guard
+			// for its absence and fall back to the index.
+			canonnEd3d_multifaction.allFactions = null;
+		}
+
+		const paramKey = factionsParam.trim().toLowerCase();
+		let cacheKey = null, refreshing = false;
 		try {
-			const stamp = await canonnEd3d_multifaction.stampOf(DUMP_URL);
-			if (stamp) {
-				cacheKey = CACHE_PREFIX + stamp + '|' + factionsParam.trim().toLowerCase();
-				const hit = await canonnEd3d_multifaction.derivedCache.get(cacheKey);
-				if (hit && hit.systemsData) {
-					canonnEd3d_multifaction.systemsData = hit.systemsData;
-					canonnEd3d_multifaction.allFactionNames = hit.allFactionNames || [];
-					canonnEd3d_multifaction.systemFactionIndex = hit.systemFactionIndex || null;
-					// The full dump is deliberately not cached — it is the 16.6 MB
-					// we are avoiding. The two click-time scans that use it already
-					// guard for its absence and fall back to the index.
-					canonnEd3d_multifaction.allFactions = null;
+			// Both at once: one is a round trip and the other is a disk read,
+			// and neither needs the other's answer.
+			const [found, stamp] = await Promise.all([
+				canonnEd3d_multifaction.derivedCache.first(CACHE_PREFIX),
+				canonnEd3d_multifaction.stampOf(DUMP_URL)
+			]);
+			if (stamp) cacheKey = CACHE_PREFIX + stamp + '|' + paramKey;
+
+			if (found && found.value && found.value.systemsData &&
+			    found.key.endsWith('|' + paramKey)) {
+				adopt(found.value);
+				if (cacheKey && found.key === cacheKey) {
+					// Built from the dump being served right now: nothing to do.
 					console.log('multifaction: served from cache,',
 						canonnEd3d_multifaction.systemsData.systems.length, 'systems');
 					launch();
 					return;
 				}
+				/* Built from an older dump, or from one we cannot identify
+				   because the HEAD failed. Either way it is a true drawing of
+				   this faction set, and three seconds of empty screen is the
+				   worse trade. Show it now, rebuild underneath, swap. */
+				refreshing = true;
+				if (window.Ed3d && Ed3d.emit) Ed3d.emit('dataSnapshot');
+				console.log('multifaction: drawing the last snapshot while the dump is refetched');
+				launch();
 			}
 		} catch (e) {
 			// Any cache trouble just means the full path below.
 		}
 
 		try {
+			// The build below appends to canonnEd3d_multifaction.systemsData.
+			// On the refresh path that object is the map currently on screen,
+			// so it starts empty or the new systems land on top of the old.
+			if (refreshing) {
+				canonnEd3d_multifaction.systemsData = { categories: {}, systems: [], routes: [] };
+			}
 			// The Spansh dump is a JSON array of faction objects
 			const allFactions = await canonnEd3d_multifaction.fetchGzJson(DUMP_URL);
 
@@ -377,7 +444,7 @@ var canonnEd3d_multifaction = {
 				});
 			}
 
-			launch();
+			if (refreshing) refresh(); else launch();
 
 		} catch (err) {
 			console.error('multifaction: error loading data –', err);
