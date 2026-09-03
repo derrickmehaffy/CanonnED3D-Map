@@ -50,8 +50,9 @@ var Grid = {
         //-- Kept on a multiple of the cell size, so moving it never shifts
         //   where the lines fall.
         uOrigin: { value: new THREE.Vector2(0, 0) },
-        //-- Camera height above the plane, in cells. Near zero the plane is
-        //   edge-on and there is nothing a filter can resolve.
+        //-- How far off edge-on the view is: height over distance, which is
+        //   the sine of the elevation angle. Near zero the plane is edge-on
+        //   and there is nothing a filter can resolve.
         uHeight: { value: 1.0 }
       },
       transparent: true,
@@ -102,8 +103,8 @@ var Grid = {
         //   is why the tearing got worse the lower the camera went.
         '  float density = max(w.x, w.y);',
         '  a *= 1.0 - smoothstep(0.18, 0.55, density);',
-        //-- And let go entirely as the camera comes level with the plane,
-        //   where it is edge-on and there is genuinely nothing to draw.
+        //-- And let go as the view comes level with the plane, where it is
+        //   edge-on and there is genuinely nothing to draw.
         '  a *= smoothstep(0.0, 1.0, uHeight);',
         '  if (a <= 0.002) discard;',
         '  float d = distance(cameraPosition, vWorld);',
@@ -231,8 +232,16 @@ var Grid = {
 
     var height = Math.abs(camera.position.y - this.obj.position.y);
 
+    //-- Measured as an angle, not an absolute height. Height alone scales
+    //   with zoom, so flying in towards a plane you are looking straight down
+    //   at would fade the grid out exactly when it is most readable. The
+    //   elevation angle does not care how close you are — only whether the
+    //   surface is turned away from you.
     var h = this.obj.material.uniforms.uHeight;
-    if (h != undefined) h.value = Math.min(height / (this.size * 2.5), 1);
+    if (h != undefined) {
+      var dist = Math.max(camera.position.distanceTo(controls.target), 1e-6);
+      h.value = Math.min((height / dist) / 0.12, 1);
+    }
 
     //-- Size to what can be seen. Past that the density fade has removed the
     //   lines anyway, so a bigger quad buys nothing and costs precision.

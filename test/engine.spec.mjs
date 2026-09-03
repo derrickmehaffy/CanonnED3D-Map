@@ -304,6 +304,32 @@ test('the grid does not tear into a band at any viewing angle', async ({ page })
   });
   expect(overhead, 'the grid still draws when it can be resolved').toBeGreaterThan(500);
 
+  // Zooming in must not take the grid with it. The edge-on fade is measured as
+  // an angle rather than an absolute height for exactly this reason: height
+  // alone shrinks as you fly in, so a grid you are looking straight down at
+  // would disappear at precisely the point it is most readable.
+  const closeIn = await page.evaluate(() => {
+    const grids = [Ed3d.grid1H.obj, Ed3d.grid1K.obj];
+    controls.target.set(0, 0, 0);
+    camera.position.set(20, 90, 20);          // right down on the plane, looking down
+    controls.update();
+    Ed3d.grid1H.updateOrigin();
+    Ed3d.grid1K.updateOrigin();
+    grids.forEach((g) => { g.visible = true; });
+    return grids.map((g) => g.material.uniforms.uHeight.value);
+  });
+  expect(closeIn.every((v) => v > 0.9), 'a top-down view is never treated as edge-on').toBe(true);
+
+  // Level with the plane it should let go, whatever the zoom.
+  const levelWith = await page.evaluate(() => {
+    controls.target.set(0, 0, 0);
+    camera.position.set(-900, 6, 900);
+    controls.update();
+    Ed3d.grid1H.updateOrigin();
+    return Ed3d.grid1H.obj.material.uniforms.uHeight.value;
+  });
+  expect(levelWith, 'edge-on is faded out').toBeLessThan(0.2);
+
   // 2000 down to 60 walks from a comfortable three-quarter view to nearly
   // edge-on. 900 and 220 are around where the tearing actually showed up.
   for (const elevation of [2000, 900, 220, 60]) {
