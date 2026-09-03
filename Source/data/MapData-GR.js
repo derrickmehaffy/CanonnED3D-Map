@@ -27,7 +27,9 @@ var canonnEd3d_gr = {
 
 	formatRuins: function (data) {
 		const typeMap = { 'Alpha': 201, 'Beta': 202, 'Gamma': 203 };
-		const thumbBase = 'https://ruins.canonn.tech/images/maps/';
+		// The local vector plans rather than Bifrost's bitmaps: same three
+		// drawings, sharp at any size, and no cross-site request per row.
+		const thumbBase = 'img/ruins/';
 		for (let i = 0; i < data.length; i++) {
 			let s = data[i];
 			let name = s["System Name"];
@@ -39,7 +41,7 @@ var canonnEd3d_gr = {
 			let cat = typeMap[s["Site Type"]] || 214;
 			let type = s["Site Type"] || 'Unknown';
 			let thumb = typeMap[type]
-				? '<br><img src="' + thumbBase + type.toLowerCase() + '-thumbnail.png">'
+				? '<br><img src="' + thumbBase + type.toLowerCase() + '.svg">'
 				: '';
 			// Several ruins in one system share its coordinates, so Ed3d merges
 			// them into a single point and concatenates these blocks. Each one

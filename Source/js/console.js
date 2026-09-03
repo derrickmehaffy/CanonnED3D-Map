@@ -704,6 +704,11 @@
       (hideFiltered ? ' checked' : '') + '> Hide deselected entirely</label>';
     if (note) h += '<div class="note">' + note + '</div>';
     if (CFG.templates) {
+      h += '<div class="tmplpick">' + CATS.map(function (cat, i) {
+        if (!c[i]) return '';
+        return '<button class="tchip' + (cat.name === hoverType ? ' on' : '') + '" data-t="' + i + '">' +
+          '<span class="sw" style="background:' + col(i) + '"></span>' + esc(cat.name) + '</button>';
+      }).join('') + '</div>';
       h += '<div class="tmpl"><div class="tmpl-h"><span>Template map</span><b id="tmpl-n"></b></div>' +
         '<img id="tmpl-img" alt="Site template map"><div class="tmpl-f" id="tmpl-f"></div></div>';
     }
@@ -845,7 +850,7 @@
     var lay = e.target.closest('.layer[data-t]');
     if (lay) {
       var i = +lay.dataset.t;
-      if (e.shiftKey) { showTemplate(catName(i)); return; }
+
       setCatVisible(i, !on(i));
       renderPanel(); updateShown();
       return;
@@ -858,6 +863,8 @@
       }
       return;
     }
+    var chip = e.target.closest('.tchip');
+    if (chip) { showTemplate(catName(+chip.dataset.t)); renderPanel(); return; }
     var all = e.target.closest('[data-all]');
     if (all) { setAllCats(all.dataset.all === '1'); return; }
     var srt = e.target.closest('[data-sort]');
@@ -867,10 +874,6 @@
     if (cam) { doCamera(cam.dataset.cam); return; }
     var swt = e.target.closest('[data-sw]');
     if (swt) { doDisplay(swt.dataset.sw, !swt.classList.contains('on')); return; }
-  });
-  $('side').addEventListener('mouseover', function (e) {
-    var lay = e.target.closest('.layer[data-t]');
-    if (lay && CFG.templates) showTemplate(catName(+lay.dataset.t));
   });
 
   /* ── camera ───────────────────────────────────────────────────────────── */
@@ -1153,16 +1156,7 @@
     }
     if (!types.length) types = s.s.map(function (x) { return CATS[x[0]]; }).filter(Boolean);
 
-    //-- Which type is highlighted, and whose plan the Layers panel shows.
-    if (!cardType || types.indexOf(cardType) === -1) cardType = types[0] || null;
 
-    var chips = types.length > 1
-      ? '<div class="c-types">' + types.map(function (t) {
-          return '<button class="c-type' + (t === cardType ? ' on' : '') + '" data-cat="' +
-            esc(t.id) + '"><span class="sw" style="background:' + t.color + '"></span>' +
-            esc(t.name) + '</button>';
-        }).join('') + '</div>'
-      : '';
 
     var body = s.s.length && s.s[0][1]
       ? '<div class="c-body">' + safeHtml(s.s[0][1]) + '</div>'
@@ -1183,7 +1177,7 @@
         Math.round(Math.sqrt(s.x * s.x + s.y * s.y + s.z * s.z)).toLocaleString() + ' ly from Sol</div>' +
       '<div class="c-sec"><span>' + count + ' ' + CFG.unit + (count > 1 ? 's' : '') + '</span>' +
         '<b>' + esc(types.map(function (t) { return t.name; }).join(' · ')) + '</b></div>' +
-      chips + body + link +
+      body + link +
       // No site plan here: the Layers panel already shows it, larger, and two
       // copies of the same drawing made the card twice as tall for nothing.
       // The chips above still choose which one that panel shows.
@@ -1196,14 +1190,6 @@
       '</div>' +
       '<button class="c-reset" id="creset">Reset position</button>';
     $('creset').onclick = resetCardBox;
-
-    Array.prototype.forEach.call(c.querySelectorAll('.c-type'), function (el) {
-      el.onclick = function () {
-        cardType = types.filter(function (t) { return String(t.id) === el.dataset.cat; })[0] || cardType;
-        renderCard();
-        if (CFG.templates && cardType) showTemplate(cardType.name);
-      };
-    });
 
     $('cx').onclick = function () { sel = null; c.className = 'card hidden'; };
     makeCardMovable(c);

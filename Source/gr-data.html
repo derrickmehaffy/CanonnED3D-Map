@@ -67,13 +67,16 @@
     window.CONSOLE = {
       unit: 'ruin',
       templates: true,
-      note: 'Ruins come in three layouts. Hover a type to see its site plan; ' +
-            'click one to show or hide it on the map.'
+      note: 'Ruins come in three layouts. Click a type above to show or hide it ' +
+            'on the map, or pick one below to see its site plan.'
     };
+    // The real site plans from canonn-science/GR-RuinsComboMap, with the
+    // obelisk clusters and their numbering stripped out. Vector, so they stay
+    // sharp at any size, and smaller than the bitmap thumbnails they replace.
     window.THUMBS = {
-      alpha: 'img/ruins/alpha.png',
-      beta:  'img/ruins/beta.png',
-      gamma: 'img/ruins/gamma.png'
+      alpha: 'img/ruins/alpha.svg',
+      beta:  'img/ruins/beta.svg',
+      gamma: 'img/ruins/gamma.svg'
     };
     window.TNOTE = {
       Alpha: 'Six-pointed plan. Obelisks around a raised central dais.',

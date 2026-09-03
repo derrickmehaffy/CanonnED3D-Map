@@ -407,13 +407,16 @@ body.card-dragging{user-select:none;cursor:grabbing}
 
 
 /* Card: the types present, and the concatenated site blocks. */
-.c-types{display:flex;flex-wrap:wrap;gap:4px;padding:2px 13px 10px}
-.c-type{display:flex;align-items:center;gap:6px;padding:4px 9px;background:var(--panel-2);
+/* Which site plan to show, picked explicitly rather than by hovering the layer
+   rows — hovering meant the plan changed whenever the pointer crossed the
+   list on its way somewhere else. */
+.tmplpick{display:flex;flex-wrap:wrap;gap:4px;margin:14px 0 8px}
+.tchip{display:flex;align-items:center;gap:6px;padding:4px 9px;background:var(--panel-2);
   border:1px solid var(--rule);color:var(--dim);font-family:var(--cond);font-size:11px;
   font-weight:600;cursor:pointer}
-.c-type .sw{width:8px;height:8px;border-radius:1px;display:block}
-.c-type:hover{color:var(--text)}
-.c-type.on{border-color:var(--amber);color:var(--amber)}
+.tchip .sw{width:8px;height:8px;border-radius:1px;display:block}
+.tchip:hover{color:var(--text)}
+.tchip.on{border-color:var(--amber);color:var(--amber)}
 .c-body{padding:2px 13px 10px;font-family:var(--mono);font-size:10.5px;
   line-height:1.75;color:var(--dim);border-bottom:1px solid var(--rule)}
 .c-body a{color:var(--ion);text-decoration:none}

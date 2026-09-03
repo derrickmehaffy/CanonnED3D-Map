@@ -134,12 +134,13 @@ test('the grid still follows the camera and toggles', async ({ page }) => {
   expect(r.shown).toBe(true);
 });
 
-/* The HDR pipeline is opt-in: Ed3d's colours were authored against the
-   non-colour-managed path, so turning it on shifts every hue. It must stay off
-   until asked, and must restore the renderer exactly when switched back. */
-test('the HDR pipeline is off by default and reverts cleanly', async ({ page }) => {
+/* PostFX must leave the renderer exactly as it found it, because it changes
+   global state — tone mapping, output colour space, and renderer.render itself.
+   Whether it starts on is the console's decision, covered in panel.spec.mjs. */
+test('the HDR pipeline reverts the renderer cleanly', async ({ page }) => {
   await loaded(page);
   const r = await page.evaluate(() => {
+    PostFX.disable();                     // whatever the console did, start clean
     const before = {
       enabled: PostFX.enabled,
       toneMapping: renderer.toneMapping,
@@ -162,9 +163,6 @@ test('the HDR pipeline is off by default and reverts cleanly', async ({ page }) 
     return { before, on, after, HalfFloatType: THREE.HalfFloatType,
              ACES: THREE.ACESFilmicToneMapping, NoToneMapping: THREE.NoToneMapping };
   });
-
-  expect(r.before.enabled, 'off until asked for').toBe(false);
-  expect(r.before.toneMapping).toBe(r.NoToneMapping);
 
   expect(r.on.enabled).toBe(true);
   expect(r.on.toneMapping).toBe(r.ACES);

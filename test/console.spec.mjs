@@ -106,18 +106,21 @@ test('a page can opt in to template maps and its own vocabulary', async ({ page 
   const img = page.locator('#tmpl-img');
   await expect(img).toBeVisible();
 
-  // Hovering a type swaps the template and its note.
-  await page.locator('#side .layer').nth(1).hover();
+  // Picking a type swaps the plan. Chips rather than hover: hovering meant the
+  // plan changed whenever the pointer crossed the list on its way elsewhere.
+  await page.locator('.tchip', { hasText: 'Beta' }).click();
   await expect(page.locator('#tmpl-n')).toHaveText('Beta');
-  await expect(img).toHaveAttribute('src', 'img/ruins/beta.png');
+  await expect(img).toHaveAttribute('src', 'img/ruins/beta.svg');
   await expect(page.locator('#tmpl-f')).toContainText('central spire');
 
   // The image is real, not a broken reference.
   const drawn = await img.evaluate((el) => el.naturalWidth > 0);
   expect(drawn, 'the template image actually loaded').toBe(true);
 
-  await page.locator('#side .layer').nth(0).hover();
+  await page.locator('.tchip', { hasText: 'Alpha' }).click();
   await expect(page.locator('#tmpl-n')).toHaveText('Alpha');
+  // And picking a plan must not toggle the layer off.
+  await expect(page.locator('#st-shown')).toContainText('3 / 3');
 });
 
 test('pages that declare nothing still get sane defaults', async ({ page }) => {
