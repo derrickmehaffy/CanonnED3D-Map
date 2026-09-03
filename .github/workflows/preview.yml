@@ -10,17 +10,22 @@
 # So this workflow publishes no CNAME at all. A preview lives at
 # https://<owner>.github.io/<repo>/ and nowhere else.
 #
-# It also never runs on its own: workflow_dispatch only, so nothing is
-# published by the act of pushing a branch.
+# It is scoped to the working branch and nothing else. GitHub only offers
+# workflow_dispatch for workflows that exist on the default branch, and putting
+# this on master would fire mainl.yml — the very deploy being avoided — so the
+# branch trigger is what makes a preview possible without touching master at
+# all. Adding a branch here is how you preview a different one.
 name: Preview build
 
 on:
+  push:
+    branches:
+      - phase0-safety-net-and-quick-wins
   workflow_dispatch:
     inputs:
       ref:
         description: Branch, tag or SHA to publish
-        required: true
-        default: phase0-safety-net-and-quick-wins
+        required: false
 
 # One preview at a time; a newer run replaces an older one rather than racing it.
 concurrency:
@@ -41,7 +46,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref }}
+          # Dispatched with a ref, or whatever branch was just pushed.
+          ref: ${{ inputs.ref || github.ref }}
 
       # Belt and braces: fail loudly rather than publish a domain claim, even
       # if someone later adds a CNAME under Source/.
@@ -56,7 +62,7 @@ jobs:
       # still someone's text, and text does not belong in a shell line.
       - name: Say which build this is
         env:
-          REF: ${{ inputs.ref }}
+          REF: ${{ inputs.ref || github.ref_name }}
           SHA: ${{ github.sha }}
         run: |
           printf '%s\n' \
