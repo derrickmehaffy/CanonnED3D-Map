@@ -78,6 +78,8 @@ input[type=range]{accent-color:var(--amber)}
   color:var(--dimmer);margin-bottom:4px}
 .s-sub{font-family:var(--mono);font-size:10px;color:var(--dimmer);margin-bottom:11px}
 .s-sub b{color:var(--amber);font-weight:500}
+/* A second section inside one panel — the site plan under the filters. */
+.s-t.sec{margin-top:18px;padding-top:14px;border-top:1px solid var(--rule)}
 .grp{margin-top:15px}
 .grp:first-child{margin-top:0}
 
@@ -395,12 +397,13 @@ body.resizing .side-grip::after{background:var(--amber)}
 .card.moved{right:auto;top:auto}
 .c-h{cursor:grab;user-select:none}
 .c-h:active{cursor:grabbing}
-.card .c-grip{position:absolute;right:0;bottom:0;width:16px;height:16px;
-  cursor:nwse-resize;z-index:2;touch-action:none}
-.card .c-grip::after{content:'';position:absolute;right:3px;bottom:3px;
-  width:7px;height:7px;border-right:2px solid var(--rule);border-bottom:2px solid var(--rule)}
+.card .c-grip{position:absolute;left:0;bottom:0;width:16px;height:16px;
+  cursor:nesw-resize;z-index:2;touch-action:none}
+.card .c-grip::after{content:'';position:absolute;left:3px;bottom:3px;
+  width:7px;height:7px;border-left:2px solid var(--rule);border-bottom:2px solid var(--rule)}
 .card .c-grip:hover::after{border-color:var(--amber)}
-.card .c-reset{font-family:var(--mono);font-size:9.5px;color:var(--dimmer);
+.card .c-reset{display:block;margin-left:auto;font-family:var(--mono);
+  font-size:9.5px;color:var(--dimmer);
   background:none;border:0;cursor:pointer;padding:0 13px 9px}
 .card .c-reset:hover{color:var(--amber)}
 body.card-dragging{user-select:none;cursor:grabbing}
@@ -410,7 +413,7 @@ body.card-dragging{user-select:none;cursor:grabbing}
 /* Which site plan to show, picked explicitly rather than by hovering the layer
    rows — hovering meant the plan changed whenever the pointer crossed the
    list on its way somewhere else. */
-.tmplpick{display:flex;flex-wrap:wrap;gap:4px;margin:14px 0 8px}
+.tmplpick{display:flex;flex-wrap:wrap;gap:4px;margin:10px 0 8px}
 .tchip{display:flex;align-items:center;gap:6px;padding:4px 9px;background:var(--panel-2);
   border:1px solid var(--rule);color:var(--dim);font-family:var(--cond);font-size:11px;
   font-weight:600;cursor:pointer}

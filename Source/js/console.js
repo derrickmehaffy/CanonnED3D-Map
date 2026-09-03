@@ -700,10 +700,14 @@
     var note = esc(CFG.note) +
       (multi ? (CFG.note ? '<br><br>' : '') + '<b>' + multi + '</b> systems hold more than one, <b>' +
         mixed + '</b> mixing types.' : '');
+    if (note) h += '<div class="note">' + note + '</div>';
+    // Last in the filter block, under Select all / Clear and under the type
+    // rows it acts on: it decides what happens to the types already switched
+    // off, so it only reads correctly after them.
     h += '<label class="hidechk"><input type="checkbox" id="hidefilt"' +
       (hideFiltered ? ' checked' : '') + '> Hide deselected entirely</label>';
-    if (note) h += '<div class="note">' + note + '</div>';
     if (CFG.templates) {
+      h += '<div class="s-t sec">Site plan</div>';
       h += '<div class="tmplpick">' + CATS.map(function (cat, i) {
         if (!c[i]) return '';
         return '<button class="tchip' + (cat.name === hoverType ? ' on' : '') + '" data-t="' + i + '">' +
@@ -1130,6 +1134,39 @@
     if (CFG.templates) showTemplate(catName(rec.s[0][0]));
   }, 200);
 
+  /* Closing the card drops Ed3d's selection too.
+
+     Without that the close button did nothing you could see. The poll above
+     runs five times a second off Action.selectedPoint, which the engine
+     leaves set after a click, so the card came straight back on the next
+     tick. Clearing it also takes the 3D cursor off the map, which is what
+     closing the card ought to mean. */
+  function closeCard() {
+    sel = null;
+    var c = $('card');
+    if (c) c.className = 'card hidden';
+    if (typeof Action === 'undefined' || !Action) return;
+    Action.selectedPoint = null;
+    Action.oldSel = null;
+    if (Action.disableSelection) Action.disableSelection();
+  }
+
+  /* Give a system the engine's own selection, so choosing it from the systems
+     list or the palette looks like clicking it in the map: cursor on the
+     point, selection set, grid moved under it. Picking from the list only
+     flew the camera before, which left nothing at all marking which of the
+     points in view you had actually asked for. */
+  function selectInMap(rec) {
+    if (typeof Action === 'undefined' || !Action) return;
+    if (!window.System || !System.points) return;
+    var pt = System.points[rec.idx];
+    if (!pt) return;
+    Action.oldSel = rec.idx;
+    Action.selectedPoint = pt;
+    if (Action.addCursorOnSelect) Action.addCursorOnSelect(pt.x, pt.y, pt.z);
+    if (Action.moveGridTo) Action.moveGridTo(pt.x, pt.y, pt.z);
+  }
+
   function renderCard() {
     var s = sel, q = encodeURIComponent(s.n);
 
@@ -1172,7 +1209,10 @@
     c.className = 'card';
     c.innerHTML =
       '<div class="c-h"><div class="n">' + esc(s.n) + '</div>' +
-        '<button class="x" id="cx" aria-label="Close">&times;</button></div>' +
+        // Not id="cx": Ed3d's own coordinate readout already owns that id,
+        // so getElementById returned its <span> and the close button was
+        // wired to nothing on any page where the HUD renders first.
+        '<button class="x" id="card-x" aria-label="Close">&times;</button></div>' +
       '<div class="c-meta">' + s.x + ' · ' + s.y + ' · ' + s.z + '<br>' +
         Math.round(Math.sqrt(s.x * s.x + s.y * s.y + s.z * s.z)).toLocaleString() + ' ly from Sol</div>' +
       '<div class="c-sec"><span>' + count + ' ' + CFG.unit + (count > 1 ? 's' : '') + '</span>' +
@@ -1191,7 +1231,7 @@
       '<button class="c-reset" id="creset">Reset position</button>';
     $('creset').onclick = resetCardBox;
 
-    $('cx').onclick = function () { sel = null; c.className = 'card hidden'; };
+    $('card-x').onclick = closeCard;
     makeCardMovable(c);
     $('ccopy').onclick = function () {
       var b = this;
@@ -1212,6 +1252,7 @@
      systems list so they behave identically. */
   function gotoSystem(rec) {
     sel = rec; cardType = null; renderCard();
+    selectInMap(rec);
     if (CFG.templates) showTemplate(catName(rec.s[0][0]));
     if (typeof controls === 'undefined') return;
     controls.target.set(rec.x, rec.y, -rec.z);
@@ -1555,8 +1596,16 @@
       applyCardBox(c, clampCard(c, s0.left + dx, s0.top + dy, s0.w, s0.h));
     }, 'card-dragging');
 
+    /* The grip is on the bottom-left corner: the card sits against the right
+       edge of the stage by default, so a right-hand grip pulled it away from
+       the thing it is anchored to. Dragging left therefore widens, and the
+       left edge is derived from the width that survived clamping rather than
+       from the raw drag — otherwise the right edge crept once the card hit
+       its minimum width. */
     drag(grip, function (s0, dx, dy) {
-      applyCardBox(c, clampCard(c, s0.left, s0.top, s0.w + dx, s0.h + dy));
+      var box = clampCard(c, s0.left, s0.top, s0.w - dx, s0.h + dy);
+      box.left = Math.max(0, s0.left + s0.w - box.w);
+      applyCardBox(c, box);
     }, 'card-dragging');
   }
 
