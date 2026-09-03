@@ -8,11 +8,19 @@
 
 .orrery{
   position:fixed;inset:0;z-index:60;display:none;
-  grid-template-rows:46px auto 1fr 42px;
+  grid-template-rows:auto auto 1fr auto;
   background:var(--void,#05070A);color:var(--text,#CAD4DC);
   font-family:var(--sans,'IBM Plex Sans',system-ui,sans-serif)
 }
 .orrery.open{display:grid}
+/* Rows named, not counted. The spine hides itself below 960px, and with rows
+   assigned by source order that shifted everything up one — the stage took
+   the "auto" track and collapsed to its content while the time bar inherited
+   the 1fr and grew to half the screen. */
+.orr-top{grid-row:1}
+.orr-spine{grid-row:2}
+.orr-mid{grid-row:3;min-width:0}
+.orr-foot{grid-row:4}
 /* The galaxy map stays mounted underneath, camera and all — it is only
    switched off. Hiding it here stops it painting behind a transparent edge. */
 body.orrery-open .app{visibility:hidden}
@@ -36,7 +44,7 @@ body.orrery-open .app{visibility:hidden}
 .orr-page:not(.has-system) .orr-empty{display:flex}
 
 /* top */
-.orr-top{display:flex;align-items:center;gap:12px;padding:0 12px;
+.orr-top{display:flex;align-items:center;gap:12px;min-height:46px;padding:0 12px;
   border-bottom:1px solid var(--rule,#1B242E);background:var(--panel,#0C1116);
   position:relative;z-index:5}
 .orr-home{align-items:center;gap:9px;color:var(--amber,#FF9D00);text-decoration:none;flex:none}
@@ -238,7 +246,7 @@ body.orrery-open .app{visibility:hidden}
 .orr-seeds button:hover{border-color:var(--amber,#FF9D00);color:var(--amber,#FF9D00)}
 
 /* the clock */
-.orr-foot{display:flex;align-items:center;gap:18px;padding:0 12px;
+.orr-foot{display:flex;align-items:center;gap:18px;min-height:42px;padding:0 12px;
   border-top:1px solid var(--rule,#1B242E);background:var(--panel,#0C1116)}
 .orr-time{display:flex;align-items:center;gap:6px}
 .orr-time button{width:30px;height:24px;display:grid;place-items:center;
@@ -285,8 +293,28 @@ body.orrery-open .app{visibility:hidden}
   .orr-spine{display:none}
 }
 @media (max-width:820px){
-  /* Not enough room for both rails and a model worth looking at; the list is
-     how you find a body, so it is the one that goes. */
+  /* No room for two rails beside a model worth looking at. The list is how
+     you find a body, so it goes; the detail moves under the view rather than
+     squeezing it to a strip, which is what it did before. */
   .orr-left{display:none}
   .orr-scale{display:none}
+  .orr-mid{flex-direction:column}
+  .orr-stage{flex:1;min-height:0}
+  /* A definite height, not a cap: .orr-facts is flex:1 inside it, and inside
+     a parent sized by its own content that resolves to nothing — the panel
+     collapsed to 19px. */
+  .orr-right{width:auto;flex:none;height:42%;border-left:0;
+    border-top:1px solid var(--rule,#1B242E)}
+  .orr-tools{max-width:none;left:12px;justify-content:flex-start}
+  .orr-legend{display:none}
+}
+@media (max-width:560px){
+  /* The header cannot hold a search box and everything else on one line at
+     this width — it was down to a single letter. It gets its own row. */
+  .orr-top{flex-wrap:wrap;gap:8px;padding:6px 8px}
+  .orr-find{order:10;flex-basis:100%;max-width:none}
+  .orr-home span,.orr-title span{display:none}
+  .orr-foot{gap:10px;padding:0 8px}
+  .orr-clock{flex:1;min-width:0}
+  #orr-date{font-size:10.5px}
 }

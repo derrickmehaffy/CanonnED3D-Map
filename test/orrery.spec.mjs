@@ -468,3 +468,42 @@ test('the spine places every body by its distance from arrival', async ({ page }
   await expect(page.locator('.orr-facts .orr-f-h b')).toHaveText('Testholm 1 a');
   await expect(page.locator('.orr-spine .pip').last()).toHaveClass(/on/);
 });
+
+/* The spine hides itself below 960px. With grid rows assigned by source order
+   that shifted every child up one: the stage took the "auto" track and
+   collapsed to its content while the time bar inherited the 1fr and grew to
+   half the screen. Rows are named now, and this is what says so. */
+test('the layout holds at every width', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+
+  for (const [w, h] of [[1440, 900], [900, 800], [768, 1024], [390, 844]]) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.orr-facts .orr-f-h')).toBeVisible({ timeout: 60_000 });
+
+    const box = await page.evaluate(() => {
+      const r = (s) => {
+        const e = document.querySelector(s);
+        return e ? e.getBoundingClientRect() : null;
+      };
+      return {
+        vw: innerWidth, vh: innerHeight, scrollW: document.documentElement.scrollWidth,
+        mid: r('.orr-mid'), stage: r('.orr-stage'), foot: r('.orr-foot'),
+        facts: r('.orr-right')
+      };
+    });
+
+    const at = `${w}x${h}`;
+    // Nothing sticks out sideways.
+    expect(box.scrollW, `no sideways scroll at ${at}`).toBe(w);
+    expect(Math.round(box.mid.width), `the middle fits at ${at}`).toBeLessThanOrEqual(w);
+    // The view gets the room, not the time bar.
+    expect(Math.round(box.foot.height), `time bar stays a bar at ${at}`).toBeLessThan(70);
+    expect(box.stage.height, `the view has real height at ${at}`).toBeGreaterThan(200);
+    // And the detail panel is readable rather than a sliver.
+    expect(box.facts.height, `detail panel is usable at ${at}`).toBeGreaterThan(120);
+    // Everything lands inside the window.
+    expect(Math.round(box.foot.bottom), `nothing below the fold at ${at}`).toBeLessThanOrEqual(h);
+  }
+});
