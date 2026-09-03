@@ -1140,6 +1140,141 @@
     if (CFG.templates) showTemplate(catName(rec.s[0][0]));
   }, 200);
 
+  /* ── the primary star, from the same place Signals gets it ──────────────
+     Every map here knows a system's name and where it is, and nothing else.
+     What the system actually *is* — what you arrive at, whether you can scoop
+     there, how many bodies are worth the detour — lives in Canonn's system
+     dump, which is what Signals reads.
+
+     Those cloud functions are billed per invocation, so this asks on a click
+     and never otherwise: not on hover, not for the systems list, not on load.
+     What comes back is boiled down to the dozen fields the card prints and
+     kept in localStorage. Star physics does not move, so a month is a safe
+     life for an entry.
+
+     Every step is allowed to fail. An unknown system, a browser with no
+     network, a full localStorage — each ends with the block simply absent,
+     because the rest of the card is still worth reading. */
+  var Star = (function () {
+    var API = 'https://us-central1-canonn-api-236217.cloudfunctions.net/query';
+    var TTL = 30 * 24 * 3600 * 1000;
+    var mem = {}, inflight = {};
+
+    /* undefined: not asked yet. null: asked, nothing to show. */
+    function cached(name) {
+      if (mem[name] !== undefined) return mem[name];
+      var raw = recall('star.' + name);
+      if (!raw) return undefined;
+      try {
+        var box = JSON.parse(raw);
+        if (!box || Date.now() - box.t > TTL) return undefined;
+        mem[name] = box.d;
+        return box.d;
+      } catch (e) { return undefined; }
+    }
+
+    function store(name, d) {
+      mem[name] = d;
+      remember('star.' + name, JSON.stringify({ t: Date.now(), d: d }));
+    }
+
+    /* One system's worth of dump, reduced to what the card prints. */
+    function digest(sys) {
+      if (!sys) return null;
+      var bodies = sys.bodies || [];
+      var stars = bodies.filter(function (b) { return b && b.type === 'Star'; });
+      // mainStar is the arrival star. Falling back to the first one listed is
+      // better than nothing on a system whose dump predates that flag.
+      var main = null;
+      stars.forEach(function (b) { if (b.mainStar && !main) main = b; });
+      if (!main) main = stars[0];
+      if (!main) return null;
+      // In a multi-star system the arrival star is "<system> A"; saying so is
+      // the difference between "there is a K3 here" and "the one you drop out
+      // at is the K3". A lone star repeats the system name, so drop it.
+      var label = (main.name || '').indexOf((sys.name || '') + ' ') === 0
+        ? main.name.slice((sys.name || '').length + 1) : '';
+      return {
+        n: main.name || '',
+        lab: label,
+        sub: main.subType || '',
+        cls: main.spectralClass || '',
+        lum: main.luminosity || '',
+        k: main.surfaceTemperature || 0,
+        mass: main.solarMasses || 0,
+        rad: main.solarRadius || 0,
+        age: main.age || 0,
+        // K, G, B, F, O, A and M are the classes a fuel scoop can refuel from.
+        scoop: /^[KGBFOAM]/.test(main.spectralClass || ''),
+        stars: stars.length,
+        bodies: sys.bodyCount || bodies.length,
+        land: bodies.filter(function (b) { return b && b.isLandable; }).length
+      };
+    }
+
+    async function get(url) {
+      var r = await fetch(url);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }
+
+    async function load(name) {
+      var hit = await get(API + '/typeahead?q=' + encodeURIComponent(name));
+      var row = hit && hit.min_max && hit.min_max[0];
+      // typeahead is a prefix search, so it answers for names that merely
+      // start with what was asked. Only an exact match is this system.
+      if (!row || row.name !== name || !row.id64) return null;
+      var dump = await get(API + '/codex/dump?id=' + row.id64 + '&caller=CanonnED3D');
+      return digest(dump && dump.system);
+    }
+
+    return {
+      /** cb(summary | null). Called immediately when the answer is known. */
+      get: function (name, cb) {
+        var known = cached(name);
+        if (known !== undefined) { cb(known); return; }
+        if (inflight[name]) { inflight[name].push(cb); return; }
+        inflight[name] = [cb];
+        load(name).catch(function () { return undefined; }).then(function (d) {
+          var waiting = inflight[name];
+          delete inflight[name];
+          // undefined is "the lookup broke", which is not a fact about the
+          // system and must not be cached for a month.
+          if (d !== undefined) store(name, d);
+          waiting.forEach(function (fn) { try { fn(d === undefined ? null : d); } catch (e) {} });
+        });
+      }
+    };
+  })();
+
+  function num(v, dp) { return v.toFixed(dp).replace(/\.?0+$/, '') || '0'; }
+
+  function starHtml(d) {
+    if (!d) return '';
+    var facts = [];
+    if (d.k)    facts.push(Math.round(d.k).toLocaleString() + ' K');
+    if (d.mass) facts.push(num(d.mass, 2) + ' M&#9737;');
+    if (d.rad)  facts.push(num(d.rad, 2) + ' R&#9737;');
+    if (d.age)  facts.push(d.age >= 1000 ? num(d.age / 1000, 1) + ' Gyr' : d.age + ' Myr');
+
+    var foot = [];
+    if (d.bodies) foot.push(d.bodies + ' bod' + (d.bodies > 1 ? 'ies' : 'y'));
+    if (d.stars > 1) foot.push(d.stars + ' stars');
+    if (d.land) foot.push(d.land + ' landable');
+    foot.push(d.scoop ? 'scoopable' : 'not scoopable');
+
+    var cls = (d.cls + ' ' + d.lum).trim();
+    return '<div class="c-star">' +
+      '<div class="c-star-h"><span>Primary star</span>' +
+        (cls ? '<b>' + esc(cls) + '</b>' : '') + '</div>' +
+      (d.sub ? '<div class="c-star-n">' +
+        (d.lab ? '<i>' + esc(d.lab) + '</i>' : '') + esc(d.sub) + '</div>' : '') +
+      (facts.length ? '<div class="c-star-g">' +
+        facts.map(function (f) { return '<span>' + f + '</span>'; }).join('') + '</div>' : '') +
+      '<div class="c-star-f">' + esc(foot.join(' · ')) + '</div>' +
+    '</div>';
+  }
+
   /* Closing the card drops Ed3d's selection too.
 
      Without that the close button did nothing you could see. The poll above
@@ -1221,6 +1356,7 @@
         '<button class="x" id="card-x" aria-label="Close">&times;</button></div>' +
       '<div class="c-meta">' + s.x + ' · ' + s.y + ' · ' + s.z + '<br>' +
         Math.round(Math.sqrt(s.x * s.x + s.y * s.y + s.z * s.z)).toLocaleString() + ' ly from Sol</div>' +
+      '<div id="cstar"></div>' +
       '<div class="c-sec"><span>' + count + ' ' + CFG.unit + (count > 1 ? 's' : '') + '</span>' +
         '<b>' + esc(types.map(function (t) { return t.name; }).join(' · ')) + '</b></div>' +
       body + link +
@@ -1236,6 +1372,24 @@
       '</div>' +
       '<button class="c-reset" id="creset">Reset position</button>';
     $('creset').onclick = resetCardBox;
+
+    /* The star block fills itself in. A system already in the cache answers
+       inside this call, so there is no placeholder to flash on one you have
+       opened before; anything that has to go to the network shows that it is
+       looking, and a slow answer for a system you have already moved on from
+       is dropped rather than written into someone else's card. */
+    (function () {
+      var want = s.n, answered = false;
+      Star.get(want, function (d) {
+        answered = true;
+        if (!sel || sel.n !== want) return;
+        var slot = $('cstar');
+        if (slot) slot.innerHTML = starHtml(d);
+      });
+      if (!answered) $('cstar').innerHTML =
+        '<div class="c-star wait"><div class="c-star-h"><span>Primary star</span></div>' +
+        '<div class="c-star-f">looking up&#8230;</div></div>';
+    })();
 
     $('card-x').onclick = closeCard;
     makeCardMovable(c);

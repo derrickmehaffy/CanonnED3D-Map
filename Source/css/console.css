@@ -424,6 +424,24 @@ body.card-dragging{user-select:none;cursor:grabbing}
 .tchip .sw{width:8px;height:8px;border-radius:1px;display:block}
 .tchip:hover{color:var(--text)}
 .tchip.on{border-color:var(--amber);color:var(--amber)}
+/* The primary star: what you actually arrive at, from the system dump
+   Signals reads. Physical facts on one line, system facts on the next. */
+.c-star{padding:9px 13px 10px;border-bottom:1px solid var(--rule)}
+.c-star-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+  font-family:var(--cond);font-size:10px;letter-spacing:.15em;text-transform:uppercase;
+  color:var(--dimmer)}
+.c-star-h b{font-family:var(--mono);font-size:11px;letter-spacing:.06em;
+  font-weight:500;color:var(--amber);text-transform:none}
+.c-star-n{margin-top:5px;font-family:var(--cond);font-size:12.5px;color:var(--text)}
+/* Which star, when there is more than one: "A", "B"… */
+.c-star-n i{font-family:var(--mono);font-style:normal;font-size:11px;color:var(--dim);
+  margin-right:7px}
+.c-star-g{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:5px;
+  font-family:var(--mono);font-size:10.5px;color:var(--ion);
+  font-variant-numeric:tabular-nums}
+.c-star-f{margin-top:5px;font-family:var(--mono);font-size:10px;color:var(--dimmer)}
+.c-star.wait .c-star-f{color:var(--dimmer);font-style:italic}
+
 .c-body{padding:2px 13px 10px;font-family:var(--mono);font-size:10.5px;
   line-height:1.75;color:var(--dim);border-bottom:1px solid var(--rule)}
 .c-body a{color:var(--ion);text-decoration:none}
