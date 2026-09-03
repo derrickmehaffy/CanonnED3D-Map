@@ -404,3 +404,19 @@ body.resizing .side-grip::after{background:var(--amber)}
   background:none;border:0;cursor:pointer;padding:0 13px 9px}
 .card .c-reset:hover{color:var(--amber)}
 body.card-dragging{user-select:none;cursor:grabbing}
+
+
+/* Card: the types present, and the concatenated site blocks. */
+.c-types{display:flex;flex-wrap:wrap;gap:4px;padding:2px 13px 10px}
+.c-type{display:flex;align-items:center;gap:6px;padding:4px 9px;background:var(--panel-2);
+  border:1px solid var(--rule);color:var(--dim);font-family:var(--cond);font-size:11px;
+  font-weight:600;cursor:pointer}
+.c-type .sw{width:8px;height:8px;border-radius:1px;display:block}
+.c-type:hover{color:var(--text)}
+.c-type.on{border-color:var(--amber);color:var(--amber)}
+.c-body{padding:2px 13px 10px;font-family:var(--mono);font-size:10.5px;
+  line-height:1.75;color:var(--dim);border-bottom:1px solid var(--rule)}
+.c-body a{color:var(--ion);text-decoration:none}
+.c-body a:hover{color:var(--amber);text-decoration:underline}
+.c-body img{max-width:78px;display:block;margin:4px 0 8px;
+  border:1px solid var(--rule);background:#080C10}

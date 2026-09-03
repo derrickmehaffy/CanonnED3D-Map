@@ -43,6 +43,12 @@ var System = {
         var indexParticle = this.particleInfos[idSys];
         if (this.points[indexParticle] !== undefined) {
           this.points[indexParticle].infos = (this.points[indexParticle].infos || '') + val.infos;
+          //-- Several records can share one set of coordinates: three ruins in
+          //   the same system are three entries but one point. The count was
+          //   lost in the merge, which left anything downstream describing a
+          //   five-ruin system as holding one.
+          this.points[indexParticle].entries =
+            (this.points[indexParticle].entries || 1) + 1;
         }
         if (val.cat != undefined) Ed3d.addObjToCategories(indexParticle, val.cat);
         return;
@@ -80,6 +86,7 @@ var System = {
         infos: val.infos,
         url: val.url,
         cat: val.cat,
+        entries: 1,
         visible: true,
         clickable: true,
         color: this.particleColor[this.count - 1]

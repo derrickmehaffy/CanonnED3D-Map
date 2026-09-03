@@ -349,7 +349,8 @@
      CATS is read out of Ed3d's own HUD once the map is up; see readCats(). */
   var CATS = [];                           // [{ id, name, color, count }]
   var hoverType = null;
-  var sel = null, selSite = 0, panel = 'layers';
+  var sel = null, panel = 'layers';
+  var cardType = null;   // which type's site plan the card is showing
   var extraRoutes = [];                    // systems added from a dropped journal
   var sysQuery = '', sysSort = 'name';     // systems panel: filter text and order
   var lastScrolledTo = null;               // system the list last jumped to
@@ -552,7 +553,8 @@
 
       var rec = byName[p.name];
       if (!rec) {
-        rec = byName[p.name] = { n: p.name, x: p.x, y: p.y, z: -p.z, s: [], idx: idx };
+        rec = byName[p.name] = { n: p.name, x: p.x, y: p.y, z: -p.z, s: [],
+                                 idx: idx, entries: p.entries || 1 };
         out.push(rec);
       }
       // [category, infos, per-site link, point index]
@@ -1114,42 +1116,64 @@
     var p = Action.selectedPoint;
     // Grouped records key the system name as `n`, not `name`. Comparing the
     // wrong field meant this guard never matched, so the card was rebuilt and
-    // selSite reset to 0 five times a second — which is why the card's site
+    // the card rebuilt five times a second — which is why its site
     // rows snapped back to the first and the left panel's hover kept being
     // dragged back to the selected site's type.
     if (sel && sel.n === p.name) return;
     var rec = null;
     for (var i = 0; i < SYSLIST().length; i++) if (SYSLIST()[i].n === p.name) { rec = SYSLIST()[i]; break; }
     if (!rec) return;
-    sel = rec; selSite = 0; renderCard();
+    sel = rec; cardType = null; renderCard();
     if (CFG.templates) showTemplate(catName(rec.s[0][0]));
   }, 200);
 
   function renderCard() {
     var s = sel, q = encodeURIComponent(s.n);
-    var site = s.s[selSite], ty = catName(site[0]), th = CFG.templates ? THUMBS[ty.toLowerCase()] : null;
 
-    // A link to the selected site itself, where the data gives one. Maps that
-    // set no url get no button rather than a generic one that lands on a front
-    // page — and a system with three ruins links to whichever is selected.
-    var siteLink = '';
-    if (site && site[2]) {
-      siteLink = '<a class="wide" href="' + esc(site[2]) + '" target="_blank" rel="noopener">' +
-        esc(CFG.siteLinkLabel || 'View site') + ' <span class="ax">&#8599;</span></a>';
+    /* What is in this system, told straight.
+
+       These are two different things and the card used to run them together.
+       s.s is one entry per *category* the point belongs to, not one per site:
+       several ruins in a system share its coordinates, so Ed3d merges them
+       into a single point. A system with two Alphas and a Beta produced "1
+       ruin, 1 Alpha" and a stray category chip in the middle of the list,
+       none of which described the system.
+
+       The count comes from System's own record of how many entries merged.
+       The types come from Ed3d.catObjs, which is the only place that knows
+       every category a merged point ended up in — the point's own cat field
+       only ever holds the first record's. */
+    var count = s.entries || s.s.length || 1;
+    var types = [];
+    if (window.Ed3d && Ed3d.catObjs) {
+      CATS.forEach(function (cat) {
+        var list = Ed3d.catObjs[cat.id];
+        if (list && list.indexOf(s.idx) > -1) types.push(cat);
+      });
     }
-    var tally = {}; s.s.forEach(function (x) { tally[x[0]] = (tally[x[0]] || 0) + 1; });
-    var sum = Object.keys(tally).map(function (k) { return tally[k] + ' ' + catName(k); }).join(' · ');
-    var rows = s.s.map(function (si, i) {
-      return '<div class="site' + (i === selSite ? ' on' : '') + '" data-i="' + i + '" role="button" tabindex="0">' +
-        '<span class="sw" style="background:' + col(si[0]) + '"></span>' +
-        '<span class="ty">' + esc(catName(si[0])) + '</span>' +
-        '<span class="bd">' + (si[1] ? safeHtml(si[1]) : '—') + '</span></div>';
-    }).join('');
+    if (!types.length) types = s.s.map(function (x) { return CATS[x[0]]; }).filter(Boolean);
+
+    //-- Which type is highlighted, and whose plan the Layers panel shows.
+    if (!cardType || types.indexOf(cardType) === -1) cardType = types[0] || null;
+
+    var chips = types.length > 1
+      ? '<div class="c-types">' + types.map(function (t) {
+          return '<button class="c-type' + (t === cardType ? ' on' : '') + '" data-cat="' +
+            esc(t.id) + '"><span class="sw" style="background:' + t.color + '"></span>' +
+            esc(t.name) + '</button>';
+        }).join('') + '</div>'
+      : '';
+
+    var body = s.s.length && s.s[0][1]
+      ? '<div class="c-body">' + safeHtml(s.s[0][1]) + '</div>'
+      : '';
+
     var link = '';
-    if (CFG.panel === 'star' && s.s[0][2]) {
+    if (CFG.panel === 'star' && s.s[0] && s.s[0][2]) {
       link = '<div class="c-link">Guardian structure at <a href="?map=gs">' +
         esc(s.s[0][2]) + '</a> — open the Structures map</div>';
     }
+
     var c = $('card');
     c.className = 'card';
     c.innerHTML =
@@ -1157,24 +1181,30 @@
         '<button class="x" id="cx" aria-label="Close">&times;</button></div>' +
       '<div class="c-meta">' + s.x + ' · ' + s.y + ' · ' + s.z + '<br>' +
         Math.round(Math.sqrt(s.x * s.x + s.y * s.y + s.z * s.z)).toLocaleString() + ' ly from Sol</div>' +
-      '<div class="c-sec"><span>' + s.s.length + ' ' + CFG.unit + (s.s.length > 1 ? 's' : '') +
-        '</span><b>' + esc(sum) + '</b></div>' + rows + link +
-      (th ? '<div class="c-tmpl"><img src="' + th + '" alt="' + ty + ' template">' +
-            '<div class="cap">' + ty + ' template — ' + (TNOTE[ty] || '') + '</div></div>' : '') +
+      '<div class="c-sec"><span>' + count + ' ' + CFG.unit + (count > 1 ? 's' : '') + '</span>' +
+        '<b>' + esc(types.map(function (t) { return t.name; }).join(' · ')) + '</b></div>' +
+      chips + body + link +
+      // No site plan here: the Layers panel already shows it, larger, and two
+      // copies of the same drawing made the card twice as tall for nothing.
+      // The chips above still choose which one that panel shows.
       '<div class="c-acts">' +
-        // Signals is the primary destination: bodies, orbital elements, materials,
-        // signal counts per category, nearest DSSA and nebulae. EDSM was dropped —
-        // per LCU No Fool Like One it is no longer reliable, and Signals already
-        // covers everything the map linked out to it for.
         // Signals is the destination for everything about a system — bodies,
         // orbital elements, materials, signal counts — and carries its own
         // links out to the other tools, so the map does not duplicate them.
         '<a class="wide" href="https://signals.canonn.tech/?system=' + q + '" target="_blank" rel="noopener">Open in Signals <span class="ax">&#8599;</span></a>' +
-        siteLink +
         '<button id="ccopy">Copy name</button><button id="ccentre">Centre here</button>' +
       '</div>' +
       '<button class="c-reset" id="creset">Reset position</button>';
     $('creset').onclick = resetCardBox;
+
+    Array.prototype.forEach.call(c.querySelectorAll('.c-type'), function (el) {
+      el.onclick = function () {
+        cardType = types.filter(function (t) { return String(t.id) === el.dataset.cat; })[0] || cardType;
+        renderCard();
+        if (CFG.templates && cardType) showTemplate(cardType.name);
+      };
+    });
+
     $('cx').onclick = function () { sel = null; c.className = 'card hidden'; };
     makeCardMovable(c);
     $('ccopy').onclick = function () {
@@ -1187,9 +1217,6 @@
       controls.target.set(s.x, s.y, -s.z);
       moveTo({ x: s.x - 120, y: s.y + 90, z: -s.z + 120 });
     };
-    Array.prototype.forEach.call(c.querySelectorAll('.site'), function (el) {
-      el.onclick = function () { selSite = +el.dataset.i; renderCard(); if (CFG.templates) showTemplate(catName(s.s[selSite][0])); };
-    });
     // Deliberately NOT calling showTemplate() here. renderCard() runs on every
     // card refresh, and doing so yanked the left panel's highlight away from
     // whatever the pointer was hovering.
@@ -1198,7 +1225,7 @@
   /* Select a system and fly the camera to it. Shared by the palette and the
      systems list so they behave identically. */
   function gotoSystem(rec) {
-    sel = rec; selSite = 0; renderCard();
+    sel = rec; cardType = null; renderCard();
     if (CFG.templates) showTemplate(catName(rec.s[0][0]));
     if (typeof controls === 'undefined') return;
     controls.target.set(rec.x, rec.y, -rec.z);

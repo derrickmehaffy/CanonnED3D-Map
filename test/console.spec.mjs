@@ -157,8 +157,16 @@ test('each site links to itself, and Inara is gone', async ({ page }) => {
   await expect(card).toBeVisible({ timeout: 15_000 });
 
   // One link per site, each to its own page.
-  const hrefs = await card.locator('.bd a').evaluateAll((els) => els.map((e) => e.getAttribute('href')));
+  const hrefs = await card.locator('.c-body a').evaluateAll((els) => els.map((e) => e.getAttribute('href')));
   expect(hrefs).toEqual(['https://ruins.canonn.tech/#GR6', 'https://ruins.canonn.tech/#GR7']);
+
+  // The header describes the system, not the filter categories: two records
+  // merged into one point is "2 ruins", however many categories it lands in.
+  await expect(card.locator('.c-sec')).toContainText('2 ');
+
+  // The site plan lives in the Layers panel; a second copy in the card only
+  // made it taller.
+  await expect(card.locator('.c-tmpl')).toHaveCount(0);
 
   // Signals covers everything the other tools did and links out itself.
   const actions = await card.locator('.c-acts a').evaluateAll((els) => els.map((e) => e.textContent));
