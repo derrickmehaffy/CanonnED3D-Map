@@ -236,3 +236,38 @@ test('an embedded page keeps the controls and drops the site chrome', async ({ p
   await expect(page.locator('.app .top')).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('#mapname')).toHaveText('DCoH Overwatch');
 });
+
+/* Ed3d groups its filters under an <h2> per category group. Most maps have
+   one; the landing page has one per faction, and dropping the heading left
+   four rows reading "Controlled, Present, Controlled, Present". */
+test('the layers panel names the map\'s own category groups', async ({ page }) => {
+  await ready(page);
+  await page.waitForFunction(() => window.Ed3d && Ed3d.updateSystems, { timeout: 30_000 });
+
+  // One group: it names the panel, and there is no heading to repeat.
+  await page.evaluate(() => new Promise((res) => Ed3d.updateSystems({
+    categories: { 'Pulsar type': { a: { name: 'Radio', color: 'FF9D00' } } },
+    systems: [{ name: 'One', coords: { x: 0, y: 0, z: 0 }, cat: ['a'] }]
+  }, res)));
+  await expect(page.locator('#side .s-t').first()).toHaveText('Pulsar type');
+  await expect(page.locator('#side .lgrp')).toHaveCount(0);
+
+  // Two groups whose member names collide: each gets its heading.
+  await page.evaluate(() => new Promise((res) => Ed3d.updateSystems({
+    categories: {
+      Canonn: { c1: { name: 'Controlled', color: 'FF9D00' },
+                p1: { name: 'Present', color: '884400' } },
+      'Canonn Deep Space Research': { c2: { name: 'Controlled', color: '4DE3E1' },
+                                      p2: { name: 'Present', color: '226666' } }
+    },
+    systems: [
+      { name: 'A', coords: { x: 0, y: 0, z: 0 }, cat: ['c1'] },
+      { name: 'B', coords: { x: 1, y: 0, z: 1 }, cat: ['p1'] },
+      { name: 'C', coords: { x: 2, y: 0, z: 2 }, cat: ['c2'] },
+      { name: 'D', coords: { x: 3, y: 0, z: 3 }, cat: ['p2'] }
+    ]
+  }, res)));
+  await expect(page.locator('#side .lgrp'))
+    .toHaveText(['Canonn', 'Canonn Deep Space Research']);
+  await expect(page.locator('#side .layer')).toHaveCount(4);
+});

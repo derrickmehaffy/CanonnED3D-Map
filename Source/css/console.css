@@ -87,6 +87,11 @@ body.bare .top, body.bare .strip{display:none}
 .grp{margin-top:15px}
 .grp:first-child{margin-top:0}
 
+/* Whose filters these are, when a map groups them — one group per faction on
+   the landing page, where "Controlled" alone says nothing. */
+.lgrp{font-family:var(--cond);font-size:11px;font-weight:600;color:var(--dim);
+  margin:11px 0 3px;padding-bottom:3px;border-bottom:1px solid var(--rule)}
+.lgrp:first-child{margin-top:0}
 .layer{display:flex;align-items:center;gap:9px;padding:5px 5px;cursor:pointer;
   border-left:2px solid transparent}
 .layer:hover{background:var(--panel-2)}

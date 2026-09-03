@@ -481,9 +481,16 @@
     document.querySelectorAll('#filters .map_filter').forEach(function (a) {
       var id = a.getAttribute('data-filter');
       var sw = a.querySelector('.check');
+      /* Ed3d groups its filters under an <h2> per category group, and the
+         console was dropping it. One group is fine without it — most maps
+         have one. The landing page has a group per faction, so its panel read
+         "Controlled, Present, Controlled, Present" with nothing saying whose. */
+      var box = a.closest('#filters > div');
+      var head = box && box.previousElementSibling;
       out.push({
         id: id,
         el: a,
+        group: (head && head.tagName === 'H2' && (head.textContent || '').trim()) || '',
         // Ed3d appends its own "(14)" tally to the label; the console renders
         // the count in its own column, so drop it rather than show it twice.
         name: (a.textContent || '').trim().replace(/\s*\(\d+\)\s*$/, '') || id,
@@ -708,15 +715,29 @@
     var sites = c.reduce(function (a, b) { return a + b; }, 0);
     var allOn = CATS.every(function (c) { return c.on; });
     var allOff = CATS.every(function (c) { return !c.on; });
-    var h = '<div class="s-t">' + (CFG.panel === 'star' ? 'Primary star' : 'Site type') + '</div>' +
+    // The heading is the map's own name for what it filters, read off Ed3d's
+    // category group rather than assumed. Several groups have no one name.
+    var groups = [];
+    CATS.forEach(function (cat, i) {
+      if (c[i] && cat.group && groups.indexOf(cat.group) < 0) groups.push(cat.group);
+    });
+    var title = CFG.panel === 'star' ? 'Primary star'
+              : (groups.length === 1 ? groups[0] : 'Site type');
+
+    var h = '<div class="s-t">' + esc(title) + '</div>' +
       '<div class="s-sub"><b>' + SYSLIST().length + '</b> systems · <b>' + sites + '</b> ' + CFG.unit + 's</div>' +
       '<div class="selrow">' +
       '<button data-all="1"' + (allOn ? ' disabled' : '') + '>Select all</button>' +
       '<button data-all="0"' + (allOff ? ' disabled' : '') + '>Clear</button>' +
       '</div>';
+    var lastGroup = null;
     CATS.forEach(function (cat, i) {
       var t = cat.name;
       if (!c[i]) return;
+      if (groups.length > 1 && cat.group !== lastGroup) {
+        lastGroup = cat.group;
+        h += '<div class="lgrp">' + esc(cat.group) + '</div>';
+      }
       h += '<div class="layer' + (on(i) ? '' : ' off') + (hoverType === t ? ' sel' : '') +
         '" data-t="' + i + '" role="button" tabindex="0" aria-pressed="' + on(i) + '">' +
         '<span class="sw" style="background:' + col(i) + '"></span>' +
