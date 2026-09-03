@@ -49,7 +49,10 @@ var Grid = {
         uFade:  { value: size * 900 },
         //-- Kept on a multiple of the cell size, so moving it never shifts
         //   where the lines fall.
-        uOrigin: { value: new THREE.Vector2(0, 0) }
+        uOrigin: { value: new THREE.Vector2(0, 0) },
+        //-- Camera height above the plane, in cells. Near zero the plane is
+        //   edge-on and there is nothing a filter can resolve.
+        uHeight: { value: 1.0 }
       },
       transparent: true,
       depthWrite: false,
@@ -75,6 +78,7 @@ var Grid = {
         'uniform float uSize;',
         'uniform vec3  uColor;',
         'uniform float uFade;',
+        'uniform float uHeight;',
         'varying vec3 vWorld;',
         'varying vec2 vGrid;',
         'void main() {',
@@ -84,8 +88,23 @@ var Grid = {
         // Distance to the nearest line, divided by how much c changes across
         // one pixel: the result is "pixels from the line", so the line keeps a
         // constant on-screen width at any zoom.
-        '  vec2 g = abs(fract(c - 0.5) - 0.5) / fwidth(c);',
+        //-- The derivative is floored: it reaches zero where the surface runs
+        //   near-parallel to the eye, and the division blows up.
+        '  vec2 w = max(fwidth(c), vec2(1e-6));',
+        '  vec2 g = abs(fract(c - 0.5) - 0.5) / w;',
         '  float a = 1.0 - min(min(g.x, g.y), 1.0);',
+        '  if (a <= 0.002) discard;',
+        //-- Fade once the lines are packed closer than they can be resolved.
+        //   w is cells per pixel, so 0.5 means a whole cell spans two pixels;
+        //   past that there is more than one line per pixel and no amount of
+        //   filtering helps — the coverage estimate turns to noise and the
+        //   grid tears. Tilting toward the horizon raises this sharply, which
+        //   is why the tearing got worse the lower the camera went.
+        '  float density = max(w.x, w.y);',
+        '  a *= 1.0 - smoothstep(0.18, 0.55, density);',
+        //-- And let go entirely as the camera comes level with the plane,
+        //   where it is edge-on and there is genuinely nothing to draw.
+        '  a *= smoothstep(0.0, 1.0, uHeight);',
         '  if (a <= 0.002) discard;',
         '  float d = distance(cameraPosition, vWorld);',
         '  a *= 1.0 - smoothstep(uFade * 0.25, uFade, d);',
@@ -95,7 +114,15 @@ var Grid = {
       ].join('\n')
     });
 
-    this.obj = new THREE.Mesh(new THREE.PlaneGeometry(extent, extent), material);
+    //-- A unit quad, sized each frame to roughly the visible ground. It is
+    //   deliberately not the full two-million-unit extent: the shader reads
+    //   world position from an interpolated varying, and interpolating one
+    //   across a quad that big runs out of float precision at the far end —
+    //   the lines break into dashes and crawl as the camera moves. Keeping the
+    //   quad near the size of what is on screen keeps the numbers in a range
+    //   float32 carries. See updateOrigin().
+    this.obj = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
+    this.obj.scale.set(size * 2000, size * 2000, 1);
     this.obj.rotation.x = -Math.PI / 2;
     // The quad is enormous and always under the camera; culling it by its
     // bounding sphere only ever gets it wrong.
@@ -192,10 +219,26 @@ var Grid = {
     var u = this.obj.material.uniforms.uOrigin;
     if (u == undefined || typeof controls === 'undefined' || !controls) return;
 
-    var step = this.size * 64;
-    var ox = Math.round(controls.target.x / step) * step;
-    var oz = Math.round(controls.target.z / step) * step;
+    if (typeof camera === 'undefined' || !camera) return;
+
+    //-- Follow the camera, snapped to whole cells so the lines never shift.
+    var step = this.size;
+    var ox = Math.round(camera.position.x / step) * step;
+    var oz = Math.round(camera.position.z / step) * step;
     if (u.value.x !== ox || u.value.y !== oz) u.value.set(ox, oz);
+    this.obj.position.x = ox;
+    this.obj.position.z = oz;
+
+    var height = Math.abs(camera.position.y - this.obj.position.y);
+
+    var h = this.obj.material.uniforms.uHeight;
+    if (h != undefined) h.value = Math.min(height / (this.size * 2.5), 1);
+
+    //-- Size to what can be seen. Past that the density fade has removed the
+    //   lines anyway, so a bigger quad buys nothing and costs precision.
+    var reach = Math.max(camera.position.distanceTo(controls.target), height, this.size * 4);
+    var span = Math.min(reach * 60, this.size * 20000);
+    if (this.obj.scale.x !== span) this.obj.scale.set(span, span, 1);
 
   },
 

@@ -218,3 +218,100 @@ test('route materials follow a canvas resize', async ({ page }) => {
   });
   expect(ok, 'stale resolution would draw lines at the wrong width').toBe(true);
 });
+
+/* The grid tears and crawls where its lines fall closer together than a pixel:
+   the coverage estimate turns to noise. Tilting toward the horizon is what
+   drives it — top-down was always fine, and it got worse the lower the camera
+   went — so the shader fades on line density, which is what actually decides
+   whether a line can be resolved.
+
+   Measured rather than asserted on the source: read the framebuffer along the
+   horizon and count lit pixels, across a sweep of elevations rather than one,
+   because the angle it broke at was nowhere near edge-on. */
+test('the grid does not tear into a band at any viewing angle', async ({ page }) => {
+  await loaded(page);
+
+  const litAlongHorizon = (elevation) => page.evaluate((y) => {
+    // Isolate the grid: the galaxy backdrop and the route lines cross the
+    // horizon too, and would be counted as tearing.
+    const grids = [Ed3d.grid1H.obj, Ed3d.grid1K.obj];
+    const hidden = [];
+    scene.traverse((o) => {
+      if (o !== scene && o.visible && grids.indexOf(o) === -1 &&
+          (o.isMesh || o.isPoints || o.isLine || o.isSprite)) {
+        o.visible = false; hidden.push(o);
+      }
+    });
+
+    controls.target.set(0, 0, 0);
+    camera.position.set(2500, y, 2500);
+    controls.update();
+    // Two things the render loop normally does, which driving the renderer
+    // directly skips: sizing the grid quad to the view, and re-running the
+    // far-view check that decides whether the fine grids are shown at all.
+    // This is about the shader, so the grids are simply made visible.
+    Ed3d.grid1H.updateOrigin();
+    Ed3d.grid1K.updateOrigin();
+    grids.forEach((g) => { g.visible = true; });
+    renderer.render(scene, camera);
+
+    const gl = renderer.getContext();
+    const w = gl.drawingBufferWidth;
+    const row = new Uint8Array(w * 4);
+    // The worst band sits a little above centre, where the plane runs out.
+    gl.readPixels(0, Math.floor(gl.drawingBufferHeight * 0.52), w, 1,
+                  gl.RGBA, gl.UNSIGNED_BYTE, row);
+
+    hidden.forEach((o) => { o.visible = true; });
+
+    let lit = 0;
+    for (let i = 0; i < w; i++) {
+      // Anything appreciably above the #0d0d10 background.
+      if (row[i * 4] > 45 || row[i * 4 + 1] > 45 || row[i * 4 + 2] > 55) lit++;
+    }
+    return { lit, width: w };
+  }, elevation);
+
+  // Straight down the grid is fully resolvable and must still draw. Counted
+  // over the whole frame, because from overhead there is no horizon row to
+  // sample — the plane fills the view.
+  const overhead = await page.evaluate(() => {
+    const grids = [Ed3d.grid1H.obj, Ed3d.grid1K.obj];
+    const hidden = [];
+    scene.traverse((o) => {
+      if (o !== scene && o.visible && grids.indexOf(o) === -1 &&
+          (o.isMesh || o.isPoints || o.isLine || o.isSprite)) { o.visible = false; hidden.push(o); }
+    });
+    controls.target.set(0, 0, 0);
+    // Inside the far-view threshold (scale = distance/200 > 25), past which
+    // Ed3d hides the fine grids itself.
+    camera.position.set(300, 2000, 300);
+    controls.update();
+    Ed3d.grid1H.updateOrigin();
+    Ed3d.grid1K.updateOrigin();
+    grids.forEach((g) => { g.visible = true; });
+    renderer.render(scene, camera);
+    const gl = renderer.getContext();
+    const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+    const buf = new Uint8Array(w * h * 4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    hidden.forEach((o) => { o.visible = true; });
+    let lit = 0;
+    for (let i = 0; i < w * h; i++) {
+      if (buf[i * 4] > 45 || buf[i * 4 + 1] > 45 || buf[i * 4 + 2] > 55) lit++;
+    }
+    return lit;
+  });
+  expect(overhead, 'the grid still draws when it can be resolved').toBeGreaterThan(500);
+
+  // 2000 down to 60 walks from a comfortable three-quarter view to nearly
+  // edge-on. 900 and 220 are around where the tearing actually showed up.
+  for (const elevation of [2000, 900, 220, 60]) {
+    const r = await litAlongHorizon(elevation);
+    expect(
+      r.lit,
+      `at elevation ${elevation} the horizon should stay clear, ` +
+      `${r.lit}/${r.width} pixels lit`
+    ).toBeLessThan(r.width * 0.12);
+  }
+});
