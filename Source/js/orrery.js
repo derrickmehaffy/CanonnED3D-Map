@@ -35,6 +35,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 /* ── constants ──────────────────────────────────────────────────────────── */
 
 const DEG = Math.PI / 180;
+/* Kilometres per astronomical unit — what turns a body's real radius into the
+   same units its orbit is drawn in. */
+const AU_KM = 149597870.7;
 
 /* Elite is set 1286 years ahead of us, so the dump's real-world timestamp is
    also a date a commander would recognise. */
@@ -60,7 +63,10 @@ const RATES = [
   { label: '100 yrs/s', days: 36525 }
 ];
 const LADDER = RATES.map((r) => ({ ...r, dir: -1 })).reverse().concat(RATES.map((r) => ({ ...r, dir: 1 })));
-const START_RATE = LADDER.findIndex((r) => r.dir === 1 && r.label === '1 week/s');
+/* A week a second is too quick to read on opening — the inner planets blur
+   and the moons are a smear. A day a second still moves: Io comes round in
+   under two seconds, the Moon in twenty-seven. */
+const START_RATE = LADDER.findIndex((r) => r.dir === 1 && r.label === '1 day/s');
 
 /* Elite's own body classes, given the colours the game gives them. Keys are
    the dump's subType strings verbatim; anything unlisted falls through the
@@ -221,7 +227,20 @@ function buildModel(sys) {
     parent.children.push(n);
   });
 
-  return { name: sys.name, star: root, all: [...nodes.values()], epoch, sys };
+  /* Stations, which the dump keeps in two places: on the body they sit on or
+     orbit, and at system level for the ones the dump does not attach to a
+     body. Both carry a real distanceToArrival, which is the fact worth
+     showing — what they do not carry is any orbital element, so this is the
+     one thing here that cannot be given a position in the 3D view without
+     inventing it. They go where the data supports: the distance axis, the
+     list, and the panel. */
+  const ports = [];
+  nodes.forEach((n) => {
+    (n.raw.stations || []).forEach((st) => { if (st && st.name) ports.push({ st, on: n }); });
+  });
+  (sys.stations || []).forEach((st) => { if (st && st.name) ports.push({ st, on: null }); });
+
+  return { name: sys.name, star: root, all: [...nodes.values()], ports, epoch, sys };
 }
 
 function parseEpoch(s) {
@@ -241,33 +260,40 @@ function parseEpoch(s) {
  * that looks nothing like Sol.
  */
 function layout(model, trueDistance) {
-  const bodyR = (n) => {
+  /* Ideal drawn radius: what a body would like to be.
+
+     In "spread" mode that is a heavy exaggeration, because Earth's radius is
+     0.0000426 AU and nothing would be visible otherwise. In "true distance"
+     it is the real thing, on the same scale as the orbits — which is the only
+     way that mode means anything: drawn true, Sol's radius is 1.2% of
+     Mercury's orbit, and you can see that it is. */
+  const idealR = (n, perAu) => {
     if (!n.km) return 0;                       // barycentres draw nothing
+    if (trueDistance) return (n.km / AU_KM) * perAu;
     if (n.type === 'Star') return 3.2;
     // Compressed hard: Jupiter is 11 Earths across and would swamp the view.
-    const r = 1.05 * Math.pow(n.km / 6378, 0.42);
-    return Math.max(0.32, Math.min(2.6, r));
+    return Math.max(0.32, Math.min(2.6, 1.05 * Math.pow(n.km / 6378, 0.42)));
   };
 
-  model.all.forEach((n) => { n.drawR = bodyR(n); });
+  /* One scale for the whole system when distances are true, so a moon of
+     Neptune and a moon of Earth are drawn against the same ruler. */
+  const maxAu = Math.max(...model.all.map((n) => n.aAu || 0), 1e-9);
+  const perAu = ORBIT_OUT / maxAu;
 
   const spread = (kids, inner, outer) => {
     const orbiting = kids.filter((k) => k.aAu > 0);
     if (!orbiting.length) return;
 
     if (trueDistance) {
-      /* Anchored at zero, or it is not true distance at all — it was being
-         mapped into the same [inner, outer] band as the compressed mode,
-         which turns 0.39 AU against 700 into 16 units against 100 and
-         destroys the very ratio the mode exists to show. From zero, Mercury
-         lands almost on top of the star, which is the honest answer. */
-      const hi = Math.max(...orbiting.map((k) => k.aAu));
-      orbiting.forEach((k) => { k.a = outer * (k.aAu / hi); });
+      /* Anchored at zero and on the system's own scale, or it is not true
+         distance at all — mapping into an [inner, outer] band turns 0.39 AU
+         against 700 into 16 units against 100 and destroys the very ratio
+         the mode exists to show. */
+      orbiting.forEach((k) => { k.a = k.aAu * perAu; });
     } else {
       /* Log, not square root. Sol runs 0.39 AU to 700, and under a square root
          the eight planets everyone came to see occupy the first fifth of the
-         view while Sedna and Persephone take the rest. On a log the same set
-         spreads across the whole of it, which is what an orrery is for. */
+         view while Sedna and Persephone take the rest. */
       const key = (k) => Math.log10(Math.max(k.aAu, 1e-6));
       const lo = Math.min(...orbiting.map(key));
       const hi = Math.max(...orbiting.map(key));
@@ -278,19 +304,53 @@ function layout(model, trueDistance) {
     kids.forEach((k) => { if (!k.a) k.a = 0; });
   };
 
+  /* No body may be drawn larger than the room it actually has.
+
+     Without this the exaggeration runs away: at true distance Mercury came out
+     twelve times wider than its own orbit and Sol's disc was wider than
+     Saturn's, so the whole inner system was drawn inside the star and
+     neighbouring planets overlapped. A body is capped by the gap to the orbit
+     on either side of it, and a parent by the orbit of its innermost child.
+     Two neighbours each taking a third of the gap between them cannot meet. */
+  const GAP = 0.34, OWN = 0.4, PARENT = 0.42;
+
+  const fit = (n) => {
+    const kids = n.children.filter((k) => k.a > 0).sort((x, y) => x.a - y.a);
+    if (kids.length) n.drawR = Math.min(n.drawR, kids[0].a * PARENT);
+    kids.forEach((k, i) => {
+      const below = i === 0 ? k.a : k.a - kids[i - 1].a;
+      const above = i === kids.length - 1 ? Infinity : kids[i + 1].a - k.a;
+      k.drawR = Math.min(k.drawR, Math.min(below, above) * GAP, k.a * OWN);
+      fit(k);
+    });
+  };
+
+  model.all.forEach((n) => { n.drawR = idealR(n, perAu); n.a = 0; });
+
+  // Orbits first, then sizes, because a moon system is laid out against the
+  // planet's drawn radius and that radius is about to be cut down to fit.
   spread(model.star.children, ORBIT_IN, ORBIT_OUT);
   model.all.forEach((n) => {
     if (!n.children.length || n === model.star) return;
-    // A moon system is sized off its planet, so it reads as belonging to it.
+    if (trueDistance) { spread(n.children); return; }
     const base = Math.max(n.drawR, 0.6);
     spread(n.children, base * 2.2, base * 7);
   });
+  fit(model.star);
 }
 
 /* ── the view ───────────────────────────────────────────────────────────── */
 
 const Orrery = (function () {
   let panel, canvas, renderer, scene, cam3, cam2, controls, raycaster;
+  /* One constant-size dot per body, over the top of the spheres.
+
+     Drawn true, a body is far smaller than its orbit — Mercury's radius is
+     two millionths of the view — so at true distance the spheres vanish and
+     you are left looking at bare ellipses. The dots do not scale with zoom,
+     so every body stays visible and stays clickable whatever the scale, and
+     the sphere underneath is still the honest one. */
+  let pips = null, pipNodes = [];
   let model = null, meshes = [], loop = 0, lastFrame = 0;
   let simDays = 0, rateIx = START_RATE, playing = true;
   let mode3d = true, trueDistance = false, selected = null;
@@ -583,10 +643,13 @@ const Orrery = (function () {
       ? n.raw.distanceToArrival : (n === model.star ? 0 : null);
 
     const withLs = model.all.filter((n) => n.drawR > 0 && lsOf(n) !== null);
+    const withPorts = (model.ports || []).filter(
+      (p) => typeof p.st.distanceToArrival === 'number');
     if (withLs.length < 2) { host.innerHTML = ''; host.classList.add('empty'); return; }
     host.classList.remove('empty');
 
-    const max = Math.max(...withLs.map(lsOf), 1);
+    const max = Math.max(...withLs.map(lsOf),
+                        ...withPorts.map((p) => p.st.distanceToArrival), 1);
     // Log, with everything under 10 Ls pinned to the star end rather than
     // running off to minus infinity.
     const at = (ls) => Math.log10(Math.max(ls, 10) / 10) / Math.log10(max / 10 || 1);
@@ -610,6 +673,10 @@ const Orrery = (function () {
             'title="' + esc(shortName(n)) + ' — ' +
               Math.round(lsOf(n)).toLocaleString() + ' Ls"></button>';
         }).join('') +
+        withPorts.map((p) =>
+          '<span class="port" style="left:' + (at(p.st.distanceToArrival) * 100) + '%" ' +
+          'title="' + esc(p.st.name) + (p.st.type ? ' — ' + esc(p.st.type) : '') + ' &middot; ' +
+            Math.round(p.st.distanceToArrival).toLocaleString() + ' Ls"></span>').join('') +
       '</div>' +
       '<span class="orr-sp-max">' + Math.round(max).toLocaleString() + ' Ls</span>';
 
@@ -665,7 +732,39 @@ const Orrery = (function () {
 
   /* ── scene ────────────────────────────────────────────────────────────── */
 
+  function buildPips() {
+    if (pips) { scene.remove(pips); pips.geometry.dispose(); pips.material.dispose(); }
+    pipNodes = model.all.filter((n) => n.drawR > 0 || n.type === 'Star');
+    const pos = new Float32Array(pipNodes.length * 3);
+    const col = new Float32Array(pipNodes.length * 3);
+    const c = new THREE.Color();
+    pipNodes.forEach((n, i) => {
+      c.set(n.type === 'Star' ? starColour() : new THREE.Color(tintOf(n.sub)));
+      col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
+    });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    pips = new THREE.Points(geo, new THREE.PointsMaterial({
+      size: 6, sizeAttenuation: false, vertexColors: true,
+      map: glowTexture(), transparent: true, alphaTest: 0.25, depthWrite: false
+    }));
+    pips.renderOrder = 2;
+    pips.frustumCulled = false;
+    scene.add(pips);
+  }
+
+  function movePips() {
+    if (!pips) return;
+    const a = pips.geometry.getAttribute('position');
+    pipNodes.forEach((n, i) => {
+      if (n._pos) a.setXYZ(i, n._pos.x, n._pos.y, n._pos.z);
+    });
+    a.needsUpdate = true;
+  }
+
   function clearScene() {
+    if (pips) { scene.remove(pips); pips.geometry.dispose(); pips.material.dispose(); pips = null; }
     meshes.forEach((m) => {
       if (m.mesh) { scene.remove(m.mesh); m.mesh.geometry.dispose(); m.mesh.material.dispose(); }
       if (m.line) { scene.remove(m.line); m.line.geometry.dispose(); m.line.material.dispose(); }
@@ -736,6 +835,7 @@ const Orrery = (function () {
       meshes.push(entry);
     });
 
+    buildPips();
     frame();
     draw(0);
   }
@@ -856,6 +956,7 @@ const Orrery = (function () {
       }
       if (m.line) m.line.position.copy(n.parent ? n.parent._pos : ORIGIN);
     });
+    movePips();
 
     // Selecting a body is also aiming at it: the camera target eases onto
     // whatever is chosen and then stays with it, which is the only way to
@@ -896,7 +997,19 @@ const Orrery = (function () {
       ((e.clientX - r.left) / r.width) * 2 - 1,
       -((e.clientY - r.top) / r.height) * 2 + 1
     );
-    raycaster.setFromCamera(p, mode3d ? cam3 : cam2);
+    const cam = mode3d ? cam3 : cam2;
+    raycaster.setFromCamera(p, cam);
+
+    /* The dots are constant on screen while the threshold is in world units,
+       so it has to track how far out the camera is or picking gets easier as
+       you zoom in and impossible as you zoom out. */
+    const span = mode3d ? cam.position.distanceTo(controls.target)
+                        : (cam.top - cam.bottom) / cam.zoom;
+    raycaster.params.Points.threshold = span * 0.012;
+
+    const dot = pips ? raycaster.intersectObject(pips, false) : [];
+    if (dot.length) return select(pipNodes[dot[0].index]);
+
     const hits = raycaster.intersectObjects(
       meshes.filter((m) => m.mesh).map((m) => m.mesh), false);
     if (hits.length) select(hits[0].object.userData.node);
@@ -1075,11 +1188,36 @@ const Orrery = (function () {
         Object.entries(sig).map(([k, v]) => [signalName(k), String(v)])));
     }
 
-    if (b.stations && b.stations.length) {
-      h += sect('Stations', b.stations.map((st) =>
-        '<div class="orr-item"><b>' + esc(st.name || 'Unnamed') + '</b>' +
-        '<span>' + esc([st.type, st.controllingFaction].filter(Boolean).join(' · ')) + '</span>' +
-        '</div>').join(''));
+    const ports = (b.stations || []).filter((st) => st && st.name);
+    if (ports.length) {
+      h += sect(ports.length + ' station' + (ports.length > 1 ? 's' : ''),
+        ports.slice().sort((x, y) =>
+          (x.distanceToArrival || 0) - (y.distanceToArrival || 0)).map((st) => {
+          const pads = st.landingPads || {};
+          const big = pads.large ? 'L' : pads.medium ? 'M' : pads.small ? 'S' : '';
+          const line = [
+            st.type,
+            st.primaryEconomy,
+            typeof st.distanceToArrival === 'number'
+              ? Math.round(st.distanceToArrival).toLocaleString() + ' Ls' : ''
+          ].filter(Boolean).join(' · ');
+          return '<div class="orr-item">' +
+            '<b>' + esc(st.name) +
+              (big ? '<i class="pad" title="Largest landing pad">' + big + '</i>' : '') + '</b>' +
+            (line ? '<span>' + esc(line) + '</span>' : '') + '</div>';
+        }).join(''));
+    }
+
+    if (n === model.star) {
+      const loose = (model.ports || []).filter((p) => !p.on).map((p) => p.st);
+      if (loose.length) {
+        h += sect('Elsewhere in the system', loose.slice().sort((x, y) =>
+          (x.distanceToArrival || 0) - (y.distanceToArrival || 0)).map((st) =>
+          '<div class="orr-item"><b>' + esc(st.name) + '</b><span>' +
+          esc([st.type, typeof st.distanceToArrival === 'number'
+            ? Math.round(st.distanceToArrival).toLocaleString() + ' Ls' : '']
+            .filter(Boolean).join(' · ')) + '</span></div>').join(''));
+      }
     }
 
     panel.querySelector('#orr-facts').innerHTML = h;
@@ -1130,6 +1268,8 @@ const Orrery = (function () {
     return n.name.indexOf(sys) === 0 ? n.name.slice(sys.length) : n.name;
   }
 
+  const portsOn = (n) => (n.raw.stations || []).filter((x) => x && x.name).length;
+
   function renderList() {
     // Depth-first, so moons sit under the planet they belong to.
     const all = [];
@@ -1169,6 +1309,8 @@ const Orrery = (function () {
           : n.drawR ? '#' + new THREE.Color(tintOf(n.sub)).getHexString() : 'transparent') +
         (n.drawR ? '' : ';box-shadow:inset 0 0 0 1px var(--dimmer)') + '"></span>' +
       '<span class="nm">' + esc(shortName(n)) + '</span>' +
+      (portsOn(n) ? '<span class="pt" title="' + portsOn(n) + ' station' +
+        (portsOn(n) > 1 ? 's' : '') + '">&#9670; ' + portsOn(n) + '</span>' : '') +
       '<span class="ct">' + (n.aAu ? num(n.aAu, n.aAu < 0.1 ? 3 : 2) : '') + '</span></div>'
     ).join('');
     if (selected) {

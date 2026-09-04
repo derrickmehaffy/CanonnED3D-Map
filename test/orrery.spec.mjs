@@ -181,9 +181,11 @@ test('the clock runs, pauses, and changes rate', async ({ page }) => {
   await page.waitForTimeout(1200);
   expect(await date(), 'and stops when paused').toBe(paused);
 
-  await expect(page.locator('.orr-rate')).toHaveText('1 week/s');
+  // A week a second was too quick to read on opening; a day a second still
+  // moves — Io comes round in under two seconds.
+  await expect(page.locator('.orr-rate')).toHaveText('1 day/s');
   await page.locator('#orr-faster').click();
-  await expect(page.locator('.orr-rate')).toHaveText('1 month/s');
+  await expect(page.locator('.orr-rate')).toHaveText('1 week/s');
   // Stepping down past the slowest rate crosses zero and runs backwards.
   for (let i = 0; i < 11; i++) await page.locator('#orr-slower').click();
   await expect(page.locator('.orr-rate')).toContainText('−');
@@ -277,7 +279,12 @@ test('a body shows everything the dump holds about it', async ({ page }) => {
     materials: { Iron: 23.5, Nickel: 17.8, Sulphur: 12.9 },
     rings: [{ name: 'A Ring', type: 'Icy', innerRadius: 74500000, outerRadius: 140180000 }],
     signals: { signals: { '$SAA_SignalType_Biological;': 4, '$SAA_SignalType_Human;': 2 } },
-    stations: [{ name: 'Testholm Hub', type: 'Coriolis', controllingFaction: 'Canonn' }]
+    stations: [
+      { name: 'Testholm Hub', type: 'Coriolis', primaryEconomy: 'Refinery',
+        distanceToArrival: 502, landingPads: { large: 4, medium: 4, small: 8 } },
+      { name: 'Nearer Dock', type: 'Outpost', distanceToArrival: 480,
+        landingPads: { large: 0, medium: 2, small: 4 } }
+    ]
   });
   await stubDataHosts(page);
   await stubApi(page, rich);
@@ -300,8 +307,12 @@ test('a body shows everything the dump holds about it', async ({ page }) => {
     .toHaveText(['Landable', 'Terraformed', 'Tidally locked', 'Ringed']);
   await expect(facts.locator('.orr-sec h3')).toHaveText([
     'Body', 'Orbit', 'Atmosphere', 'Crust', 'Surface materials', 'Rings',
-    'Mapped signals', 'Stations'
+    'Mapped signals', '2 stations'
   ]);
+  // Nearest first, since the question is which one to fly to, and the largest
+  // pad is the thing that decides whether you can dock at all.
+  await expect(facts.locator('.orr-sec', { hasText: '2 stations' }).locator('.orr-item b'))
+    .toHaveText(['Nearer DockM', 'Testholm HubL']);
   // Proportions are bars, sorted by share, biggest first.
   await expect(facts.locator('.orr-sec', { hasText: 'Surface materials' })
     .locator('.orr-bar .k')).toHaveText(['Iron', 'Nickel', 'Sulphur']);
@@ -506,4 +517,87 @@ test('the layout holds at every width', async ({ page }) => {
     // Everything lands inside the window.
     expect(Math.round(box.foot.bottom), `nothing below the fold at ${at}`).toBeLessThanOrEqual(h);
   }
+});
+
+/* The exaggeration used to run away. At true distance Mercury came out twelve
+   times wider than its own orbit and Sol's disc was wider than Saturn's, so
+   the whole inner system was drawn inside the star and neighbouring planets
+   overlapped each other. A body may not be drawn larger than the room it has. */
+test('no body is drawn bigger than the room it has', async ({ page }) => {
+  const m = await mechanics(page);
+
+  for (const trueDistance of [false, true]) {
+    const bad = await page.evaluate(([mod, td]) => {
+      // Sol's real shape: a tight inner system, gas giants, and a body 700 AU
+      // out that sets the scale for everything else.
+      const AU = [0.387, 0.723, 1, 1.524, 5.204, 9.582, 19.23, 30.11, 39.48, 700];
+      const KM = [2440, 6052, 6378, 3390, 69911, 58232, 25362, 24622, 1188, 1200];
+      const sys = { name: 'S', bodies: [
+        { bodyId: 0, type: 'Star', name: 'S', mainStar: true, solarRadius: 1 },
+        ...AU.map((a, i) => ({
+          bodyId: i + 1, type: 'Planet', name: 'p' + i, subType: 'Rocky body',
+          parents: [{ Star: 0 }], radius: KM[i],
+          semiMajorAxis: a, orbitalPeriod: 365 * Math.pow(a, 1.5)
+        })),
+        // A moon, so the nesting is exercised too.
+        { bodyId: 99, type: 'Planet', name: 'moon', subType: 'Icy body',
+          parents: [{ Planet: 5 }, { Star: 0 }], radius: 1737,
+          semiMajorAxis: 0.0026, orbitalPeriod: 27 }
+      ] };
+      const model = mod.buildModel(sys);
+      mod.layout(model, td);
+
+      const bad = [];
+      const walk = (n) => {
+        const kids = n.children.filter((k) => k.a > 0).sort((x, y) => x.a - y.a);
+        // Nothing sits inside what it orbits.
+        if (kids.length && n.drawR >= kids[0].a) {
+          bad.push(n.name + ' engulfs ' + kids[0].name);
+        }
+        // Neighbours do not touch.
+        for (let i = 1; i < kids.length; i++) {
+          if (kids[i].drawR + kids[i - 1].drawR >= kids[i].a - kids[i - 1].a) {
+            bad.push(kids[i - 1].name + ' overlaps ' + kids[i].name);
+          }
+        }
+        kids.forEach(walk);
+      };
+      walk(model.star);
+      return bad;
+    }, [m, trueDistance]);
+
+    expect(bad, trueDistance ? 'at true distance' : 'spread').toEqual([]);
+  }
+});
+
+/* Stations have a real distance from arrival and no orbital elements at all,
+   so they go where the data supports them and nowhere else. */
+test('stations appear where their data actually places them', async ({ page }) => {
+  const withPorts = JSON.parse(JSON.stringify(SYSTEM));
+  withPorts.bodies[1].stations = [
+    { name: 'Far Dock', type: 'Coriolis', distanceToArrival: 900 },
+    { name: 'Near Dock', type: 'Outpost', distanceToArrival: 505 }
+  ];
+  withPorts.stations = [{ name: 'Loose Platform', type: 'Orbis Starport',
+                          distanceToArrival: 1200 }];
+
+  await stubDataHosts(page);
+  await stubApi(page, withPorts);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+
+  // On the distance axis, because that is the one spatial fact they carry.
+  await expect(page.locator('.orr-spine .port')).toHaveCount(3);
+  // The axis has to stretch to the furthest of them, not just the bodies.
+  await expect(page.locator('.orr-spine')).toContainText('1,200 Ls');
+
+  // Counted in the list against the body they belong to.
+  await expect(page.locator('.orr-row[data-id="1"] .pt')).toHaveText('◆ 2');
+  await expect(page.locator('.orr-row[data-id="0"] .pt')).toHaveCount(0);
+
+  // The ones the dump attaches to no body belong to the system, so they are
+  // read off the star rather than being lost.
+  await page.locator('.orr-row[data-id="0"]').click();
+  await expect(page.locator('.orr-sec', { hasText: 'Elsewhere in the system' }))
+    .toContainText('Loose Platform');
 });

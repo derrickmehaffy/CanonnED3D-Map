@@ -125,6 +125,16 @@ body.orrery-open .app{visibility:hidden}
 .orr-sp-ax .pip.moon{top:5px;width:5px;height:5px;margin-left:-2.5px;opacity:.8}
 .orr-sp-ax .pip:hover{box-shadow:0 0 0 3px rgba(255,157,0,.25)}
 .orr-sp-ax .pip.on{box-shadow:0 0 0 2px var(--void,#05070A),0 0 0 4px var(--amber,#FF9D00)}
+/* Stations sit under the axis rather than on it: they have a real distance,
+   which is the fact worth showing, but no orbit of their own. */
+.orr-sp-ax .port{position:absolute;top:10px;width:3px;height:6px;margin-left:-1.5px;
+  background:var(--ion,#4DE3E1);opacity:.65;pointer-events:none}
+
+.orr-row .pt{font-family:var(--mono,monospace);font-size:8.5px;color:var(--ion,#4DE3E1);
+  opacity:.75;flex:none}
+.orr-item b .pad{float:right;font-style:normal;font-family:var(--mono,monospace);
+  font-size:9px;color:var(--dimmer,#6E7F8D);border:1px solid var(--rule,#1B242E);
+  padding:0 4px;margin-left:6px}
 
 /* body */
 .orr-mid{display:flex;min-height:0}
