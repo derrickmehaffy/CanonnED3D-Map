@@ -260,13 +260,14 @@ function parseEpoch(s) {
  * that looks nothing like Sol.
  */
 function layout(model, trueDistance) {
-  /* Ideal drawn radius: what a body would like to be.
+  /* Ideal drawn radius, before the fit below cuts it down to what will go in
+     the gap.
 
-     In "spread" mode that is a heavy exaggeration, because Earth's radius is
-     0.0000426 AU and nothing would be visible otherwise. In "true distance"
-     it is the real thing, on the same scale as the orbits — which is the only
-     way that mode means anything: drawn true, Sol's radius is 1.2% of
-     Mercury's orbit, and you can see that it is. */
+     True scale means both axes: the orbits to scale with each other and the
+     bodies to scale with the orbits. That makes Mercury two millionths of the
+     view across, which is the honest answer — you go and look at it rather
+     than seeing it from here. Spread mode exaggerates instead, because at a
+     glance you want to read the system, not measure it. */
   const idealR = (n, perAu) => {
     if (!n.km) return 0;                       // barycentres draw nothing
     if (trueDistance) return (n.km / AU_KM) * perAu;
@@ -474,7 +475,7 @@ const Orrery = (function () {
       '    <button id="orr-now" title="Back to the present">Now</button></div>',
       '  <div class="orr-scale">',
       '    <button id="orr-spread" class="on" title="Orbits spread on a log scale, so the whole system is legible at once">Spread</button>',
-      '    <button id="orr-true" title="Orbits to scale with each other. Bodies stay exaggerated, or they would be invisible">True distance</button>',
+      '    <button id="orr-true" title="Orbits and bodies both to scale. Pick a body to fly to it — at this scale nothing is visible from across the system">True scale</button>',
       '  </div>',
       '</div>',
 
@@ -934,6 +935,27 @@ const Orrery = (function () {
 
   /* ── per frame ────────────────────────────────────────────────────────── */
 
+  /* The clip planes follow the zoom.
+
+     Fixed, near sat at 0.05 units — which at true distance is a third of an
+     AU in Sol, so anything you tried to get close to was clipped out of the
+     scene before it could grow. Bodies vanished as you zoomed in instead of
+     filling the view, and so did their dots, because a point behind the near
+     plane is not drawn either. Orthographic has no perspective divide, so it
+     never had the problem and does not need the fix. */
+  function adaptClip() {
+    if (!mode3d) return;
+    const d = Math.max(cam3.position.distanceTo(controls.target), 1e-7);
+    const near = Math.max(1e-6, d * 0.002);
+    // Only when it has really moved: updateProjectionMatrix every frame for a
+    // rounding difference is work for nothing.
+    if (Math.abs(cam3.near - near) > near * 0.1) {
+      cam3.near = near;
+      cam3.far = Math.max(d * 500, ORBIT_OUT * 8);
+      cam3.updateProjectionMatrix();
+    }
+  }
+
   function draw(dtSeconds) {
     if (!model) return;
     if (playing && dtSeconds) {
@@ -958,19 +980,31 @@ const Orrery = (function () {
     });
     movePips();
 
-    // Selecting a body is also aiming at it: the camera target eases onto
-    // whatever is chosen and then stays with it, which is the only way to
-    // watch a moon system without chasing it by hand.
-    if (following && selected && selected._pos) controls.target.lerp(selected._pos, 0.12);
+    /* Following means travelling with the body, not just aiming at it.
+
+       Moving the target alone leaves the camera where it was, so the offset
+       between them grows every frame. Zoomed out that reads as a gentle
+       drift; at true scale it is fatal — Mercury covers its own framing
+       distance a hundred and forty times a second there, so it was gone
+       before the first frame finished and you were left looking at where it
+       had been. Both ends move by the same step, which also leaves whatever
+       angle and distance the reader had chosen exactly as they left it. */
+    if (following && selected && selected._pos) {
+      step.copy(selected._pos).sub(controls.target);
+      controls.target.add(step);
+      (mode3d ? cam3 : cam2).position.add(step);
+    }
 
     drawLabels();
     panel.querySelector('#orr-date').textContent = gameDate();
 
     controls.update();
+    adaptClip();
     renderer.render(scene, mode3d ? cam3 : cam2);
   }
 
   const ORIGIN = new THREE.Vector3();
+  const step = new THREE.Vector3();
 
   function place(n) {
     if (n._done) return n._pos;
@@ -1035,11 +1069,17 @@ const Orrery = (function () {
      reader's, not ours. */
   function focusOn(n) {
     if (!n._pos) place(n);
+    /* Framed against its own size, with no floor.
+
+       The floor used to be 15 units, which at true scale is five hundred
+       thousand times further out than Mercury is wide — so selecting a body
+       took you nowhere near it, and scrolling could not get you there either:
+       the dolly is multiplicative, and 175 units down to Mercury is a hundred
+       and sixty ticks. Twelve times a body's own radius puts it about ten
+       degrees across: big enough to look at, with some sky left around it. */
     const want = n === model.star ? ORBIT_OUT * 1.5
       : n.children.some((c) => c.a > 0) ? Math.max(...n.children.map((c) => c.a || 0)) * 4.5
-      // A body with no moons has nothing to frame but itself, and filling the
-      // view with it puts whatever happens to be behind it in your face.
-      : Math.max(n.drawR * 42, 15);
+      : n.drawR * 12;
     const cam = mode3d ? cam3 : cam2;
     if (mode3d) {
       const dir = cam.position.clone().sub(controls.target);
@@ -1439,7 +1479,27 @@ const Orrery = (function () {
     });
   }
 
-  return { open, close, isOpen, page };
+  /* Automated-test hook, following the one ed3dmap.js already keeps: the
+     suite binds to this rather than to the camera or the scene graph, so
+     moving either does not invalidate the tests. Read-only. */
+  function state() {
+    const cam = mode3d ? cam3 : cam2;
+    const sel = selected && selected._pos ? selected : null;
+    return {
+      system: model ? model.name : null,
+      trueScale: trueDistance,
+      selected: sel ? sel.name : null,
+      // How far the camera is from what it is looking at, and from the body
+      // itself — the two numbers that were wrong.
+      toTarget: cam.position.distanceTo(controls.target),
+      toSelected: sel ? cam.position.distanceTo(sel._pos) : null,
+      selectedRadius: sel ? sel.drawR : null,
+      near: cam3.near,
+      bodies: model ? model.all.length : 0
+    };
+  }
+
+  return { open, close, isOpen, page, state };
 })();
 
 window.Orrery = Orrery;

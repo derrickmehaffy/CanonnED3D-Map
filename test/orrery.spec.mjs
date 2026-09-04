@@ -601,3 +601,58 @@ test('stations appear where their data actually places them', async ({ page }) =
   await expect(page.locator('.orr-sec', { hasText: 'Elsewhere in the system' }))
     .toContainText('Loose Platform');
 });
+
+/* Getting close to a body at true scale had four separate things in the way,
+   and the first three each hid the next.
+
+   The near plane was pinned at 0.05 units, which in Sol is a third of an AU,
+   so anything you approached was clipped out of the scene — the sphere and
+   its constant-size dot both. focusOn() had an absolute floor of 15 units,
+   half a million times further out than Mercury is wide, so selecting a body
+   went nowhere near it. Scrolling could not rescue that either: the dolly is
+   multiplicative, and 175 units down to Mercury is 160 ticks. And following
+   moved only the aim point, leaving the camera behind — at that zoom a body
+   crosses its own framing distance a hundred times a second, so it was gone
+   within a frame. */
+test('you can get right up to a body at true scale', async ({ page }) => {
+  await stubDataHosts(page);
+  // Sol's real geometry: an inner planet, and a body 700 AU out that sets the
+  // scale everything else is drawn against.
+  await stubApi(page, { name: 'Testholm', id64: 99, date: '2026-01-01 00:00:00+00', bodies: [
+    { bodyId: 0, type: 'Star', name: 'Testholm', mainStar: true,
+      subType: 'G (White-Yellow) Star', spectralClass: 'G2', solarRadius: 1 },
+    { bodyId: 1, type: 'Planet', name: 'Testholm 1', subType: 'Metal-rich body',
+      parents: [{ Star: 0 }], radius: 2440, distanceToArrival: 170,
+      semiMajorAxis: 0.387, orbitalEccentricity: 0.2, orbitalPeriod: 88 },
+    { bodyId: 2, type: 'Planet', name: 'Testholm 2', subType: 'Icy body',
+      parents: [{ Star: 0 }], radius: 1200, distanceToArrival: 340000,
+      semiMajorAxis: 700, orbitalPeriod: 5475000 }
+  ] });
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+
+  await page.locator('#orr-true').click();
+  await expect(page.locator('#orr-true')).toHaveClass(/on/);
+  await page.locator('.orr-row[data-id="1"]').click();
+  await page.waitForTimeout(600);
+
+  const at = () => page.evaluate(() => window.Orrery.state());
+  const s = await at();
+  expect(s.trueScale).toBe(true);
+  expect(s.selected).toBe('Testholm 1');
+
+  // Framed against its own size rather than an absolute floor, so it actually
+  // fills a useful part of the view instead of being a sub-pixel speck.
+  expect(s.toSelected).toBeLessThan(s.selectedRadius * 30);
+  expect(s.toSelected).toBeGreaterThan(s.selectedRadius);
+
+  // And the near plane came in with it, or the body would be clipped away.
+  expect(s.near).toBeLessThan(s.toSelected);
+
+  /* Following carries the camera, not just the aim. The body is moving; if
+     only the target moved, this distance would run away within a second. */
+  await page.waitForTimeout(2500);
+  const later = await at();
+  expect(later.selected).toBe('Testholm 1');
+  expect(Math.abs(later.toSelected - s.toSelected)).toBeLessThan(s.toSelected * 0.5);
+});
