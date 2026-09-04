@@ -114,6 +114,16 @@ function glowTexture() {
   return GLOW;
 }
 
+/* Ring systems come typed in the dump — Icy, Rocky, Metallic, Metal Rich —
+   and that is all that decides how they are drawn, because it is all the data
+   says. */
+const RING_TINT = {
+  'Icy': 0xC6D8E4,
+  'Rocky': 0x9A8F7E,
+  'Metallic': 0xB59A6E,
+  'Metal Rich': 0xC2A16A
+};
+
 function tintOf(sub) {
   if (TINT[sub]) return TINT[sub];
   const s = String(sub || '').toLowerCase();
@@ -781,6 +791,10 @@ const Orrery = (function () {
     meshes.forEach((m) => {
       if (m.mesh) { scene.remove(m.mesh); m.mesh.geometry.dispose(); m.mesh.material.dispose(); }
       if (m.line) { scene.remove(m.line); m.line.geometry.dispose(); m.line.material.dispose(); }
+      if (m.rings) {
+        scene.remove(m.rings);
+        m.rings.children.forEach((d) => { d.geometry.dispose(); d.material.dispose(); });
+      }
     });
     meshes = [];
   }
@@ -860,6 +874,42 @@ const Orrery = (function () {
         }));
         entry.line.userData.node = n;
         scene.add(entry.line);
+      }
+
+      /* Rings, at their real width.
+
+         The dump gives inner and outer radius in metres against a body radius
+         in kilometres, so one converts the other and the ring comes out in the
+         same units as the body it belongs to: Saturn's runs 1.26 to 2.38
+         Saturn radii, which is what it actually does.
+
+         Flat in the body's own equatorial plane, so they take its axial tilt —
+         Uranus is on its side and its rings should be too. They do not take
+         its spin: a ring is not painted on the planet. */
+      if (n.drawR > 0 && n.raw.rings && n.raw.rings.length && n.km) {
+        entry.rings = new THREE.Object3D();
+        n.raw.rings.forEach((r) => {
+          const inner = (r.innerRadius / 1000 / n.km) * n.drawR;
+          const outer = (r.outerRadius / 1000 / n.km) * n.drawR;
+          if (!(outer > inner) || !isFinite(outer)) return;
+          const disc = new THREE.Mesh(
+            new THREE.RingGeometry(inner, outer, 128, 1),
+            new THREE.MeshBasicMaterial({
+              color: RING_TINT[r.type] || 0xA89C8C,
+              side: THREE.DoubleSide, transparent: true, opacity: 0.34,
+              depthWrite: false
+            }));
+          // RingGeometry is built in the XY plane; the equator is XZ.
+          disc.rotation.x = Math.PI / 2;
+          disc.renderOrder = 1;
+          entry.rings.add(disc);
+        });
+        if (entry.rings.children.length) {
+          entry.rings.rotation.z = n.tilt || 0;
+          scene.add(entry.rings);
+        } else {
+          entry.rings = null;
+        }
       }
 
       meshes.push(entry);
@@ -1048,6 +1098,7 @@ const Orrery = (function () {
         }
       }
       if (m.line) m.line.position.copy(n.parent ? n.parent._pos : ORIGIN);
+      if (m.rings) m.rings.position.copy(n._pos);
     });
     movePips();
 
@@ -1569,6 +1620,20 @@ const Orrery = (function () {
       near: cam3.near,
       bodies: model ? model.all.length : 0,
       logDepth: !!(renderer && renderer.capabilities.logarithmicDepthBuffer),
+      /* The selected body's ring system, in that body's own radii — the units
+         the dump does NOT give it in, which is where the factor of a thousand
+         between metres and kilometres would show up. */
+      rings: (() => {
+        const m = sel && meshes.filter((x) => x.node === sel)[0];
+        if (!m || !m.rings || !m.rings.children.length) return { count: 0 };
+        const g = m.rings.children[0].geometry.parameters;
+        return {
+          count: m.rings.children.length,
+          innerRadii: g.innerRadius / sel.drawR,
+          outerRadii: g.outerRadius / sel.drawR,
+          tilt: m.rings.rotation.z
+        };
+      })(),
       rate: LADDER[rateIx].label,
       fastestRate: LADDER[rateHi].label,
       /* How far the worst-drawn orbit strays from the body riding on it, in

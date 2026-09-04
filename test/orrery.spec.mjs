@@ -764,3 +764,32 @@ test('the clock stops at the speed the system can still show', async ({ page }) 
   await expect(page.locator('.orr-rate')).toContainText('−');
   await expect(page.locator('#orr-slower')).toBeDisabled();
 });
+
+/* Ring geometry is in the dump and is real: inner and outer radius, and a
+   type. The radii arrive in metres against a body radius in kilometres, which
+   is the easy thing to get wrong by a factor of a thousand. */
+test('rings are drawn at the width the dump gives them', async ({ page }) => {
+  const ringed = JSON.parse(JSON.stringify(SYSTEM));
+  Object.assign(ringed.bodies[1], {
+    radius: 58232,                                  // Saturn's, in km
+    axialTilt: 0.4665,
+    rings: [{ name: 'D Ring', type: 'Icy',
+              innerRadius: 74500000, outerRadius: 140180000 }]   // metres
+  });
+  await stubDataHosts(page);
+  await stubApi(page, ringed);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+  await page.locator('.orr-row[data-id="1"]').click();
+
+  // 74,500 km and 140,180 km against a 58,232 km body: 1.28 and 2.41 radii.
+  const ring = await page.evaluate(() => window.Orrery.state().rings);
+  expect(ring.count).toBe(1);
+  expect(ring.innerRadii).toBeCloseTo(74500 / 58232, 2);
+  expect(ring.outerRadii).toBeCloseTo(140180 / 58232, 2);
+  // Flat in the body's equatorial plane, so it carries the axial tilt.
+  expect(ring.tilt).toBeCloseTo(0.4665, 3);
+
+  await expect(page.locator('.orr-facts')).toContainText('D Ring');
+  await expect(page.locator('.orr-chip', { hasText: 'Ringed' })).toBeVisible();
+});
