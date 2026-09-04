@@ -245,6 +245,264 @@ function coreBearing(coords) {
   };
 }
 
+/* ── black holes ────────────────────────────────────────────────────────────
+   The one body in a system that is not a thing to draw but an absence to draw
+   around, so it is the only one here rendered from what is behind it.
+
+   Its size is data, not judgement. Elite's dump gives a black hole a
+   solarRadius and that radius is the event horizon: Great Annihilator A is
+   198.1 solar masses and 0.000840 R☉, which is 585 km — the Schwarzschild
+   radius of 198.1 suns to within a tenth of a percent. Frontier compute it.
+   (Sagittarius A* is the exception: 516,608 suns should give a 1.5 million km
+   horizon and the dump says 10.8 million. Their galactic centre is drawn
+   larger than the physics, and we draw what the dump says, there as here.)
+
+   What you see is not the horizon but the shadow, which is larger. Light
+   passing closer than the critical impact parameter b = 3√3/2 · rs cannot
+   climb back out, so the black disc is 2.598 horizon radii across and the
+   sky just outside it is wrapped around the hole into a ring. Both are in the
+   shader below; neither is decoration.
+
+   The lens bends the sky and only the sky. Bending the rest of the system
+   would mean rendering the scene to a texture first, which is a cost this
+   page does not otherwise pay — and with the sky switched off there is
+   nothing behind the hole to bend, so it is simply black, which is what you
+   would see. */
+
+const SHADOW = 3 * Math.sqrt(3) / 2;      // 2.598 — shadow radius ÷ horizon radius
+
+/* Star colours, read from the same 293 bytes the system card reads.
+
+   console.js has this lookup too and cannot lend it: that is a classic script
+   and this is a module, and orrery.html does not load the console at all.
+   Which is exactly why this is here — going through window.CanonnConsole
+   meant that on the standalone page nothing found the table and every star in
+   every system fell back to the same amber, black holes included. */
+let SPECTRAL = null, spectralAsked = null;
+function spectralTable() {
+  if (!spectralAsked) {
+    spectralAsked = fetch('data/spectral-colors.json')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { SPECTRAL = j || {}; })
+      // A missing table leaves every disc unlit, which is honest: it means
+      // unclassified, not "no star". It is not worth failing the page over.
+      .catch(() => { SPECTRAL = {}; });
+  }
+  return spectralAsked;
+}
+
+/** '#rrggbb' for a spectral class, or '' when the table cannot place it. */
+function classColour(cls) {
+  if (!SPECTRAL || !cls) return '';
+  const c = String(cls).toUpperCase();
+  // "K3" is K, "DA" is D, "H5" is H. Two-letter keys get first refusal.
+  const key = SPECTRAL[c] ? c
+            : SPECTRAL[c.slice(0, 2)] ? c.slice(0, 2)
+            : SPECTRAL[c.charAt(0)] ? c.charAt(0) : '';
+  // Wolf-Rayet carries two colours; the first is the one to draw.
+  return key ? '#' + String(SPECTRAL[key]).split(',')[0].replace(/^#/, '') : '';
+}
+
+/** Elite spells these "Black Hole" and "Supermassive Black Hole". */
+function isHole(sub) { return /black hole/i.test(sub || ''); }
+
+/* The sky again, as something a shader can read — and as radiance rather than
+   as points.
+
+   The drawn sky is nine thousand points on a unit sphere, which a fragment
+   shader cannot sample, so the same model is painted once into an
+   equirectangular image: longitude across, latitude down. But a lens bending
+   nine thousand points mostly finds the gaps between them, and the hole came
+   out as a dark disc cut into the starfield — the opposite of what a lens
+   does, which is to move light around without destroying any of it.
+
+   So this samples the same galaxy far more finely than the sky draws it. The
+   generator is seeded, so the first nine thousand draws are the very stars
+   the reader can see and they land exactly where they are on screen; the rest
+   are the galaxy those points were always standing in for, laid down faintly
+   and additively until the band between them glows the way it should. The
+   lens then has something continuous to bend, which is what makes an arc
+   instead of a scatter.
+
+   Built only for a system with a black hole in it, so nothing else pays. */
+function skyPanorama(coords, mode, drawn, w, h) {
+  const total = mode === 'galaxy' ? 60000 : 20000;
+  const d = mode === 'galaxy' ? galacticSky(coords, total) : plainSky(coords, total);
+
+  /* Straight into the pixels rather than through sixty thousand fillRects,
+     which took a tenth of a second and made changing the sky stutter. A
+     clamped array also adds the way light adds: overlapping samples pile up
+     and stop at white instead of wrapping round to black. */
+  const img = new Uint8ClampedArray(w * h * 4);
+  for (let i = 3; i < img.length; i += 4) img[i] = 255;
+
+  const col = new THREE.Color();
+  const paint = (from, to, alpha, size) => {
+    for (let i = from; i < to; i++) {
+      const x = d.pos[i * 3], y = d.pos[i * 3 + 1], z = d.pos[i * 3 + 2];
+      const u = (Math.atan2(z, x) / (2 * Math.PI) + 0.5) * w;
+      const v = (0.5 - Math.asin(Math.max(-1, Math.min(1, y))) / Math.PI) * h;
+      /* Equirectangular squeezes longitude toward the poles, so a dot the same
+         width everywhere becomes a smear at the top of the image. Widening it
+         by 1/cos(latitude) keeps it round on the sphere. */
+      const wide = size / Math.max(0.06, Math.sqrt(Math.max(0, 1 - y * y)));
+      // getHex converts out of the working space into sRGB, which is what the
+      // texture below declares, so the value round-trips.
+      const hex = col.fromArray(d.col, i * 3).getHex();
+      const cr = ((hex >> 16) & 255) * alpha;
+      const cg = ((hex >> 8) & 255) * alpha;
+      const cb = (hex & 255) * alpha;
+
+      const y0 = Math.max(0, Math.round(v - size));
+      const y1 = Math.min(h - 1, Math.round(v + size));
+      const x0 = Math.round(u - wide), x1 = Math.round(u + wide);
+      for (let py = y0; py <= y1; py++) {
+        for (let px = x0; px <= x1; px++) {
+          // Longitude wraps and the sampler reads across the join; latitude
+          // does not wrap, which is why only this one is taken modulo.
+          const k = (py * w + (((px % w) + w) % w)) * 4;
+          img[k] += cr; img[k + 1] += cg; img[k + 2] += cb;
+        }
+      }
+    }
+  };
+  /* The unresolved galaxy goes down first, wide and faint, so that where the
+     samples are dense they merge into a continuum rather than staying a
+     scatter of dots. That matters more than it sounds: a lens demagnifies —
+     it squeezes a wide piece of sky into a narrow one — and a point shrunk
+     below a pixel is a point the sampler misses, which showed up as a dark
+     annulus between the ring and the edge. A continuum survives being
+     squeezed; a scatter of points does not. */
+  paint(drawn, total, 0.13, 1.8);     // the galaxy between the stars
+  paint(0, drawn, 1, 0.9);            // the stars the reader can actually see
+
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  c.getContext('2d').putImageData(new ImageData(img, w, h), 0, 0);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  /* No mipmaps, deliberately. Longitude wraps at the seam, so the hardware's
+     own derivative of u jumps a whole texture there and picks the coarsest
+     mip: a grey arc drawn across the lens. The blur a stretched ray needs is
+     done in the shader instead, along the axis it is actually stretched on,
+     which is both seam-free and closer to the truth. */
+  tex.generateMipmaps = false;
+  tex.minFilter = tex.magFilter = THREE.LinearFilter;
+  return tex;
+}
+
+/* A quad that always faces the camera, centred on the hole. The offset is
+   added in world space from the camera's own right and up, so the lens is a
+   disc from wherever you fly, and vWorld reaches the fragment shader without
+   needing a matrix inverse GLSL1 does not have. */
+const HOLE_VERT = [
+  'uniform vec3 uCenter;',
+  'uniform vec3 uRight;',
+  'uniform vec3 uUp;',
+  'uniform float uSize;',
+  'varying vec2 vXY;',
+  'varying vec3 vWorld;',
+  '#include <common>',
+  '#include <logdepthbuf_pars_vertex>',
+  'void main() {',
+  '  vXY = position.xy;',
+  '  vWorld = uCenter + (uRight * position.x + uUp * position.y) * uSize;',
+  '  gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.0);',
+  '  #include <logdepthbuf_vertex>',
+  '}'
+].join('\n');
+
+/* Gravitational lensing, done as lensing rather than as a painted ring.
+
+   Every fragment of the quad is a ray with an impact parameter b — its
+   distance from the axis through the hole. Inside the critical parameter it
+   is captured and the fragment is black. Outside, the ray reaches us from an
+   apparent angle θ = atan(b/D) having been bent by α, so it left the sky at
+   β = θ − α; the shader looks that direction up in the panorama. β running
+   negative is not an error, it is the ray that passed the far side of the
+   hole, and it is what draws the ring.
+
+   α is the weak-field 2·rs/b divided by (1 − bc/b), which is the standard
+   near-field correction: it recovers 2·rs/b far out, and it diverges at the
+   photon sphere the way the real deflection does. The divergence is floored,
+   because a ray that has wrapped the hole fifty times lands somewhere this
+   approximation has no opinion about and the honest thing is to stop.
+
+   The deflection is rolled off over the outer third of the quad. That is the
+   one liberty here: the real lens has no edge, and this one has to, so it
+   fades out rather than ending in a step against the sky it is bending. */
+const HOLE_FRAG = [
+  'uniform sampler2D uSky;',
+  'uniform vec3 uCenter;',
+  'uniform vec3 uFwd;',      // camera → hole, unit
+  'uniform float uD;',       // camera → hole, world units
+  'uniform float uSize;',    // half-width of the quad, world units
+  'uniform float uRs;',      // event horizon, world units
+  'uniform float uHasSky;',
+  'varying vec2 vXY;',
+  'varying vec3 vWorld;',
+  '#include <common>',
+  '#include <logdepthbuf_pars_fragment>',
+
+  'vec3 look(float beta, vec3 perp) {',
+  '  vec3 dir = normalize(uFwd * cos(beta) + perp * sin(beta));',
+  '  float u = atan(dir.z, dir.x) / 6.2831853 + 0.5;',
+  '  float v = 0.5 - asin(clamp(dir.y, -1.0, 1.0)) / 3.1415927;',
+  '  return texture2D(uSky, vec2(u, v)).rgb;',
+  '}',
+
+  'void main() {',
+  '  float r = length(vXY);',
+  '  if (r > 1.0) discard;',
+  '  float b = r * uSize;',
+  '  float bc = uRs * 2.5980762;',
+  '  vec3 col = vec3(0.0);',
+
+  /* With no sky there is nothing to bend, and the lens has nothing to say
+     outside the shadow — so it says nothing, rather than painting a black
+     disc over whatever happens to be behind it. */
+  '  float fade = uHasSky > 0.5 ? 1.0 : 0.0;',
+  '  if (b > bc && uHasSky > 0.5) {',
+  '    vec3 perp = normalize(vWorld - uCenter);',
+  '    float theta = atan(b, uD);',
+  '    float a = (2.0 * uRs / b) / max(1.0 - bc / b, 0.02);',
+  '    a *= 1.0 - smoothstep(0.4, 0.95, r);',
+  '    float beta = theta - a;',
+  '    fade = 1.0 - smoothstep(0.55, 1.0, r);',
+  /* Five taps along the one axis the sky is stretched on, combined by max
+     rather than by average.
+
+     Averaging is right for an extended source and wrong for this one: this sky
+     is points, and a point caught by one tap in five came back at a fifth of
+     its brightness, which turned the lens into a dark disc cut out of the
+     starfield. Lensing does not dim — surface brightness is conserved, and a
+     point source is drawn out into an arc of the same brightness — so the taps
+     are a smear, and max is what smears them. */
+  '    float spread = min(a * 0.008, 0.008);',
+  '    vec3 c0 = look(beta, perp);',
+  '    c0 = max(c0, look(beta - spread, perp));',
+  '    c0 = max(c0, look(beta + spread, perp));',
+  '    c0 = max(c0, look(beta - spread * 0.5, perp));',
+  '    c0 = max(c0, look(beta + spread * 0.5, perp));',
+  '    col = c0;',
+  '  }',
+
+  /* The lens has an edge and the sky it bends does not, so the outer band
+     hands back to the real sky behind it. The two roll-offs are deliberately
+     staggered: the deflection is most of the way to nothing before the quad
+     starts becoming transparent, so by the time the real sky shows through
+     the lens is already drawing the same stars in the same places and there
+     is nothing left to mark the join. */
+  '  gl_FragColor = vec4(col, b <= bc ? 1.0 : fade);',
+  '  #include <logdepthbuf_fragment>',
+  '  #include <tonemapping_fragment>',
+  '  #include <colorspace_fragment>',
+  '}'
+].join('\n');
+
 /* ── stars ──────────────────────────────────────────────────────────────────
    A star is the one body in a system that is not a surface but a process, so
    it gets a shader rather than a painted texture: convection cells that churn
@@ -653,6 +911,7 @@ function buildModel(sys) {
     sub: b.subType || '',
     raw: b,
     km: b.type === 'Star' ? (b.solarRadius || 0) * 696340 : (b.radius || 0),
+    hole: b.type === 'Star' && isHole(b.subType),
     // Elements, in radians and days. A body with no period does not move.
     aAu: b.semiMajorAxis || 0,
     e: b.orbitalEccentricity || 0,
@@ -724,7 +983,15 @@ function layout(model, trueDistance) {
      glance you want to read the system, not measure it. */
   const idealR = (n, perAu) => {
     if (!n.km) return 0;                       // barycentres draw nothing
-    if (trueDistance) return (n.km / AU_KM) * perAu;
+    /* A black hole is drawn at its shadow rather than its horizon: the shadow
+       is the black disc you actually see, and sizing the node by it means the
+       collision fitting, the framing and the pip all work on what the reader
+       is looking at instead of on something 2.6 times smaller. */
+    const km = n.hole ? n.km * SHADOW : n.km;
+    if (trueDistance) return (km / AU_KM) * perAu;
+    // Schematic, and a black hole is not a star: half a star's disc, which
+    // leaves its ring sitting a little outside where a star's edge would be.
+    if (n.hole) return 1.6;
     if (n.type === 'Star') return 3.2;
     // Compressed hard: Jupiter is 11 Earths across and would swamp the view.
     return Math.max(0.32, Math.min(2.6, 1.05 * Math.pow(n.km / 6378, 0.42)));
@@ -815,6 +1082,8 @@ const Orrery = (function () {
      the planets through. */
   let showLabels = true, following = true, orbitMode = 0;   // 0 all, 1 planets, 2 none
   let skyMode = 'none', sky = null;                        // none | galaxy | stars
+  // The same sky as a picture, for any black hole in the system to bend.
+  let lensSky = null, lenses = [];
   let ambient = null, ambientPct = 30, glowPct = 60;
 
   /* Preferences live in localStorage, guarded: a private window can make even
@@ -1267,7 +1536,7 @@ const Orrery = (function () {
           return '<button class="pip' + (moon ? ' moon' : '') +
             (selected === n ? ' on' : '') + '" data-id="' + n.id + '" ' +
             'style="left:' + (at(lsOf(n)) * 100) + '%;--c:' +
-              (n.type === 'Star' ? '#' + starColour().getHexString()
+              (n.type === 'Star' ? '#' + starColour(n).getHexString()
                                  : '#' + new THREE.Color(tintOf(n.sub)).getHexString()) + '" ' +
             'title="' + esc(shortName(n)) + ' — ' +
               Math.round(lsOf(n)).toLocaleString() + ' Ls"></button>';
@@ -1355,7 +1624,7 @@ const Orrery = (function () {
     const col = new Float32Array(pipNodes.length * 3);
     const c = new THREE.Color();
     pipNodes.forEach((n, i) => {
-      c.set(n.type === 'Star' ? starColour() : new THREE.Color(tintOf(n.sub)));
+      c.set(n.type === 'Star' ? starColour(n) : new THREE.Color(tintOf(n.sub)));
       col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
     });
     const geo = new THREE.BufferGeometry();
@@ -1383,6 +1652,7 @@ const Orrery = (function () {
     if (pips) { scene.remove(pips); pips.geometry.dispose(); pips.material.dispose(); pips = null; }
     meshes.forEach((m) => {
       if (m.mesh) { scene.remove(m.mesh); m.mesh.geometry.dispose(); m.mesh.material.dispose(); }
+      if (m.lens) { scene.remove(m.lens); m.lens.geometry.dispose(); m.lens.material.dispose(); }
       if (m.line) { scene.remove(m.line); m.line.geometry.dispose(); m.line.material.dispose(); }
       if (m.rings) {
         scene.remove(m.rings);
@@ -1390,14 +1660,51 @@ const Orrery = (function () {
       }
     });
     meshes = [];
+    lenses = [];
   }
 
-  function starColour() {
-    const c = window.CanonnConsole && CanonnConsole.starColour;
-    const cls = model.star.raw.spectralClass;
-    const hex = c ? c(cls) : '';
-    return new THREE.Color(hex || '#FFD9A0');
+  /* The primary's colour by default, and any star's when asked.
+     Great Annihilator has seven stars, two of them black holes; painting all
+     seven with the primary's accent said the T Tauris were black holes too. */
+  function starColour(node) {
+    return new THREE.Color(classColour((node || model.star).raw.spectralClass) || '#FFD9A0');
   }
+
+  /* Twelve horizon radii of quad. The deflection is down to a tenth of a
+     radian by that edge and is rolled off to nothing over the last third, so
+     the lens stops where it stops being worth drawing. */
+  const LENS = 12;
+  /* Something for the sampler to point at when the sky is off. The shader
+     never reads it — uHasSky gates that — but a bound texture beats a null. */
+  let NOSKY = null;
+  function noSky() {
+    if (!NOSKY) NOSKY = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
+    NOSKY.needsUpdate = true;
+    return NOSKY;
+  }
+
+  function holeMaterial(n) {
+    const rs = n.drawR / SHADOW;             // drawR is the shadow, not the horizon
+    return new THREE.ShaderMaterial({
+      uniforms: {
+        uSky: { value: lensSky || noSky() },
+        uHasSky: { value: lensSky ? 1 : 0 },
+        uCenter: { value: new THREE.Vector3() },
+        uRight: { value: new THREE.Vector3(1, 0, 0) },
+        uUp: { value: new THREE.Vector3(0, 1, 0) },
+        uFwd: { value: new THREE.Vector3(0, 0, -1) },
+        uD: { value: 1 },
+        uSize: { value: rs * LENS },
+        uRs: { value: rs }
+      },
+      vertexShader: HOLE_VERT,
+      fragmentShader: HOLE_FRAG,
+      transparent: true,
+      depthWrite: false        // the shadow sphere underneath does the occluding
+    });
+  }
+
+  const camX = new THREE.Vector3(), camY = new THREE.Vector3(), camZ = new THREE.Vector3();
 
   function buildScene() {
     clearScene();
@@ -1414,18 +1721,32 @@ const Orrery = (function () {
       if (n.drawR > 0) {
         const isStar = n.type === 'Star';
         const geo = new THREE.SphereGeometry(n.drawR, isStar ? 32 : 20, isStar ? 24 : 14);
-        const mat = isStar
-          // The star is its own light source, so it is not lit by one — it
-          // makes its own, and churns while it does it.
-          ? starMaterial(n, starTint)
+        const mat = n.hole
+          // Nothing leaves it, so nothing is painted on it. This sphere is the
+          // shadow: it occludes what is behind it, and it takes the click.
+          ? new THREE.MeshBasicMaterial({ color: 0x000000 })
+          : isStar
+          // A star is its own light source, so it is not lit by one — it makes
+          // its own, and churns while it does it.
+          ? starMaterial(n, starColour(n))
           : new THREE.MeshLambertMaterial({ map: bodyTexture(n) });
         entry.mesh = new THREE.Mesh(geo, mat);
         entry.mesh.userData.node = n;
         scene.add(entry.mesh);
 
-        if (isStar) {
+        if (n.hole) {
+          /* The lens rides a camera-facing quad rather than the sphere,
+             because what it draws is not the hole's surface — a hole has no
+             surface — but the sky behind it, arriving bent. Never a click
+             target: the shadow underneath is the body. */
+          const lens = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), holeMaterial(n));
+          lens.frustumCulled = false;      // its geometry is built in the shader
+          lens.raycast = () => {};
+          entry.lens = lens;
+          scene.add(lens);
+        } else if (isStar) {
           const glow = new THREE.Sprite(new THREE.SpriteMaterial({
-            map: glowTexture(), color: starTint, transparent: true, opacity: 0.85,
+            map: glowTexture(), color: starColour(n), transparent: true, opacity: 0.85,
             blending: THREE.AdditiveBlending, depthWrite: false
           }));
           glow.scale.setScalar(n.drawR * 6);
@@ -1523,6 +1844,7 @@ const Orrery = (function () {
 
       meshes.push(entry);
     });
+    lenses = meshes.filter((m) => m.lens);
 
     buildPips();
     frame();
@@ -1692,6 +2014,26 @@ const Orrery = (function () {
     buildSky();
   }
 
+  /* The sky the lens reads, kept in step with the sky the reader sees.
+
+     Painted only for a system that has a black hole in it, so every other
+     system pays nothing; and cleared when the sky is switched off, because
+     with no sky behind it there is nothing for a hole to bend and black is
+     the honest answer. */
+  function buildLensSky(drawn) {
+    if (lensSky) { lensSky.dispose(); lensSky = null; }
+    if (drawn && model && model.all.some((n) => n.hole)) {
+      const coords = (model.sys && model.sys.coords) || { x: 0, y: 0, z: 0 };
+      lensSky = skyPanorama(coords, skyMode, drawn, 2048, 1024);
+    }
+    /* buildScene runs before the sky is chosen, so the lenses it made are
+       holding whatever was current then. Hand them the new one. */
+    lenses.forEach((m) => {
+      m.lens.material.uniforms.uSky.value = lensSky || noSky();
+      m.lens.material.uniforms.uHasSky.value = lensSky ? 1 : 0;
+    });
+  }
+
   function buildSky() {
     if (sky) {
       scene.remove(sky);
@@ -1699,10 +2041,11 @@ const Orrery = (function () {
       sky.material.dispose();
       sky = null;
     }
-    if (skyMode === 'none' || !model) return;
+    if (skyMode === 'none' || !model) { buildLensSky(0); return; }
     const coords = (model.sys && model.sys.coords) || { x: 0, y: 0, z: 0 };
     const n = skyMode === 'galaxy' ? 9000 : 2600;
     const d = skyMode === 'galaxy' ? galacticSky(coords, n) : plainSky(coords, n);
+    buildLensSky(n);
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(d.pos, 3));
@@ -1820,6 +2163,37 @@ const Orrery = (function () {
     }
 
     controls.update();
+
+    /* A lens is a billboard as well as a lens: it needs the camera's own axes
+       to face, and where the camera sits relative to the hole to bend by.
+       Updated after controls, so it is built against the camera this frame is
+       about to be drawn with rather than the one before it. */
+    if (lenses.length) {
+      const cam = mode3d ? cam3 : cam2;
+      cam.updateMatrixWorld();
+      cam.matrixWorld.extractBasis(camX, camY, camZ);
+      lenses.forEach((m) => {
+        const u = m.lens.material.uniforms;
+        u.uCenter.value.copy(m.node._pos);
+        // The shader builds its own geometry, but the renderer sorts blended
+        // objects by where the object says it is, so say where it is.
+        m.lens.position.copy(m.node._pos);
+        u.uRight.value.copy(camX);
+        u.uUp.value.copy(camY);
+        if (cam.isOrthographicCamera) {
+          /* Parallel projection has no eye point: every ray runs down the view
+             axis, so the apparent angle is zero at every impact parameter and
+             what the lens shows is the sky from directly behind the hole. */
+          u.uFwd.value.copy(camZ).negate();
+          u.uD.value = 1e9;
+        } else {
+          u.uFwd.value.copy(m.node._pos).sub(cam.position);
+          u.uD.value = u.uFwd.value.length() || 1;
+          u.uFwd.value.divideScalar(u.uD.value);
+        }
+      });
+    }
+
     adaptClip();
     renderer.render(scene, mode3d ? cam3 : cam2);
   }
@@ -2070,9 +2444,11 @@ const Orrery = (function () {
     if (face && face.toDataURL) {
       disc = '<span class="orr-face" style="background-image:url(' +
         face.toDataURL() + ')"></span>';
+    } else if (n.hole) {
+      disc = '<span class="orr-face hole"></span>';
     } else if (isStar) {
       disc = '<span class="orr-face star" style="background:' +
-        starColour().getStyle() + '"></span>';
+        starColour(n).getStyle() + '"></span>';
     }
 
     h += '<div class="orr-f-h">' + disc + '<div class="orr-f-n"><b>' +
@@ -2088,7 +2464,16 @@ const Orrery = (function () {
       chip(n.spin < 0, 'Retrograde spin');
     if (flags) h += '<div class="orr-chips">' + flags + '</div>';
 
-    h += measures(isStar ? [
+    /* A black hole answers different questions. Its surface temperature is
+       zero and its absolute magnitude is 20 because there is no surface and no
+       light, so neither is a measurement; what there is to know is how big the
+       hole is, how big the black disc is, and how much mass is doing it. */
+    h += measures(n.hole ? [
+      ['Horizon', n.km && Math.round(n.km).toLocaleString(), 'km'],
+      ['Shadow', n.km && Math.round(n.km * SHADOW).toLocaleString(), 'km'],
+      ['Mass', b.solarMasses && Math.round(b.solarMasses).toLocaleString(), '&times; Sun'],
+      ['Arrival', b.distanceToArrival && Math.round(b.distanceToArrival).toLocaleString(), 'Ls']
+    ] : isStar ? [
       ['Class', [b.spectralClass, b.luminosity].filter(Boolean).join(' '), ''],
       ['Surface', b.surfaceTemperature && Math.round(b.surfaceTemperature).toLocaleString(), 'K'],
       ['Mass', b.solarMasses && num(b.solarMasses, 2), '&times; Sun'],
@@ -2102,7 +2487,14 @@ const Orrery = (function () {
         n.P >= 365 ? 'years' : 'days']
     ]);
 
-    h += sect(isStar ? 'Star' : 'Body', table(isStar ? [
+    h += sect(n.hole ? 'Black hole' : isStar ? 'Star' : 'Body', table(n.hole ? [
+      ['Class', [b.spectralClass, b.luminosity].filter(Boolean).join(' ')],
+      ['Radius', b.solarRadius && num(b.solarRadius, 6) + ' × Sun'],
+      // Where light orbits rather than escaping — 1.5 horizon radii.
+      ['Photon sphere', n.km && Math.round(n.km * 1.5).toLocaleString() + ' km'],
+      ['Age', b.age && (b.age >= 1000 ? num(b.age / 1000, 1) + ' bn yrs'
+                                      : b.age.toLocaleString() + ' m yrs')]
+    ] : isStar ? [
       ['Radius', b.solarRadius && num(b.solarRadius, 3) + ' × Sun'],
       ['Magnitude', b.absoluteMagnitude !== undefined && b.absoluteMagnitude !== null
         ? num(b.absoluteMagnitude, 2) : '']
@@ -2255,7 +2647,7 @@ const Orrery = (function () {
       '<div class="orr-row" data-id="' + n.id + '" style="--depth:' + depth + '" ' +
       'role="button" tabindex="0" title="' + esc(n.name) + '">' +
       '<span class="dot" style="background:' +
-        (n.type === 'Star' ? '#' + starColour().getHexString()
+        (n.type === 'Star' ? '#' + starColour(n).getHexString()
           : n.drawR ? '#' + new THREE.Color(tintOf(n.sub)).getHexString() : 'transparent') +
         (n.drawR ? '' : ';box-shadow:inset 0 0 0 1px var(--dimmer)') + '"></span>' +
       '<span class="nm">' + esc(shortName(n)) + '</span>' +
@@ -2311,7 +2703,9 @@ const Orrery = (function () {
 
     let sys;
     try {
-      sys = await fetchSystem(name, id64);
+      // The table is 293 bytes against a dump of a couple of hundred kilobytes,
+      // and asking for both at once costs nothing over asking for the dump.
+      [sys] = await Promise.all([fetchSystem(name, id64), spectralTable()]);
     } catch (err) {
       panel.querySelector('#orr-msg').className = 'orr-msg bad';
       panel.querySelector('#orr-msg').textContent =
@@ -2430,6 +2824,38 @@ const Orrery = (function () {
         scale: sky ? sky.scale.x : 0,
         inScene: !!(sky && sky.parent)
       },
+      /* Every black hole, in the terms its shader works in: the horizon it
+         was given, the shadow that horizon draws, how far out the lens runs,
+         and whether there is a sky behind it to bend. */
+      holes: lenses.map((m) => {
+        const u = m.lens.material.uniforms;
+        const img = u.uSky.value && u.uSky.value.image;
+        /* Where the shadow landed on screen and how wide it came out, from the
+           same projection the renderer used. A claim about what a black hole
+           looks like can only be settled in pixels, and this is what tells a
+           test where to go and read them. */
+        const buf = renderer.getSize(new THREE.Vector2())
+          .multiplyScalar(renderer.getPixelRatio());
+        cam.updateMatrixWorld();
+        cam.matrixWorld.extractBasis(camX, camY, camZ);
+        const mid = m.node._pos.clone().project(cam);
+        const off = m.node._pos.clone().addScaledVector(camX, m.node.drawR).project(cam);
+        return {
+          screen: {
+            x: (mid.x * 0.5 + 0.5) * buf.x,
+            y: (0.5 - mid.y * 0.5) * buf.y,
+            shadowPx: Math.abs(off.x - mid.x) * 0.5 * buf.x
+          },
+          name: m.node.name,
+          horizonKm: m.node.km,
+          shadow: m.node.drawR,
+          horizon: u.uRs.value,
+          lens: u.uSize.value,
+          hasSky: u.uHasSky.value,
+          skyWidth: img ? img.width : 0,
+          toCamera: u.uD.value
+        };
+      }),
       ambient: ambientPct,
       glow: glowPct,
       // The star's own clock, in real seconds — deliberately not the orbit
@@ -2488,7 +2914,36 @@ const Orrery = (function () {
     });
   }
 
-  return { open, close, isOpen, page, state, faces };
+  /* One frame, read back as pixels.
+
+     Alongside faces() and never called by the page itself. Some claims can
+     only be settled in pixels — that a black hole draws as a dark disc with
+     light gathered outside it is one, and it is exactly the claim that was
+     silently false while it drew as a glowing ball. Reading the canvas back
+     directly would mean preserveDrawingBuffer, which costs every reader on
+     every frame for the sake of a test; this costs one extra render, only
+     when something asks. */
+  function pixels(x, y, w, h) {
+    const size = renderer.getSize(new THREE.Vector2())
+      .multiplyScalar(renderer.getPixelRatio());
+    const rt = new THREE.WebGLRenderTarget(size.x, size.y);
+    rt.texture.colorSpace = THREE.SRGBColorSpace;
+    renderer.setRenderTarget(rt);
+    renderer.render(scene, mode3d ? cam3 : cam2);
+    const buf = new Uint8Array(w * h * 4);
+    // GL counts rows from the bottom of the frame; a screen counts from the top.
+    renderer.readRenderTargetPixels(rt, x, size.y - y - h, w, h, buf);
+    renderer.setRenderTarget(null);
+    rt.dispose();
+    const out = new Array(w * h * 4);
+    for (let r = 0; r < h; r++) {
+      const src = (h - 1 - r) * w * 4;
+      for (let i = 0; i < w * 4; i++) out[r * w * 4 + i] = buf[src + i];
+    }
+    return { w, h, data: out };
+  }
+
+  return { open, close, isOpen, page, state, faces, pixels };
 })();
 
 window.Orrery = Orrery;

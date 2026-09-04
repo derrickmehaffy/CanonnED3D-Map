@@ -1085,3 +1085,193 @@ test('the panels resize, and stay where they were put', async ({ page }) => {
   const mid = await widthOf('.orr-mid');
   expect(stage).toBeGreaterThan(mid * 0.3);
 });
+
+/* ── black holes ────────────────────────────────────────────────────────────
+
+   Great Annihilator's two, verbatim from Canonn's dump. Real numbers because
+   the first test below is about what Elite's numbers mean, and a made-up mass
+   and radius could not be wrong about that. */
+const HOLES = {
+  name: 'Annihilator', id64: 2587943, bodyCount: 3,
+  date: '2026-01-01 00:00:00+00',
+  coords: { x: 354.84, y: -42.44, z: 22997.22 },
+  bodies: [
+    { bodyId: 0, type: 'Star', name: 'Annihilator A', mainStar: true,
+      subType: 'Black Hole', spectralClass: 'H5', luminosity: 'VII',
+      solarRadius: 0.000840251168224299, solarMasses: 198.097656,
+      surfaceTemperature: 0, absoluteMagnitude: 20, age: 2,
+      rotationalPeriod: 1.037e-6, distanceToArrival: 0 },
+    { bodyId: 1, type: 'Star', name: 'Annihilator B', subType: 'Black Hole',
+      spectralClass: 'H0', luminosity: 'VII',
+      solarRadius: 0.000280255526599569, solarMasses: 66.074219,
+      surfaceTemperature: 0, absoluteMagnitude: 20,
+      parents: [{ Star: 0 }], semiMajorAxis: 347.65, orbitalPeriod: 227703,
+      distanceToArrival: 211599 },
+    { bodyId: 2, type: 'Star', name: 'Annihilator A 1', subType: 'T Tauri Star',
+      spectralClass: 'TTS6', luminosity: 'VI', solarRadius: 0.331, solarMasses: 0.148,
+      surfaceTemperature: 1564, parents: [{ Star: 0 }],
+      semiMajorAxis: 7.07, orbitalPeriod: 487.4, distanceToArrival: 3468 }
+  ]
+};
+
+/* The claim the whole rendering rests on: Elite's solarRadius for a black hole
+   is not a stylistic choice, it is the Schwarzschild radius of the mass the
+   dump gives alongside it. If that ever stopped being true the drawn size
+   would be arbitrary, and this is where we would find out. */
+test('a black hole\'s radius in the dump is its event horizon', async () => {
+  const KM_PER_SUN = 2.9532;          // 2GM/c², per solar mass
+  for (const b of HOLES.bodies.filter((x) => x.subType === 'Black Hole')) {
+    const stated = b.solarRadius * 696340;
+    const schwarzschild = b.solarMasses * KM_PER_SUN;
+    expect(Math.abs(stated - schwarzschild) / schwarzschild,
+      b.name + ': ' + stated.toFixed(1) + ' km stated, ' +
+      schwarzschild.toFixed(1) + ' km of Schwarzschild').toBeLessThan(0.005);
+  }
+});
+
+test('a black hole is drawn at its shadow, not its horizon', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page, HOLES);
+  await page.goto('/orrery.html?system=Annihilator', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+
+  const holes = await page.evaluate(() => window.Orrery.state().holes);
+  expect(holes.map((h) => h.name)).toEqual(['Annihilator A', 'Annihilator B']);
+  // The T Tauri in the same system is a star and gets no lens.
+  expect(holes).toHaveLength(2);
+
+  const a = holes[0];
+  expect(a.horizonKm).toBeCloseTo(0.000840251168224299 * 696340, 3);
+  /* What is drawn is the shadow — 3√3/2 horizon radii — because that is the
+     black disc an observer sees, not the horizon inside it. */
+  expect(a.shadow / a.horizon).toBeCloseTo(3 * Math.sqrt(3) / 2, 4);
+  // And the lens runs well past the shadow, or there is nowhere for a ring.
+  expect(a.lens / a.shadow).toBeGreaterThan(3);
+});
+
+/* The rendering claim, checked as pixels rather than as intent: a dark disc
+   with light gathered into a ring just outside it. Nothing else in the scene
+   looks like that, and the amber ball this used to draw did not. */
+test('a black hole is a shadow with a ring, not a glowing ball', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+
+  await stubDataHosts(page);
+  /* The two holes without the T Tauri that orbits between them. This is a
+     photometric measurement and a star drawn a few tens of pixels away throws
+     its glow right across the annuli being compared; the pair alone leaves
+     the hole standing against the sky, which is the thing being measured. */
+  await stubApi(page, { ...HOLES, bodyCount: 2, bodies: HOLES.bodies.slice(0, 2) });
+  /* The galaxy, not the even scatter — because a ring is a fact about the sky
+     as much as about the hole. Lensing conserves surface brightness, so a sky
+     of uniform brightness lenses into a sky of uniform brightness and there is
+     no ring to find. It takes structure behind the hole to make one, and this
+     system sits three thousand light years off the core with the band right
+     across it. */
+  await page.addInitScript(() => {
+    try { localStorage.setItem('canonn.orrery.sky', 'galaxy'); } catch (e) {}
+  });
+  await page.goto('/orrery.html?system=Annihilator', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(2, { timeout: 60_000 });
+  await page.waitForTimeout(1500);
+
+  const profile = await page.evaluate(() => {
+    const at = window.Orrery.state().holes[0].screen;
+    // Out to eight shadow radii, which reaches past the lens and into the
+    // ordinary sky on the same frame, so the two are directly comparable.
+    const half = Math.round(at.shadowPx * 8);
+    const img = window.Orrery.pixels(
+      Math.round(at.x) - half, Math.round(at.y) - half, half * 2, half * 2);
+
+    const band = (lo, hi) => {
+      let sum = 0, n = 0;
+      for (let y = 0; y < img.h; y++) {
+        for (let x = 0; x < img.w; x++) {
+          const r = Math.hypot(x - half, y - half) / at.shadowPx;
+          if (r < lo || r >= hi) continue;
+          const i = (y * img.w + x) * 4;
+          sum += (img.data[i] + img.data[i + 1] + img.data[i + 2]) / 3; n++;
+        }
+      }
+      return n ? sum / n : null;
+    };
+    return {
+      shadowPx: at.shadowPx,
+      inside: band(0, 0.8),      // the shadow
+      ring: band(1.05, 2.2),     // immediately outside it
+      mid: band(3.0, 4.2),       // still under the lens, bent only gently
+      sky: band(5.5, 8)          // past the lens, the sky itself
+    };
+  });
+
+  expect(profile.shadowPx, 'a shadow big enough to measure').toBeGreaterThan(4);
+  expect(profile.inside, 'the shadow is dark').toBeLessThan(profile.sky);
+  expect(profile.ring, 'light is gathered just outside it')
+    .toBeGreaterThan(profile.inside * 2);
+  expect(profile.ring, 'and it is brighter than the sky it came from')
+    .toBeGreaterThan(profile.sky);
+  /* Away from the ring the lens hands the sky back at the brightness it found
+     it: lensing moves light, it does not destroy it. A dark disc cut out of
+     the starfield here would mean the shader was averaging points into
+     nothing, which is what it did on the first attempt. */
+  expect(profile.mid).toBeGreaterThan(profile.sky * 0.4);
+
+  expect(errors.filter((e) => /shader|GLSL|WebGL|THREE/i.test(e))).toEqual([]);
+});
+
+test('with no sky behind it there is nothing for a hole to bend', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page, HOLES);
+  await page.goto('/orrery.html?system=Annihilator', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+  await openView(page);
+
+  await page.locator('#orr-sky-galaxy').click();
+  await expect.poll(() => page.evaluate(() => window.Orrery.state().holes[0].hasSky)).toBe(1);
+  expect(await page.evaluate(() => window.Orrery.state().holes[0].skyWidth)).toBe(2048);
+
+  await page.locator('#orr-sky-none').click();
+  await expect.poll(() => page.evaluate(() => window.Orrery.state().holes[0].hasSky)).toBe(0);
+});
+
+/* Surface temperature 0 and absolute magnitude 20 are Elite saying "no
+   surface, no light", not measurements. Printing them as figures would be the
+   panel asserting something the data never said. */
+test('the panel answers what a black hole can be asked', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page, HOLES);
+  await page.goto('/orrery.html?system=Annihilator', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+
+  const facts = page.locator('.orr-facts');
+  await expect(facts).toContainText('Black Hole');
+  // Arrival is absent because this one *is* the arrival star, at zero.
+  await expect(facts.locator('.orr-meas dt')).toHaveText(['Horizon', 'Shadow', 'Mass']);
+  await expect(facts.locator('.orr-meas')).toContainText('585');
+  await expect(facts.locator('.orr-meas')).toContainText('1,520');
+  await expect(facts).toContainText('Photon sphere');
+  await expect(facts, 'a temperature of zero is not a temperature')
+    .not.toContainText('0 K');
+  await expect(facts, 'and a magnitude of 20 is not a brightness')
+    .not.toContainText('Magnitude');
+
+  // The T Tauri in the same system is still a star and still says so.
+  await page.locator('.orr-row', { hasText: 'A 1' }).click();
+  await expect(facts).toContainText('T Tauri');
+  await expect(facts.locator('.orr-meas')).toContainText('1,564');
+});
+
+/* Every star used to be painted the primary's colour, which in a system whose
+   primary is a black hole told you the T Tauris were black holes too. */
+test('each star is painted its own colour', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page, HOLES);
+  await page.goto('/orrery.html?system=Annihilator', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+
+  const dot = (id) => page.locator('.orr-row[data-id="' + id + '"]').locator('.dot')
+    .evaluate((el) => getComputedStyle(el).backgroundColor);
+  // H is the black hole class; TTS6 is a T Tauri, and resolves under T.
+  expect(await dot(0)).not.toBe(await dot(2));
+});
