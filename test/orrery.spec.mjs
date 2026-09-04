@@ -805,6 +805,43 @@ test('rings are drawn at the width the dump gives them', async ({ page }) => {
 
   await expect(page.locator('.orr-facts')).toContainText('D Ring');
   await expect(page.locator('.orr-chip', { hasText: 'Ringed' })).toBeVisible();
+
+  /* Not a flat plate. Rings are banded with gaps, which is what stops a wide
+     one reading as a solid disc, and how solid it is drawn comes from the
+     mass the dump gives it over the area it covers. */
+  expect(ring.banded).toBe(true);
+  expect(ring.opacity).toBeGreaterThan(0.2);
+  expect(ring.opacity).toBeLessThan(0.4);
+});
+
+/* A ring's mass and its area are both in the dump, so how solid it looks is
+   data rather than taste. Across Sol that separates them by a factor of
+   fifty: Jupiter's halo ring is a whisper and Uranus's is heavy. */
+test('a faint ring is drawn faint', async ({ page }) => {
+  const withRing = (mass, innerRadius, outerRadius) => {
+    const sys = JSON.parse(JSON.stringify(SYSTEM));
+    Object.assign(sys.bodies[1], {
+      radius: 58232,
+      rings: [{ name: 'R', type: 'Icy', mass, innerRadius, outerRadius }]
+    });
+    return sys;
+  };
+  const opacityOf = async (sys) => {
+    await stubApi(page, sys);
+    await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+    await page.locator('.orr-row[data-id="1"]').click();
+    return page.evaluate(() => window.Orrery.state().rings.opacity);
+  };
+  await stubDataHosts(page);
+
+  // Jupiter's halo ring: barely any mass spread over a very wide band.
+  const whisper = await opacityOf(withRing(10000, 92000000, 182000000));
+  // Uranus's: more mass over a smaller one.
+  const heavy = await opacityOf(withRing(171570, 30890000, 103000000));
+
+  expect(whisper).toBeLessThan(heavy);
+  expect(whisper).toBeLessThan(0.15);
 });
 
 /* A star is the one body in a system that is not a surface but a process, so

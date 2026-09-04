@@ -117,6 +117,51 @@ function glowTexture() {
 /* Ring systems come typed in the dump — Icy, Rocky, Metallic, Metal Rich —
    and that is all that decides how they are drawn, because it is all the data
    says. */
+/* Rings are not flat plates, and drawing them as one is what makes a wide
+   band look solid. Real ones are banded, with gaps: a strip of varying
+   density across the radius, seeded per ring so a given ring always looks
+   like itself. Radial only — the geometry's UVs are rewritten so u runs from
+   the inner edge to the outer, which is the axis the structure lives on. */
+function ringTexture(ring, tint) {
+  const rnd = seeded('ring|' + (ring.name || '') + '|' + ring.innerRadius);
+  const w = 512;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = 1;
+  const ctx = c.getContext('2d');
+  const b = baseHsl(tint);
+
+  ctx.clearRect(0, 0, w, 1);
+  // A handful of broad bands, then finer structure inside them.
+  for (let i = 0; i < 26 + Math.floor(rnd() * 22); i++) {
+    const x = rnd() * w;
+    const width = w * (0.006 + rnd() * 0.075);
+    ctx.fillStyle = hsl(b.h + (rnd() - 0.5) * 10, b.s * (0.6 + rnd() * 0.6),
+                        Math.max(10, Math.min(94, b.l + (rnd() - 0.4) * 34)),
+                        0.35 + rnd() * 0.65);
+    ctx.fillRect(x, 0, width, 1);
+  }
+  // Gaps: rings are mostly the spaces between them at a distance.
+  for (let i = 0; i < 4 + Math.floor(rnd() * 6); i++) {
+    ctx.clearRect(rnd() * w, 0, w * (0.004 + rnd() * 0.03), 1);
+  }
+  // Both edges fade rather than ending on a hard line.
+  ['left', 'right'].forEach((side) => {
+    const g = ctx.createLinearGradient(side === 'left' ? 0 : w, 0,
+                                       side === 'left' ? w * 0.07 : w * 0.93, 0);
+    g.addColorStop(0, 'rgba(0,0,0,1)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = g;
+    ctx.fillRect(side === 'left' ? 0 : w * 0.93, 0, w * 0.07, 1);
+    ctx.globalCompositeOperation = 'source-over';
+  });
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  return tex;
+}
+
 const RING_TINT = {
   'Icy': 0xC6D8E4,
   'Rocky': 0x9A8F7E,
@@ -501,6 +546,26 @@ function bodyTexture(n) {
   tex.wrapS = THREE.RepeatWrapping;
   TEX_CACHE.set(key, tex);
   return tex;
+}
+
+/* How solid a ring is drawn.
+
+   The dump carries a mass per ring alongside its radii, so surface density is
+   simply mass over area — and it separates them by a factor of fifty across
+   Sol: Jupiter's halo ring is a whisper, Saturn's D ring middling, Uranus's
+   and Neptune's the heaviest. Worth saying plainly, because it is the reverse
+   of the real solar system, where Saturn's rings dwarf everything: these are
+   the game's numbers, not astronomy's, and this draws what the data says.
+
+   The units are unstated, so the scale is anchored on a value from the game
+   rather than on physics, and clamped so nothing is either invisible or a
+   plate. */
+function ringOpacity(r) {
+  if (!r.mass || !(r.outerRadius > r.innerRadius)) return 0.3;
+  const area = Math.PI * (r.outerRadius * r.outerRadius - r.innerRadius * r.innerRadius);
+  const density = r.mass / area;
+  // Saturn's D ring sits at 1.3e-12 and reads about right at a third opaque.
+  return Math.max(0.06, Math.min(0.5, 0.3 * Math.pow(density / 1.3e-12, 0.45)));
 }
 
 function tintOf(sub) {
@@ -1328,13 +1393,27 @@ const Orrery = (function () {
           const inner = (r.innerRadius / 1000 / n.km) * n.drawR;
           const outer = (r.outerRadius / 1000 / n.km) * n.drawR;
           if (!(outer > inner) || !isFinite(outer)) return;
-          const disc = new THREE.Mesh(
-            new THREE.RingGeometry(inner, outer, 128, 1),
-            new THREE.MeshBasicMaterial({
-              color: RING_TINT[r.type] || 0xA89C8C,
-              side: THREE.DoubleSide, transparent: true, opacity: 0.34,
-              depthWrite: false
-            }));
+
+          const tint = RING_TINT[r.type] || 0xA89C8C;
+          const geo = new THREE.RingGeometry(inner, outer, 160, 1);
+
+          /* RingGeometry maps its UVs across the bounding square, which is no
+             use for something whose structure is radial. Rewritten so u runs
+             from the inner edge to the outer and the band texture lands the
+             way a ring is actually built. */
+          const pa = geo.getAttribute('position');
+          const uv = geo.getAttribute('uv');
+          for (let i = 0; i < pa.count; i++) {
+            const rad = Math.hypot(pa.getX(i), pa.getY(i));
+            uv.setXY(i, (rad - inner) / (outer - inner || 1), 0.5);
+          }
+          uv.needsUpdate = true;
+
+          const disc = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+            map: ringTexture(r, tint),
+            side: THREE.DoubleSide, transparent: true,
+            opacity: ringOpacity(r, n.raw.rings), depthWrite: false
+          }));
           // RingGeometry is built in the XY plane; the equator is XZ.
           disc.rotation.x = Math.PI / 2;
           disc.renderOrder = 1;
@@ -2189,7 +2268,11 @@ const Orrery = (function () {
           count: m.rings.children.length,
           innerRadii: g.innerRadius / sel.drawR,
           outerRadii: g.outerRadius / sel.drawR,
-          tilt: m.rings.rotation.z
+          tilt: m.rings.rotation.z,
+          // Driven by mass over area, so a faint halo ring and a heavy one do
+          // not come out identical.
+          opacity: m.rings.children[0].material.opacity,
+          banded: !!m.rings.children[0].material.map
         };
       })(),
       rate: LADDER[rateIx].label,
