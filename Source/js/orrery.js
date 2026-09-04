@@ -360,6 +360,8 @@ const Orrery = (function () {
      and the trans-Neptunian inclinations alone make a tangle you cannot see
      the planets through. */
   let showLabels = true, following = true, orbitMode = 0;   // 0 all, 1 planets, 2 none
+  // Which slice of the rate ladder this system can usefully use — see below.
+  let rateLo = 0, rateHi = LADDER.length - 1;
   const ORBIT_LABEL = ['Orbits: all', 'Orbits: planets', 'Orbits: none'];
   let standalone = false;
   let galaxyWasVisible = null;
@@ -698,7 +700,17 @@ const Orrery = (function () {
   }
 
   function initGL() {
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    /* A system spans from a body a few thousand kilometres across to an orbit
+       seven hundred astronomical units wide. A linear depth buffer cannot hold
+       that: whatever near and far are set to, one end of the range gets almost
+       no precision, and the surfaces that lose are the ones drawn close
+       together — a moon against its planet, an orbit line grazing the body on
+       it. three.js has the standard answer built in, and its own example for
+       it covers a micrometre to a hundred million light years. It costs a
+       fragment-shader depth write, which is worth it here. */
+    renderer = new THREE.WebGLRenderer({
+      canvas, antialias: true, alpha: false, logarithmicDepthBuffer: true
+    });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x05070A);
@@ -902,13 +914,42 @@ const Orrery = (function () {
     b.classList.toggle('paused', !on);
   }
 
+  /* How fast is still worth watching.
+
+     Past a point the clock is not fast, it is undersampled. At a century a
+     second Mercury turns seven times between frames: it stops moving and
+     starts strobing, and no amount of care in the geometry can help, because
+     the samples simply are not there. The ceiling belongs to the system
+     rather than being a constant — it comes from the shortest year among the
+     bodies orbiting the star, at roughly four frames per orbit at 60fps.
+
+     Moons are deliberately left out of that. They are sub-pixel until you are
+     at their planet, and by the time you are, you will have slowed down. */
+  function usefulRate() {
+    const years = model.star.children.map((n) => n.P).filter((p) => p > 0);
+    return years.length ? Math.min(...years) * 15 : Infinity;
+  }
+
+  function limitRates() {
+    const cap = usefulRate();
+    const ok = [];
+    LADDER.forEach((r, i) => { if (r.days <= cap) ok.push(i); });
+    if (ok.length) { rateLo = ok[0]; rateHi = ok[ok.length - 1]; }
+    setRate(rateIx);
+  }
+
   function setRate(ix) {
-    rateIx = Math.max(0, Math.min(LADDER.length - 1, ix));
+    rateIx = Math.max(rateLo, Math.min(rateHi, ix));
     const r = LADDER[rateIx];
     panel.querySelector('#orr-rate').textContent =
       (r.dir < 0 && r.days > 1 / 86400 ? '− ' : '') + r.label;
-    panel.querySelector('#orr-slower').disabled = rateIx === 0;
-    panel.querySelector('#orr-faster').disabled = rateIx === LADDER.length - 1;
+    const slower = panel.querySelector('#orr-slower');
+    const faster = panel.querySelector('#orr-faster');
+    slower.disabled = rateIx === rateLo;
+    faster.disabled = rateIx === rateHi;
+    faster.title = faster.disabled
+      ? 'As fast as this system reads — beyond this its inner bodies skip whole orbits between frames'
+      : 'Faster';
   }
 
   function setMode(on3d) {
@@ -969,13 +1010,19 @@ const Orrery = (function () {
        plane it replaced, just smaller: for a body whose framing distance is
        itself around a millionth of a unit — a small moon at true scale — an
        absolute 1e-6 would swallow most of the gap to the camera and clip the
-       thing you came to look at. d is already floored, so this cannot be 0. */
+       thing you came to look at. d is already floored, so this cannot be 0.
+
+       Near still has to follow the camera even with a logarithmic depth
+       buffer: that fixes precision across the range, not clipping. Anything
+       closer than near is still cut away. Far can be generous now, though,
+       which is what keeps the rest of the system drawn while you are down
+       among the moons. */
     const near = d * 0.002;
     // Only when it has really moved: updateProjectionMatrix every frame for a
     // rounding difference is work for nothing.
     if (Math.abs(cam3.near - near) > near * 0.1) {
       cam3.near = near;
-      cam3.far = Math.max(d * 500, ORBIT_OUT * 8);
+      cam3.far = Math.max(d * 500, ORBIT_OUT * 40);
       cam3.updateProjectionMatrix();
     }
   }
@@ -1447,6 +1494,7 @@ const Orrery = (function () {
       model.all.filter((n) => n.type === 'Star').length + ' star' +
       (model.all.filter((n) => n.type === 'Star').length > 1 ? 's' : '');
 
+    limitRates();
     buildScene();
     renderList();
     buildLabels();
@@ -1520,6 +1568,9 @@ const Orrery = (function () {
       selectedRadius: sel ? sel.drawR : null,
       near: cam3.near,
       bodies: model ? model.all.length : 0,
+      logDepth: !!(renderer && renderer.capabilities.logarithmicDepthBuffer),
+      rate: LADDER[rateIx].label,
+      fastestRate: LADDER[rateHi].label,
       /* How far the worst-drawn orbit strays from the body riding on it, in
          that body's own radii. A polyline is a polygon, so it always sags
          below the true ellipse; what matters is whether the sag is bigger

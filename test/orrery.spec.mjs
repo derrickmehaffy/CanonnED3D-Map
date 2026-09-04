@@ -694,3 +694,73 @@ test('a body rides on its own orbit line, at either scale', async ({ page }) => 
   await page.waitForTimeout(500);
   expect(await miss(), 'true scale').toBeLessThan(1);
 });
+
+/* A system spans from a body a few thousand kilometres across to an orbit
+   hundreds of AU wide. A linear depth buffer cannot hold that range: whatever
+   near and far are set to, one end gets almost no precision, and what loses is
+   exactly the surfaces drawn close together — a moon against its planet, an
+   orbit line grazing the body riding it. */
+test('depth is held logarithmically, across the whole span', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+  expect(await page.evaluate(() => window.Orrery.state().logDepth)).toBe(true);
+});
+
+/* Past a point the clock is not fast, it is undersampled: a body that turns
+   several times between frames stops moving and starts strobing, and no care
+   in the geometry can help because the samples are not there. The ceiling
+   belongs to the system, not to the control. */
+test('the clock stops at the speed the system can still show', async ({ page }) => {
+  const withPeriods = (name, periods) => ({
+    name, id64: 99, date: '2026-01-01 00:00:00+00',
+    bodies: [
+      { bodyId: 0, type: 'Star', name, mainStar: true,
+        subType: 'G (White-Yellow) Star', spectralClass: 'G2', solarRadius: 1 },
+      ...periods.map((P, i) => ({
+        bodyId: i + 1, type: 'Planet', name: name + ' ' + (i + 1),
+        subType: 'Rocky body', parents: [{ Star: 0 }], radius: 6000,
+        semiMajorAxis: Math.pow(P / 365, 2 / 3), orbitalPeriod: P,
+        distanceToArrival: 400 + i
+      }))
+    ]
+  });
+
+  const capOf = async (sys) => {
+    await stubApi(page, sys);
+    await page.goto('/orrery.html?system=' + encodeURIComponent(sys.name),
+      { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.orr-facts .orr-f-h')).toBeVisible({ timeout: 60_000 });
+    for (let i = 0; i < 25; i++) {
+      await page.locator('#orr-faster').click({ force: true }).catch(() => {});
+    }
+    return page.evaluate(() => window.Orrery.state());
+  };
+
+  await stubDataHosts(page);
+
+  // Sol's shape: an 88-day inner planet holds the ceiling down.
+  const fast = await capOf(withPeriods('Quick', [88, 365, 4332]));
+  expect(fast.fastestRate).toBe('1 year/s');
+  await expect(page.locator('#orr-faster')).toBeDisabled();
+
+  // A system whose innermost body takes eight years can be run far harder
+  // without anything skipping, so the ceiling lifts to the top of the ladder.
+  const slow = await capOf(withPeriods('Slow', [3000, 60000]));
+  expect(slow.fastestRate).toBe('100 yrs/s');
+  await expect(page.locator('#orr-faster')).toBeDisabled();
+
+  // A middling one lands in between rather than at either end — the ceiling
+  // tracks the data, it is not a two-way switch.
+  const mid = await capOf(withPeriods('Middling', [2200, 60000]));
+  expect(mid.fastestRate).toBe('10 yrs/s');
+
+  // Whatever the ceiling, "slower" still reaches the bottom of the ladder and
+  // the reverse half of it.
+  for (let i = 0; i < 25; i++) {
+    await page.locator('#orr-slower').click({ force: true }).catch(() => {});
+  }
+  await expect(page.locator('.orr-rate')).toContainText('−');
+  await expect(page.locator('#orr-slower')).toBeDisabled();
+});
