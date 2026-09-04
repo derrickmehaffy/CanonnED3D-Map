@@ -656,3 +656,41 @@ test('you can get right up to a body at true scale', async ({ page }) => {
   expect(later.selected).toBe('Testholm 1');
   expect(Math.abs(later.toSelected - s.toSelected)).toBeLessThan(s.toSelected * 0.5);
 });
+
+/* A polyline is a polygon: it always sags below the true ellipse it stands
+   for. At a fixed 180 segments that sag is r·pi²/(2·180²), which against
+   Mercury drawn to scale is three and a half times the planet's own radius —
+   so the planet sat visibly off its own orbit and wobbled in and out of it as
+   it travelled, worse the faster time ran. Spread mode hid it only by drawing
+   bodies hundreds of thousands of times too large. */
+test('a body rides on its own orbit line, at either scale', async ({ page }) => {
+  await stubDataHosts(page);
+  // Sol's real span: a small inner planet, a gas giant, and a small body far
+  // out — which is the case that needs the most segments by a long way.
+  await stubApi(page, { name: 'Testholm', id64: 99, date: '2026-01-01 00:00:00+00', bodies: [
+    { bodyId: 0, type: 'Star', name: 'Testholm', mainStar: true,
+      subType: 'G (White-Yellow) Star', spectralClass: 'G2', solarRadius: 1 },
+    { bodyId: 1, type: 'Planet', name: 'Testholm 1', subType: 'Metal-rich body',
+      parents: [{ Star: 0 }], radius: 2440, distanceToArrival: 170,
+      semiMajorAxis: 0.387, orbitalEccentricity: 0.2056, orbitalPeriod: 88 },
+    { bodyId: 2, type: 'Planet', name: 'Testholm 2', subType: 'Class I gas giant',
+      parents: [{ Star: 0 }], radius: 69911, distanceToArrival: 2600,
+      semiMajorAxis: 5.204, orbitalEccentricity: 0.0488, orbitalPeriod: 4332 },
+    { bodyId: 3, type: 'Planet', name: 'Testholm 3', subType: 'Icy body',
+      parents: [{ Star: 0 }], radius: 995, distanceToArrival: 290000,
+      semiMajorAxis: 506, orbitalEccentricity: 0.85, orbitalPeriod: 4161000 }
+  ] });
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(4, { timeout: 60_000 });
+
+  const miss = () => page.evaluate(() => window.Orrery.state().worstOrbitMiss);
+
+  // Under one body-radius everywhere, which is the point at which it stops
+  // being something you can see.
+  expect(await miss(), 'spread').toBeLessThan(1);
+
+  await page.locator('#orr-true').click();
+  await expect(page.locator('#orr-true')).toHaveClass(/on/);
+  await page.waitForTimeout(500);
+  expect(await miss(), 'true scale').toBeLessThan(1);
+});

@@ -813,11 +813,26 @@ const Orrery = (function () {
         }
       }
 
-      // The path, sampled once in the body's own plane and then carried
-      // around by its parent each frame.
+      /* The path, sampled once in the body's own plane and then carried
+         around by its parent each frame.
+
+         Sampled finely enough for the body that sits on it. A polyline is a
+         polygon, and a fixed 180 segments sags below the true ellipse by
+         r·pi²/(2·180²) — which against Mercury drawn to scale is three and a
+         half times the planet's own radius, so the planet visibly missed its
+         own orbit and wobbled in and out of it as it travelled. The ratio
+         that matters is orbit radius over body radius, and that is physical:
+         orbit km over body km, the same at any draw scale. Spread mode hides
+         it only because it draws the body hundreds of thousands of times too
+         large. Enough segments to keep the sag under a quarter of the body,
+         capped so a small object on a very wide orbit — Sedna wants 38,000 —
+         does not run away with memory. */
       if (n.a > 0 && n.P) {
         const pts = [];
-        const steps = 180;
+        const steps = n.drawR > 0
+          ? Math.max(180, Math.min(32768,
+              Math.ceil(Math.PI * Math.sqrt(2 * n.a / n.drawR))))
+          : 180;
         for (let s = 0; s <= steps; s++) {
           const E = (s / steps) * Math.PI * 2;
           const r = n.a * (1 - n.e * Math.cos(E));
@@ -827,9 +842,11 @@ const Orrery = (function () {
         }
         const geo = new THREE.BufferGeometry().setFromPoints(pts);
         const moon = n.parent && n.parent !== model.star;
+        entry.lineNode = n;
         entry.line = new THREE.Line(geo, new THREE.LineBasicMaterial({
           color: moon ? 0x28343F : 0x33465A, transparent: true, opacity: moon ? 0.34 : 0.5
         }));
+        entry.line.userData.node = n;
         scene.add(entry.line);
       }
 
@@ -845,7 +862,9 @@ const Orrery = (function () {
   function frame() {
     const span = ORBIT_OUT * 1.25;
     cam3.position.set(span * 0.22, span * 0.46, span * 0.78);
-    cam3.near = 0.05; cam3.far = span * 40; cam3.updateProjectionMatrix();
+    // Relative to the system, not an absolute figure: adaptClip() takes over
+    // from here anyway, but a hardcoded 0.05 is only ever right for one scale.
+    cam3.near = span * 0.0004; cam3.far = span * 40; cam3.updateProjectionMatrix();
     cam2.position.set(0, span * 3, 0);
     cam2.far = span * 40;
     controls.target.set(0, 0, 0);
@@ -946,7 +965,12 @@ const Orrery = (function () {
   function adaptClip() {
     if (!mode3d) return;
     const d = Math.max(cam3.position.distanceTo(controls.target), 1e-7);
-    const near = Math.max(1e-6, d * 0.002);
+    /* Purely proportional. A floor here is the same mistake as the fixed
+       plane it replaced, just smaller: for a body whose framing distance is
+       itself around a millionth of a unit — a small moon at true scale — an
+       absolute 1e-6 would swallow most of the gap to the camera and clip the
+       thing you came to look at. d is already floored, so this cannot be 0. */
+    const near = d * 0.002;
     // Only when it has really moved: updateProjectionMatrix every frame for a
     // rounding difference is work for nothing.
     if (Math.abs(cam3.near - near) > near * 0.1) {
@@ -1495,7 +1519,17 @@ const Orrery = (function () {
       toSelected: sel ? cam.position.distanceTo(sel._pos) : null,
       selectedRadius: sel ? sel.drawR : null,
       near: cam3.near,
-      bodies: model ? model.all.length : 0
+      bodies: model ? model.all.length : 0,
+      /* How far the worst-drawn orbit strays from the body riding on it, in
+         that body's own radii. A polyline is a polygon, so it always sags
+         below the true ellipse; what matters is whether the sag is bigger
+         than the thing sitting on it. Under 1 means you cannot see it. */
+      worstOrbitMiss: meshes.reduce((worst, m) => {
+        const n = m.node;
+        if (!m.line || !(n.drawR > 0) || !(n.a > 0)) return worst;
+        const N = m.line.geometry.getAttribute('position').count - 1;
+        return Math.max(worst, (n.a * (1 - Math.cos(Math.PI / N))) / n.drawR);
+      }, 0)
     };
   }
 
