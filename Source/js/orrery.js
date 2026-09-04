@@ -906,9 +906,11 @@ const Orrery = (function () {
       // drop in. The orbit view shows AU from each parent, which is a
       // different question from "how far is the fly-out".
       '<div class="orr-spine" id="orr-spine"></div>',
+      '<div class="orr-grip orr-grip-h" id="orr-grip-h" role="separator"',
+      '     aria-label="Resize the distance axis" tabindex="0"></div>',
 
       '<div class="orr-mid">',
-      '  <aside class="orr-side orr-left">',
+      '  <aside class="orr-side orr-left" id="orr-left">',
       '    <div class="orr-s-h">',
       '      <div class="orr-s-t">Bodies</div>',
       '      <input id="orr-filter" class="orr-filter" type="text" autocomplete="off"',
@@ -961,7 +963,11 @@ const Orrery = (function () {
       '    </div>',
       '    <div class="orr-legend" id="orr-legend"></div>',
       '  </div>',
-      '  <aside class="orr-side orr-right">',
+      '    <div class="orr-grip orr-grip-l" id="orr-grip-l" role="separator"',
+      '         aria-label="Resize the body list" tabindex="0"></div>',
+      '  <aside class="orr-side orr-right" id="orr-right">',
+      '    <div class="orr-grip orr-grip-r" id="orr-grip-r" role="separator"',
+      '         aria-label="Resize the detail panel" tabindex="0"></div>',
       '    <div class="orr-facts" id="orr-facts"></div>',
       '  </aside>',
       '</div>',
@@ -1022,11 +1028,99 @@ const Orrery = (function () {
       if (b) go(b.dataset.sys);
     });
     wireSearch();
+    wireResize();
 
     document.addEventListener('keydown', onKey);
     window.addEventListener('resize', () => { resize(); drawSpine(); });
     canvas.addEventListener('pointerdown', onPick);
     initGL();
+  }
+
+  /* ── resizing ─────────────────────────────────────────────────────────────
+     The list, the detail and the distance axis are all things a reader wants
+     more or less of depending on what they are doing, so all three take a
+     drag. Widths and heights are remembered, and clamped on the way back in as
+     well as on the way out: a size chosen on a wide screen must not be able to
+     leave a narrow one with no room for the model itself. */
+
+  function clampSide(px, which) {
+    const room = panel.querySelector('.orr-mid').getBoundingClientRect().width || 1200;
+    // Always leave the stage at least half the width between the two rails.
+    const max = Math.max(180, room * 0.34);
+    return Math.round(Math.max(160, Math.min(max, px)));
+  }
+
+  function setSide(which, px) {
+    const el = panel.querySelector('#orr-' + which);
+    const w = clampSide(px, which);
+    el.style.width = w + 'px';
+    keep(which + 'Width', w);
+    resize();
+    return w;
+  }
+
+  function setSpine(px) {
+    const h = Math.round(Math.max(0, Math.min(120, px)));
+    const el = panel.querySelector('#orr-spine');
+    el.style.height = h + 'px';
+    // Below the point where an axis can be read, it is simply put away.
+    el.classList.toggle('shut', h < 16);
+    keep('spineHeight', h);
+    resize();
+    return h;
+  }
+
+  function drag(grip, onMove) {
+    grip.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      grip.setPointerCapture(e.pointerId);
+      document.body.classList.add('orr-dragging');
+      const move = (ev) => onMove(ev);
+      const up = () => {
+        grip.removeEventListener('pointermove', move);
+        grip.removeEventListener('pointerup', up);
+        document.body.classList.remove('orr-dragging');
+      };
+      grip.addEventListener('pointermove', move);
+      grip.addEventListener('pointerup', up);
+    });
+    // Keyboard, because a drag handle that only takes a pointer is a wall.
+    grip.addEventListener('keydown', (e) => {
+      const step = e.shiftKey ? 40 : 12;
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); onMove(null, -step); }
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); onMove(null, step); }
+    });
+  }
+
+  function wireResize() {
+    const left = panel.querySelector('#orr-left');
+    const right = panel.querySelector('#orr-right');
+    const spine = panel.querySelector('#orr-spine');
+
+    drag(panel.querySelector('#orr-grip-l'), (ev, step) => {
+      const w = ev ? ev.clientX - left.getBoundingClientRect().left
+                   : left.getBoundingClientRect().width + step;
+      setSide('left', w);
+    });
+    drag(panel.querySelector('#orr-grip-r'), (ev, step) => {
+      const w = ev ? right.getBoundingClientRect().right - ev.clientX
+                   : right.getBoundingClientRect().width - step;
+      setSide('right', w);
+    });
+    drag(panel.querySelector('#orr-grip-h'), (ev, step) => {
+      const h = ev ? ev.clientY - spine.getBoundingClientRect().top
+                   : spine.getBoundingClientRect().height + step;
+      setSpine(h);
+      drawSpine();
+    });
+
+    setSide('left', recallNum('leftWidth', 262));
+    setSide('right', recallNum('rightWidth', 276));
+    setSpine(recallNum('spineHeight', 37));
+    window.addEventListener('resize', () => {
+      setSide('left', left.getBoundingClientRect().width);
+      setSide('right', right.getBoundingClientRect().width);
+    });
   }
 
   /* ── finding a system ─────────────────────────────────────────────────────
@@ -1870,11 +1964,94 @@ const Orrery = (function () {
       '<div><dt>' + k + '</dt><dd>' + esc(String(v)) + '</dd></div>').join('') + '</dl>' : '';
   }
 
+  /* The four numbers you actually decide on, set the way the system card in
+     the galaxy map sets them: label above in condensed caps, the figure large
+     and tabular, the unit small and dim beside it. A column of label-and-value
+     rows makes you read; this you can scan. */
+  function measures(cells) {
+    const live = cells.filter((c) => c && c[1]);
+    if (!live.length) return '';
+    return '<div class="orr-meas">' + live.map(([k, v, u]) =>
+      '<div><dt>' + k + '</dt><dd>' + esc(String(v)) +
+      (u ? '<em>' + u + '</em>' : '') + '</dd></div>').join('') + '</div>';
+  }
+
+  /* The services worth knowing before you fly. Walz Depot lists twenty-six of
+     them; naming all twenty-six helps nobody, and these four are the ones that
+     decide whether the trip is worth making. */
+  const KEY_SERVICES = ['Market', 'Outfitting', 'Shipyard', 'Repair', 'Refuel'];
+
+  function serviceChips(st) {
+    const have = st.services || [];
+    if (!have.length) return '';
+    const shown = KEY_SERVICES.filter((k) => have.includes(k));
+    const rest = have.length - shown.length;
+    return '<div class="orr-svc">' +
+      shown.map((k) => '<i>' + k + '</i>').join('') +
+      (rest > 0 ? '<u>+' + rest + ' more</u>' : '') + '</div>';
+  }
+
+  /* Out to the wider tooling.
+
+     Spansh keys on the market id, which is the id the dump carries, so that is
+     an exact link to this station. Inara numbers stations itself and that
+     number is not in the dump, so the honest offer is its search — which does
+     land on the station, but it is a search and the label says so. */
+  function stationLinks(st, systemName) {
+    const out = [];
+    if (st.id) {
+      out.push('<a href="https://spansh.co.uk/station/' + encodeURIComponent(st.id) +
+        '" target="_blank" rel="noopener">Spansh <span>&#8599;</span></a>');
+    }
+    out.push('<a href="https://inara.cz/elite/search/?search=' +
+      encodeURIComponent(st.name + ' ' + systemName) +
+      '" target="_blank" rel="noopener" title="Inara numbers its own stations, so this searches for it by name">Find on Inara <span>&#8599;</span></a>');
+    return '<div class="orr-links">' + out.join('') + '</div>';
+  }
+
+  function stationCard(st, systemName) {
+    const pads = st.landingPads || {};
+    const big = pads.large ? 'L' : pads.medium ? 'M' : pads.small ? 'S' : '';
+    const meta = [
+      st.type,
+      st.primaryEconomy,
+      typeof st.distanceToArrival === 'number'
+        ? Math.round(st.distanceToArrival).toLocaleString() + ' Ls' : ''
+    ].filter(Boolean).join(' · ');
+    return '<div class="orr-stn">' +
+      '<div class="orr-stn-h"><b>' + esc(st.name) + '</b>' +
+        (big ? '<i class="pad" title="Largest landing pad">' + big + '</i>' : '') + '</div>' +
+      (meta ? '<div class="orr-stn-m">' + esc(meta) + '</div>' : '') +
+      serviceChips(st) +
+      stationLinks(st, systemName) +
+    '</div>';
+  }
+
   const chip = (on, label, kind) =>
     on ? '<span class="orr-chip ' + (kind || '') + '">' + label + '</span>' : '';
 
-  /** "$SAA_SignalType_Human;" is a game token, not something to show a reader. */
-  const signalName = (k) => String(k).replace(/^\$SAA_SignalType_/, '').replace(/;$/, '');
+  /* Signal keys are game tokens and come in more than one shape:
+     "$SAA_SignalType_Human;" from the surface scanner, and bare ones like
+     "$PLANETARYMININGLOCATION_NAME" from elsewhere. Neither is something to
+     put in front of a reader. The few that are worth naming properly are
+     named; anything else is stripped back to words rather than shown raw. */
+  const SIGNAL_NAMES = {
+    biological: 'Biological', geological: 'Geological', guardian: 'Guardian',
+    human: 'Human', thargoid: 'Thargoid', other: 'Other',
+    planetarymininglocation: 'Mining location', xenological: 'Xenological'
+  };
+
+  function signalName(k) {
+    const bare = String(k)
+      .replace(/^\$?SAA_SignalType_/i, '')
+      .replace(/^\$/, '')
+      .replace(/;$/, '')
+      .replace(/_NAME$/i, '');
+    const known = SIGNAL_NAMES[bare.toLowerCase().replace(/_/g, '')];
+    if (known) return known;
+    const words = bare.replace(/_/g, ' ').toLowerCase().trim();
+    return words.charAt(0).toUpperCase() + words.slice(1);
+  }
 
   const KM = (m) => Math.round(m / 1000).toLocaleString() + ' km';
 
@@ -1883,8 +2060,23 @@ const Orrery = (function () {
     const isStar = n.type === 'Star';
     let h = '';
 
-    h += '<div class="orr-f-h"><b>' + esc(n.name) + '</b>' +
-         '<span>' + esc(n.sub || n.type) + '</span></div>';
+    /* The disc is the body's own painted surface, the very canvas the sphere
+       out in the view is wearing — not an icon standing in for it. It exists
+       already, so showing it costs nothing and makes the thing you clicked and
+       the panel about it visibly the same object. */
+    const m = meshes.filter((x) => x.node === n)[0];
+    const face = m && m.mesh && m.mesh.material.map && m.mesh.material.map.image;
+    let disc = '';
+    if (face && face.toDataURL) {
+      disc = '<span class="orr-face" style="background-image:url(' +
+        face.toDataURL() + ')"></span>';
+    } else if (isStar) {
+      disc = '<span class="orr-face star" style="background:' +
+        starColour().getStyle() + '"></span>';
+    }
+
+    h += '<div class="orr-f-h">' + disc + '<div class="orr-f-n"><b>' +
+         esc(n.name) + '</b><span>' + esc(n.sub || n.type) + '</span></div></div>';
 
     const flags =
       chip(b.isLandable, 'Landable', 'good') +
@@ -1896,19 +2088,26 @@ const Orrery = (function () {
       chip(n.spin < 0, 'Retrograde spin');
     if (flags) h += '<div class="orr-chips">' + flags + '</div>';
 
+    h += measures(isStar ? [
+      ['Class', [b.spectralClass, b.luminosity].filter(Boolean).join(' '), ''],
+      ['Surface', b.surfaceTemperature && Math.round(b.surfaceTemperature).toLocaleString(), 'K'],
+      ['Mass', b.solarMasses && num(b.solarMasses, 2), '&times; Sun'],
+      ['Age', b.age && (b.age >= 1000 ? num(b.age / 1000, 1) : b.age.toLocaleString()),
+        b.age >= 1000 ? 'bn yrs' : 'm yrs']
+    ] : [
+      ['Radius', n.km && Math.round(n.km).toLocaleString(), 'km'],
+      ['Gravity', b.gravity && num(b.gravity, 2), 'g'],
+      ['Arrival', b.distanceToArrival && Math.round(b.distanceToArrival).toLocaleString(), 'Ls'],
+      ['Year', n.P && (n.P >= 365 ? num(n.P / 365.25, 2) : num(n.P, 1)),
+        n.P >= 365 ? 'years' : 'days']
+    ]);
+
     h += sect(isStar ? 'Star' : 'Body', table(isStar ? [
-      ['Class', [b.spectralClass, b.luminosity].filter(Boolean).join(' ')],
-      ['Surface', b.surfaceTemperature && Math.round(b.surfaceTemperature).toLocaleString() + ' K'],
-      ['Mass', b.solarMasses && num(b.solarMasses, 3) + ' × Sun'],
       ['Radius', b.solarRadius && num(b.solarRadius, 3) + ' × Sun'],
-      ['Age', b.age && (b.age >= 1000 ? num(b.age / 1000, 1) + ' bn years'
-                                      : b.age.toLocaleString() + ' m years')],
       ['Magnitude', b.absoluteMagnitude !== undefined && b.absoluteMagnitude !== null
         ? num(b.absoluteMagnitude, 2) : '']
     ] : [
-      ['Radius', n.km && Math.round(n.km).toLocaleString() + ' km'],
       ['Mass', b.earthMasses && num(b.earthMasses, b.earthMasses < 1 ? 3 : 2) + ' × Earth'],
-      ['Gravity', b.gravity && num(b.gravity, 2) + ' g'],
       ['Surface', b.surfaceTemperature && Math.round(b.surfaceTemperature) + ' K'],
       ['Pressure', b.surfacePressure ? num(b.surfacePressure, 3) + ' atm' : ''],
       ['Volcanism', b.volcanismType],
@@ -1917,9 +2116,7 @@ const Orrery = (function () {
 
     h += sect('Orbit', table([
       ['Orbits', n.parent && n.parent.name],
-      ['Arrival', b.distanceToArrival && Math.round(b.distanceToArrival).toLocaleString() + ' Ls'],
       ['Semi-major axis', n.aAu && num(n.aAu, n.aAu < 0.1 ? 5 : 3) + ' AU'],
-      ['Year', n.P && (n.P >= 365 ? qty(n.P / 365.25, 2, 'year') : qty(n.P, 1, 'day'))],
       ['Day', n.spin && (Math.abs(n.spin) >= 1 ? qty(Math.abs(n.spin), 2, 'day')
                                                : qty(Math.abs(n.spin) * 24, 1, 'hour'))],
       ['Eccentricity', n.e ? num(n.e, 4) : ''],
@@ -1960,31 +2157,16 @@ const Orrery = (function () {
     if (ports.length) {
       h += sect(ports.length + ' station' + (ports.length > 1 ? 's' : ''),
         ports.slice().sort((x, y) =>
-          (x.distanceToArrival || 0) - (y.distanceToArrival || 0)).map((st) => {
-          const pads = st.landingPads || {};
-          const big = pads.large ? 'L' : pads.medium ? 'M' : pads.small ? 'S' : '';
-          const line = [
-            st.type,
-            st.primaryEconomy,
-            typeof st.distanceToArrival === 'number'
-              ? Math.round(st.distanceToArrival).toLocaleString() + ' Ls' : ''
-          ].filter(Boolean).join(' · ');
-          return '<div class="orr-item">' +
-            '<b>' + esc(st.name) +
-              (big ? '<i class="pad" title="Largest landing pad">' + big + '</i>' : '') + '</b>' +
-            (line ? '<span>' + esc(line) + '</span>' : '') + '</div>';
-        }).join(''));
+          (x.distanceToArrival || 0) - (y.distanceToArrival || 0))
+          .map((st) => stationCard(st, model.name)).join(''));
     }
 
     if (n === model.star) {
       const loose = (model.ports || []).filter((p) => !p.on).map((p) => p.st);
       if (loose.length) {
         h += sect('Elsewhere in the system', loose.slice().sort((x, y) =>
-          (x.distanceToArrival || 0) - (y.distanceToArrival || 0)).map((st) =>
-          '<div class="orr-item"><b>' + esc(st.name) + '</b><span>' +
-          esc([st.type, typeof st.distanceToArrival === 'number'
-            ? Math.round(st.distanceToArrival).toLocaleString() + ' Ls' : '']
-            .filter(Boolean).join(' · ')) + '</span></div>').join(''));
+          (x.distanceToArrival || 0) - (y.distanceToArrival || 0))
+          .map((st) => stationCard(st, model.name)).join(''));
       }
     }
 

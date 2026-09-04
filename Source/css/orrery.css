@@ -156,6 +156,21 @@ body.orrery-open .app{visibility:hidden}
 .orr-label.on{color:var(--ion,#4DE3E1)}
 .orr-label.off{display:none}
 
+/* ── resizing ───────────────────────────────────────────────────────────────
+   The list, the detail and the distance axis all take a drag, because how much
+   of each you want depends on what you are doing. The handles sit on the
+   inside edge so they never collide with the window's own. */
+.orr-grip{position:absolute;z-index:6;background:transparent}
+.orr-grip:hover,.orr-grip:focus-visible{background:var(--amber,#FF9D00);opacity:.55}
+.orr-grip-l,.orr-grip-r{top:0;bottom:0;width:5px;cursor:col-resize}
+.orr-grip-l{right:-3px}
+.orr-grip-r{left:-3px}
+.orr-grip-h{position:relative;height:5px;margin-top:-3px;cursor:row-resize}
+body.orr-dragging{user-select:none}
+.orr-left,.orr-right{position:relative}
+/* Below the height an axis can be read at, it is simply put away. */
+.orr-spine.shut{padding:0;overflow:hidden;border-bottom:0}
+
 /* ── the view drawer ────────────────────────────────────────────────────────
    An orrery answers three questions, and its controls belong where the answers
    do: which system (the header), when (the time bar), and how it is drawn.
@@ -246,6 +261,12 @@ body.orrery-open .app{visibility:hidden}
 .orr-row:hover{background:var(--panel-2,#111820)}
 .orr-row.on{background:var(--panel-2,#111820);border-left-color:var(--amber,#FF9D00)}
 .orr-row .dot{width:9px;height:9px;border-radius:50%;flex:none}
+/* A hairline down the indent, so a moon reads as belonging to its planet
+   rather than merely being further right. */
+.orr-row[style*="--depth:1"],.orr-row[style*="--depth:2"],.orr-row[style*="--depth:3"]{
+  background-image:linear-gradient(var(--rule,#1B242E),var(--rule,#1B242E));
+  background-size:1px 100%;background-repeat:no-repeat;
+  background-position:calc(10px + (var(--depth,0) - 1) * 15px) 0}
 .orr-row .nm{flex:1;min-width:0;font-family:var(--mono,monospace);font-size:11px;
   color:var(--dim,#93A3B1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .orr-row.on .nm{color:var(--text,#CAD4DC)}
@@ -253,9 +274,53 @@ body.orrery-open .app{visibility:hidden}
   font-variant-numeric:tabular-nums}
 
 .orr-facts{flex:1;min-height:0;overflow-y:auto;padding:2px 13px 16px}
-.orr-f-h{display:flex;flex-direction:column;gap:2px}
-.orr-f-h b{font-family:var(--cond,sans-serif);font-size:14px;font-weight:600;color:#E4EBF1}
+
+/* The body wears its own face: the disc is the very canvas the sphere in the
+   view is textured with, lit from one side so it reads as a globe rather than
+   a swatch. */
+.orr-f-h{display:flex;align-items:center;gap:11px}
+.orr-f-n{display:flex;flex-direction:column;gap:2px;min-width:0}
+.orr-f-h b{font-family:var(--cond,sans-serif);font-size:14px;font-weight:600;color:#E4EBF1;
+  overflow-wrap:anywhere}
 .orr-f-h span{font-family:var(--mono,monospace);font-size:10px;color:var(--amber,#FF9D00)}
+.orr-face{flex:none;width:40px;height:40px;border-radius:50%;background-size:170% 100%;
+  background-position:38% 50%;box-shadow:inset -9px -4px 14px -4px rgba(0,0,0,.85),
+  inset 3px 2px 8px -4px rgba(255,255,255,.28)}
+.orr-face.star{box-shadow:0 0 16px -2px currentColor}
+
+/* The numbers you decide on, set the way the galaxy map's system card sets
+   them: label above, figure large and tabular, unit small beside it. */
+.orr-meas{display:grid;grid-template-columns:1fr 1fr;gap:1px;margin-top:11px;
+  background:var(--rule,#1B242E);border:1px solid var(--rule,#1B242E)}
+.orr-meas > div{background:var(--panel,#0C1116);padding:6px 9px 7px;min-width:0}
+.orr-meas dt{font-family:var(--cond,sans-serif);font-size:9px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--dimmer,#6E7F8D);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.orr-meas dd{margin:2px 0 0;display:flex;align-items:baseline;gap:4px;
+  font-family:var(--mono,monospace);font-size:13.5px;line-height:1.15;
+  color:var(--text,#CAD4DC);font-variant-numeric:tabular-nums}
+.orr-meas dd em{font-style:normal;font-size:9px;color:var(--dimmer,#6E7F8D);white-space:nowrap}
+
+/* A station is a place you might fly to, so it gets a card rather than a row:
+   what it is, how far, what it can do for you, and the way out to the tools
+   that know more. */
+.orr-stn{border:1px solid var(--rule,#1B242E);padding:7px 9px 8px;margin-bottom:4px}
+.orr-stn-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.orr-stn-h b{font-family:var(--cond,sans-serif);font-size:12px;font-weight:600;
+  color:var(--text,#CAD4DC)}
+.orr-stn-m{margin-top:1px;font-family:var(--mono,monospace);font-size:9.5px;
+  color:var(--dimmer,#6E7F8D)}
+.orr-svc{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px}
+.orr-svc i{font-style:normal;padding:1px 5px;border:1px solid var(--rule,#1B242E);
+  font-family:var(--cond,sans-serif);font-size:9.5px;color:var(--dim,#93A3B1)}
+.orr-svc u{text-decoration:none;padding:1px 4px;font-family:var(--mono,monospace);
+  font-size:9px;color:var(--dimmer,#6E7F8D)}
+.orr-links{display:flex;gap:4px;margin-top:7px}
+.orr-links a{flex:1;text-align:center;padding:3px 6px;border:1px solid #2E6E6D;
+  font-family:var(--cond,sans-serif);font-size:10px;font-weight:600;
+  color:var(--ion,#4DE3E1);text-decoration:none}
+.orr-links a:hover{background:var(--ion,#4DE3E1);color:#04100F}
+.orr-links a span{opacity:.7;margin-left:3px}
 
 /* What is true about this body at a glance, before any of the numbers. */
 .orr-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}

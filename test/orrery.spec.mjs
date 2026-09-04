@@ -211,10 +211,15 @@ test('the bodies and their facts come off the dump', async ({ page }) => {
   // The panel still names it in full: that is where you go to be sure.
   const facts = page.locator('.orr-facts');
   await expect(facts.locator('.orr-f-h b')).toHaveText('Testholm 1');
-  await expect(facts).toContainText('6,378 km');
+  // The headline four, set the way the galaxy map's system card sets them.
+  await expect(facts.locator('.orr-meas dt'))
+    .toHaveText(['Radius', 'Gravity', 'Arrival', 'Year']);
+  await expect(facts.locator('.orr-meas dd').first()).toHaveText('6,378km');
+  // And the tables below do not repeat them — a grid that restates the table
+  // under it only makes the reader check whether they differ.
+  await expect(facts.locator('.orr-sec', { hasText: 'Orbit' })).not.toContainText('Arrival');
   await expect(facts).toContainText('1 AU');
-  await expect(facts).toContainText('1 year');
-  await expect(facts).toContainText('1 day');   // not "1 years", not "1 days"
+  await expect(facts).toContainText('1 day');   // not "1 days"
 });
 
 /* The dump is the same source the card's star block reads, so a system that
@@ -319,8 +324,9 @@ test('a body shows everything the dump holds about it', async ({ page }) => {
   ]);
   // Nearest first, since the question is which one to fly to, and the largest
   // pad is the thing that decides whether you can dock at all.
-  await expect(facts.locator('.orr-sec', { hasText: '2 stations' }).locator('.orr-item b'))
-    .toHaveText(['Nearer DockM', 'Testholm HubL']);
+  const stations = facts.locator('.orr-sec', { hasText: '2 stations' });
+  await expect(stations.locator('.orr-stn-h b')).toHaveText(['Nearer Dock', 'Testholm Hub']);
+  await expect(stations.locator('.orr-stn').first().locator('.pad')).toHaveText('M');
   // Proportions are bars, sorted by share, biggest first.
   await expect(facts.locator('.orr-sec', { hasText: 'Surface materials' })
     .locator('.orr-bar .k')).toHaveText(['Iron', 'Nickel', 'Sulphur']);
@@ -982,4 +988,100 @@ test('the light controls do something, and are remembered', async ({ page }) => 
   const back = await page.evaluate(() => window.Orrery.state());
   expect(back.ambient).toBe(80);
   expect(back.glow).toBe(0);
+});
+
+/* Stations are places you might fly to, so they link out to the tools that
+   know more. The two links are not equivalent and the labels say so: Spansh
+   keys on the market id the dump carries, so that is exact; Inara numbers its
+   stations itself and that number is nowhere in the dump, so the honest offer
+   is a search. */
+test('a station links out to where more is known', async ({ page }) => {
+  const withPort = JSON.parse(JSON.stringify(SYSTEM));
+  withPort.bodies[1].stations = [{
+    name: 'Walz Depot', type: 'Planetary Outpost', primaryEconomy: 'Industrial',
+    distanceToArrival: 166, id: 3534389760,
+    landingPads: { large: 2, medium: 2, small: 4 },
+    services: ['Dock', 'Market', 'Outfitting', 'Shipyard', 'Repair', 'Refuel',
+               'Contacts', 'Missions', 'Crew Lounge', 'Livery']
+  }];
+  await stubDataHosts(page);
+  await stubApi(page, withPort);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+  await page.locator('.orr-row[data-id="1"]').click();
+
+  const card = page.locator('.orr-stn', { hasText: 'Walz Depot' });
+  // Exact, because the market id is in the dump.
+  await expect(card.locator('a').first())
+    .toHaveAttribute('href', 'https://spansh.co.uk/station/3534389760');
+  // A search, and labelled as one rather than pretending to be a deep link.
+  await expect(card.locator('a').nth(1)).toHaveText(/Find on Inara/);
+  await expect(card.locator('a').nth(1))
+    .toHaveAttribute('href', /inara\.cz\/elite\/search\/\?search=Walz%20Depot%20Testholm/);
+  for (const a of await card.locator('a').all()) {
+    await expect(a).toHaveAttribute('rel', 'noopener');
+    await expect(a).toHaveAttribute('target', '_blank');
+  }
+
+  /* Ten services listed, but only the handful that decide whether the trip is
+     worth making are named; the rest are counted. */
+  await expect(card.locator('.orr-svc i'))
+    .toHaveText(['Market', 'Outfitting', 'Shipyard', 'Repair', 'Refuel']);
+  await expect(card.locator('.orr-svc u')).toHaveText('+5 more');
+});
+
+/* Game tokens are not something to show a reader, and they come in more than
+   one shape. */
+test('signal names are read out, not printed raw', async ({ page }) => {
+  const sig = JSON.parse(JSON.stringify(SYSTEM));
+  sig.bodies[1].signals = { signals: {
+    '$SAA_SignalType_Biological;': 3,
+    '$PLANETARYMININGLOCATION_NAME': 6,
+    '$SAA_SignalType_Human;': 1
+  } };
+  await stubDataHosts(page);
+  await stubApi(page, sig);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+  await page.locator('.orr-row[data-id="1"]').click();
+
+  const signals = page.locator('.orr-sec', { hasText: 'Mapped signals' });
+  await expect(signals.locator('dt')).toHaveText(['Biological', 'Mining location', 'Human']);
+  await expect(signals).not.toContainText('$');
+  await expect(signals).not.toContainText('_NAME');
+});
+
+/* The list, the detail and the distance axis all take a drag, and the sizes
+   are remembered — they are how a reader sets the tool up for what they are
+   doing, not a mode. */
+test('the panels resize, and stay where they were put', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+
+  const widthOf = (sel) => page.evaluate((s) =>
+    Math.round(document.querySelector(s).getBoundingClientRect().width), sel);
+  const before = await widthOf('#orr-left');
+
+  // Keyboard, because a drag handle that only takes a pointer is a wall.
+  await page.locator('#orr-grip-l').focus();
+  for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowRight');
+  const wider = await widthOf('#orr-left');
+  expect(wider).toBeGreaterThan(before);
+
+  await page.locator('#orr-grip-h').focus();
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('ArrowUp');
+
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+  expect(await widthOf('#orr-left'), 'the list stayed where it was put').toBe(wider);
+
+  // Whatever is asked for, the stage keeps room to be worth looking at.
+  await page.locator('#orr-grip-l').focus();
+  for (let i = 0; i < 40; i++) await page.keyboard.press('ArrowRight');
+  const stage = await widthOf('.orr-stage');
+  const mid = await widthOf('.orr-mid');
+  expect(stage).toBeGreaterThan(mid * 0.3);
 });
