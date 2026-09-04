@@ -124,6 +124,82 @@ const RING_TINT = {
   'Metal Rich': 0xC2A16A
 };
 
+/* ── the sky ────────────────────────────────────────────────────────────────
+   Not a photograph pasted behind the scene: a galaxy sampled, then looked at
+   from where the system actually is.
+
+   Points are drawn from a disc around Sagittarius A* — whose position is
+   already in this repo, in data/milkyway-ed.json, alongside every region name
+   the galaxy map labels — with an exponential falloff outward and a thin
+   vertical spread, then projected onto the sky from the system's own
+   coordinates. The band lands where it should and is densest toward the core,
+   and it genuinely differs between systems: Sol sits 25,900 light years out
+   and sees the galaxy edge-on and distant, Colonia is 22,000 ly nearer and
+   does not.
+
+   It is a model of a galaxy rather than a catalogue of its stars, and the
+   readout on the control says so. */
+
+const CORE = { x: 25, y: 0, z: 25900 };        // Sagittarius A*, from the map's own data
+
+function galacticSky(coords, count) {
+  const rnd = seeded('sky|' + coords.x + '|' + coords.y + '|' + coords.z);
+  const pos = new Float32Array(count * 3);
+  const col = new Float32Array(count * 3);
+  const c = new THREE.Color();
+
+  for (let i = 0; i < count; i++) {
+    // A point in the disc: exponential in radius, near-gaussian in thickness.
+    const r = -Math.log(1 - rnd() * 0.985) * 8200;
+    const th = rnd() * Math.PI * 2;
+    const gx = CORE.x + Math.cos(th) * r;
+    const gz = CORE.z + Math.sin(th) * r;
+    const gy = CORE.y + (rnd() + rnd() + rnd() - 1.5) * 520;
+
+    // Where that lands on this system's sky. Scene z runs opposite the
+    // galaxy's, the same way it does everywhere else in this codebase.
+    const dx = gx - coords.x, dy = gy - coords.y, dz = -(gz - coords.z);
+    const d = Math.hypot(dx, dy, dz) || 1;
+    pos[i * 3] = dx / d; pos[i * 3 + 1] = dy / d; pos[i * 3 + 2] = dz / d;
+
+    /* Nearer material reads brighter, which is what makes the core end of the
+       band glow instead of the whole ring looking uniform. */
+    const near = Math.min(1, 4200 / d);
+    c.setHSL(0.09 + rnd() * 0.08, 0.18 + rnd() * 0.3, 0.26 + near * 0.55);
+    col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
+  }
+  return { pos, col };
+}
+
+/** No galaxy, just sky — an even scatter, still stable per system. */
+function plainSky(coords, count) {
+  const rnd = seeded('plain|' + coords.x + '|' + coords.y + '|' + coords.z);
+  const pos = new Float32Array(count * 3);
+  const col = new Float32Array(count * 3);
+  const c = new THREE.Color();
+  for (let i = 0; i < count; i++) {
+    // Evenly over the sphere; acos-free form, so the poles do not bunch.
+    const u = rnd() * 2 - 1, th = rnd() * Math.PI * 2, sr = Math.sqrt(1 - u * u);
+    pos[i * 3] = sr * Math.cos(th);
+    pos[i * 3 + 1] = u;
+    pos[i * 3 + 2] = sr * Math.sin(th);
+    const b = 0.3 + Math.pow(rnd(), 2.4) * 0.7;
+    c.setHSL(0.08 + rnd() * 0.12, 0.22 * rnd(), b * 0.66);
+    col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
+  }
+  return { pos, col };
+}
+
+/** Where the galaxy's heart is from here — the fact the sky control states. */
+function coreBearing(coords) {
+  const dx = CORE.x - coords.x, dy = CORE.y - coords.y, dz = CORE.z - coords.z;
+  return {
+    ly: Math.round(Math.hypot(dx, dy, dz)),
+    // How far off the galactic plane the system sits, looking inward.
+    tilt: Math.atan2(-dy, Math.hypot(dx, dz)) * 180 / Math.PI
+  };
+}
+
 /* ── stars ──────────────────────────────────────────────────────────────────
    A star is the one body in a system that is not a surface but a process, so
    it gets a shader rather than a painted texture: convection cells that churn
@@ -673,9 +749,24 @@ const Orrery = (function () {
      and the trans-Neptunian inclinations alone make a tangle you cannot see
      the planets through. */
   let showLabels = true, following = true, orbitMode = 0;   // 0 all, 1 planets, 2 none
+  let skyMode = 'none', sky = null;                        // none | galaxy | stars
+  let ambient = null, ambientPct = 30, glowPct = 60;
+
+  /* Preferences live in localStorage, guarded: a private window can make even
+     reading it throw, and losing the orrery over a remembered slider would be
+     a poor trade. */
+  const KEY = 'canonn.orrery.';
+  const keep = (k, v) => { try { localStorage.setItem(KEY + k, v); } catch (e) {} };
+  const recallNum = (k, d) => {
+    try { const v = parseFloat(localStorage.getItem(KEY + k)); return isNaN(v) ? d : v; }
+    catch (e) { return d; }
+  };
+  const recallStr = (k, d) => {
+    try { return localStorage.getItem(KEY + k) || d; } catch (e) { return d; }
+  };
   // Which slice of the rate ladder this system can usefully use — see below.
   let rateLo = 0, rateHi = LADDER.length - 1;
-  const ORBIT_LABEL = ['Orbits: all', 'Orbits: planets', 'Orbits: none'];
+  const ORBIT_LABEL = ['all', 'planets only', 'none'];
   let standalone = false;
   let galaxyWasVisible = null;
   const cache = new Map();
@@ -742,10 +833,6 @@ const Orrery = (function () {
       '    <div class="orr-res" id="orr-res" role="listbox"></div>',
       '  </div>',
       '  <div class="orr-title"><b id="orr-name"></b><span id="orr-sub"></span></div>',
-      '  <div class="orr-view" role="group" aria-label="View">',
-      '    <button id="orr-3d" class="on" aria-pressed="true">3D</button>',
-      '    <button id="orr-2d" aria-pressed="false">2D</button>',
-      '  </div>',
       '  <button class="orr-tb" id="orr-link" title="Copy a link straight to this system">Copy link</button>',
       '  <button class="orr-x" id="orr-close" aria-label="Close">&times;</button>',
       '</div>',
@@ -767,11 +854,45 @@ const Orrery = (function () {
       '  <div class="orr-stage"><canvas id="orr-canvas"></canvas>',
       '    <div class="orr-labels" id="orr-labels"></div>',
       '    <div class="orr-msg" id="orr-msg">Reading the system dump&#8230;</div>',
-      '    <div class="orr-tools" role="group" aria-label="What to draw">',
-      '      <button id="orr-orbits" title="Orbit paths: all, planets only, none">Orbits: all</button>',
-      '      <button id="orr-labl" class="on" title="Names over the view">Labels</button>',
-      '      <button id="orr-follow" class="on" title="Keep the camera on the selected body">Follow</button>',
-      '      <button id="orr-reset" title="Frame the whole system again">Reset view</button>',
+      '    <button class="orr-vbtn" id="orr-vopen" aria-expanded="false"',
+      '            aria-controls="orr-drawer">View</button>',
+      '    <div class="orr-drawer" id="orr-drawer" role="group" aria-label="View">',
+      '      <div class="orr-d-h">View<button id="orr-vclose" aria-label="Close">&times;</button></div>',
+      '      <div class="orr-d-s">',
+      '        <h4>Projection</h4>',
+      '        <div class="orr-seg">',
+      '          <button id="orr-3d" class="on" aria-pressed="true">3D</button>',
+      '          <button id="orr-2d" aria-pressed="false">2D</button>',
+      '        </div>',
+      '      </div>',
+      '      <div class="orr-d-s">',
+      '        <h4>Scale</h4>',
+      '        <div class="orr-seg">',
+      '          <button id="orr-spread" class="on" title="Orbits spread on a log scale, so the whole system is legible at once">Spread</button>',
+      '          <button id="orr-true" title="Orbits and bodies both to scale. Pick a body to fly to it — at this scale nothing is visible from across the system">True scale</button>',
+      '        </div>',
+      '      </div>',
+      '      <div class="orr-d-s">',
+      '        <h4>Show</h4>',
+      '        <button class="orr-opt" id="orr-orbits"><span>Orbit paths</span><b>all</b></button>',
+      '        <button class="orr-opt on" id="orr-labl"><span>Names</span><b>on</b></button>',
+      '        <button class="orr-opt on" id="orr-follow"><span>Follow selection</span><b>on</b></button>',
+      '      </div>',
+      '      <div class="orr-d-s">',
+      '        <h4>Sky</h4>',
+      '        <button class="orr-opt" id="orr-sky-galaxy"><span>Galactic</span><b></b></button>',
+      '        <div class="orr-note" id="orr-corebear"></div>',
+      '        <button class="orr-opt" id="orr-sky-stars"><span>Star field</span><b></b></button>',
+      '        <button class="orr-opt on" id="orr-sky-none"><span>Empty</span><b></b></button>',
+      '      </div>',
+      '      <div class="orr-d-s">',
+      '        <h4>Light</h4>',
+      '        <label class="orr-sl"><span>Ambient</span>',
+      '          <input id="orr-amb" type="range" min="0" max="100" value="30"></label>',
+      '        <label class="orr-sl"><span>Star glow</span>',
+      '          <input id="orr-glow" type="range" min="0" max="100" value="60"></label>',
+      '      </div>',
+      '      <button class="orr-d-reset" id="orr-reset">Frame the whole system</button>',
       '    </div>',
       '    <div class="orr-legend" id="orr-legend"></div>',
       '  </div>',
@@ -788,10 +909,6 @@ const Orrery = (function () {
       '  </div>',
       '  <div class="orr-clock"><span id="orr-date"></span>',
       '    <button id="orr-now" title="Back to the present">Now</button></div>',
-      '  <div class="orr-scale">',
-      '    <button id="orr-spread" class="on" title="Orbits spread on a log scale, so the whole system is legible at once">Spread</button>',
-      '    <button id="orr-true" title="Orbits and bodies both to scale. Pick a body to fly to it — at this scale nothing is visible from across the system">True scale</button>',
-      '  </div>',
       '</div>',
 
       // Nothing asked for yet. The search is the page, so it moves to the
@@ -823,6 +940,13 @@ const Orrery = (function () {
     $('orr-spread').onclick = () => setScale(false);
     $('orr-true').onclick = () => setScale(true);
     $('orr-labl').onclick = () => setLabels(!showLabels);
+    $('orr-vopen').onclick = () => openDrawer(!panel.classList.contains('view-open'));
+    $('orr-vclose').onclick = () => openDrawer(false);
+    ['galaxy', 'stars', 'none'].forEach((m) => {
+      $('orr-sky-' + m).onclick = () => setSky(m);
+    });
+    $('orr-amb').addEventListener('input', (e) => setAmbient(+e.target.value));
+    $('orr-glow').addEventListener('input', (e) => setGlow(+e.target.value));
     $('orr-follow').onclick = () => setFollow(!following);
     $('orr-reset').onclick = () => { if (model) { frame(); select(model.star, false); } };
     $('orr-orbits').onclick = () => setOrbits((orbitMode + 1) % 3);
@@ -1006,8 +1130,14 @@ const Orrery = (function () {
 
   function onKey(e) {
     if (!isOpen()) return;
-    if (e.key === 'Escape') { e.preventDefault(); close(); }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (panel.classList.contains('view-open')) openDrawer(false); else close();
+    }
     else if (e.key === ' ') { e.preventDefault(); setPlaying(!playing); }
+    else if (e.key === 'v' || e.key === 'V') {
+      openDrawer(!panel.classList.contains('view-open'));
+    }
     else if (e.key === ',') setRate(rateIx - 1);
     else if (e.key === '.') setRate(rateIx + 1);
   }
@@ -1040,7 +1170,8 @@ const Orrery = (function () {
 
     // One light at the star, so the far side of a planet is actually dark.
     scene.add(new THREE.PointLight(0xffffff, 2.4, 0, 0.0));
-    scene.add(new THREE.AmbientLight(0x2a3542, 1.4));
+    ambient = new THREE.AmbientLight(0x2a3542, 1.4);
+    scene.add(ambient);
     makeControls();
   }
 
@@ -1139,6 +1270,7 @@ const Orrery = (function () {
             blending: THREE.AdditiveBlending, depthWrite: false
           }));
           glow.scale.setScalar(n.drawR * 6);
+          entry.glow = glow;
           entry.mesh.add(glow);
         }
       }
@@ -1319,24 +1451,100 @@ const Orrery = (function () {
 
   function setLabels(on) {
     showLabels = on;
-    panel.querySelector('#orr-labl').classList.toggle('on', on);
+    keep('labels', on ? '1' : '0');
+    const b = panel.querySelector('#orr-labl');
+    b.classList.toggle('on', on);
+    b.querySelector('b').textContent = on ? 'on' : 'off';
     panel.querySelector('#orr-labels').classList.toggle('hide', !on);
   }
 
   function setFollow(on) {
     following = on;
-    panel.querySelector('#orr-follow').classList.toggle('on', on);
+    keep('follow', on ? '1' : '0');
+    const b = panel.querySelector('#orr-follow');
+    b.classList.toggle('on', on);
+    b.querySelector('b').textContent = on ? 'on' : 'off';
   }
 
   function setOrbits(mode) {
     orbitMode = mode;
-    panel.querySelector('#orr-orbits').textContent = ORBIT_LABEL[mode];
-    panel.querySelector('#orr-orbits').classList.toggle('on', mode !== 2);
+    keep('orbits', mode);
+    const b = panel.querySelector('#orr-orbits');
+    b.querySelector('b').textContent = ORBIT_LABEL[mode];
+    b.classList.toggle('on', mode !== 2);
     meshes.forEach((m) => {
       if (!m.line) return;
       const moon = m.node.parent && m.node.parent !== model.star;
       m.line.visible = mode === 0 || (mode === 1 && !moon);
     });
+  }
+
+  function openDrawer(on) {
+    panel.classList.toggle('view-open', on);
+    panel.querySelector('#orr-vopen').setAttribute('aria-expanded', String(on));
+    panel.querySelector('#orr-vopen').classList.toggle('on', on);
+  }
+
+  function setAmbient(pct) {
+    ambientPct = pct;
+    keep('ambient', pct);
+    panel.querySelector('#orr-amb').value = pct;
+    // 0 leaves night sides genuinely black, which is honest but loses half of
+    // every body; the top of the range is flat-lit and loses the terminator.
+    if (ambient) ambient.intensity = 0.15 + (pct / 100) * 3.1;
+  }
+
+  function setGlow(pct) {
+    glowPct = pct;
+    keep('glow', pct);
+    panel.querySelector('#orr-glow').value = pct;
+    meshes.forEach((m) => {
+      if (!m.glow) return;
+      m.glow.material.opacity = (pct / 100) * 1.05;
+      m.glow.visible = pct > 0;
+    });
+  }
+
+  function setSky(mode) {
+    skyMode = mode;
+    keep('sky', mode);
+    // These are a choice of one, and the Show rows above state their value in
+    // words rather than in colour; the sky rows do the same so the drawer
+    // reads consistently and does not lean on colour alone.
+    ['galaxy', 'stars', 'none'].forEach((m) => {
+      const el = panel.querySelector('#orr-sky-' + m);
+      el.classList.toggle('on', m === mode);
+      el.querySelector('b').textContent = m === mode ? 'shown' : '';
+    });
+    buildSky();
+  }
+
+  function buildSky() {
+    if (sky) {
+      scene.remove(sky);
+      sky.geometry.dispose();
+      sky.material.dispose();
+      sky = null;
+    }
+    if (skyMode === 'none' || !model) return;
+    const coords = (model.sys && model.sys.coords) || { x: 0, y: 0, z: 0 };
+    const n = skyMode === 'galaxy' ? 9000 : 2600;
+    const d = skyMode === 'galaxy' ? galacticSky(coords, n) : plainSky(coords, n);
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(d.pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(d.col, 3));
+    sky = new THREE.Points(geo, new THREE.PointsMaterial({
+      size: skyMode === 'galaxy' ? 1.5 : 1.9,
+      sizeAttenuation: false, vertexColors: true,
+      transparent: true, opacity: 0.95, depthWrite: false
+    }));
+    /* Directions, not places: the points sit on a unit sphere and the whole
+       thing is scaled out and carried with the camera, so the sky never gets
+       closer however far in you fly. */
+    sky.frustumCulled = false;
+    sky.renderOrder = -1;
+    scene.add(sky);
   }
 
   function setScale(isTrue) {
@@ -1428,6 +1636,15 @@ const Orrery = (function () {
 
     drawLabels();
     panel.querySelector('#orr-date').textContent = gameDate();
+
+    /* The sky is direction only, so it rides with the camera and is scaled to
+       sit just inside the far plane — near enough to draw, far enough that no
+       amount of zoom brings it closer. */
+    if (sky) {
+      const cam = mode3d ? cam3 : cam2;
+      sky.position.copy(cam.position);
+      sky.scale.setScalar(Math.max(cam3.far * 0.35, ORBIT_OUT * 4));
+    }
 
     controls.update();
     adaptClip();
@@ -1856,11 +2073,27 @@ const Orrery = (function () {
       (model.all.filter((n) => n.type === 'Star').length > 1 ? 's' : '');
 
     limitRates();
+
+    /* What the reader last chose, and the one fact the sky control can tell
+       them that nothing else here does: how far the galaxy's heart is from
+       this system, and how far off its plane they are sitting. */
+    const bear = coreBearing((model.sys && model.sys.coords) || { x: 0, y: 0, z: 0 });
+    panel.querySelector('#orr-corebear').textContent =
+      'Sagittarius A* is ' + bear.ly.toLocaleString() + ' ly away, ' +
+      Math.abs(bear.tilt).toFixed(1) + '° ' + (bear.tilt >= 0 ? 'below' : 'above') +
+      ' the plane. Modelled, not catalogued.';
+
+    setAmbient(recallNum('ambient', 30));
+    setGlow(recallNum('glow', 60));
+    setLabels(recallStr('labels', '1') === '1');
+    setFollow(recallStr('follow', '1') === '1');
+
     buildScene();
     renderList();
     buildLabels();
     drawSpine();
-    setOrbits(orbitMode);
+    setOrbits(recallNum('orbits', 0));
+    setSky(recallStr('sky', 'galaxy'));
     select(model.star);
     cancelAnimationFrame(loop);
     loop = requestAnimationFrame(animate);
@@ -1930,20 +2163,16 @@ const Orrery = (function () {
       near: cam3.near,
       bodies: model ? model.all.length : 0,
       logDepth: !!(renderer && renderer.capabilities.logarithmicDepthBuffer),
+      sky: {
+        mode: skyMode,
+        points: sky ? sky.geometry.getAttribute('position').count : 0,
+        scale: sky ? sky.scale.x : 0,
+        inScene: !!(sky && sky.parent)
+      },
+      ambient: ambientPct,
+      glow: glowPct,
       // The star's own clock, in real seconds — deliberately not the orbit
       // clock, so its surface does not strobe when time is run fast.
-      /* A fingerprint of each painted surface, so a test can prove a world
-         wears the same face on a second visit rather than being re-rolled. */
-      faces: meshes.filter((m) => m.mesh && m.mesh.material.map)
-        .map((m) => {
-          const img = m.mesh.material.map.image;
-          const d = img.getContext('2d').getImageData(0, 0, img.width, img.height).data;
-          let h = 2166136261;
-          for (let i = 0; i < d.length; i += 997) {
-            h ^= d[i]; h = Math.imul(h, 16777619);
-          }
-          return m.node.name + ':' + (h >>> 0);
-        }),
       starTime: (() => {
         const m = model && meshes.filter((x) => x.node === model.star)[0];
         const u = m && m.mesh && m.mesh.material.uniforms;
@@ -1978,7 +2207,23 @@ const Orrery = (function () {
     };
   }
 
-  return { open, close, isOpen, page, state };
+  /* A fingerprint of each painted surface, so a test can prove a world wears
+     the same face on a second visit rather than being re-rolled. Separate from
+     state() and never called by anything else: it reads every body's canvas
+     back off the GPU-bound image, which is far too expensive to sit in a
+     function the tests poll. */
+  function faces() {
+    return meshes.filter((m) => m.mesh && m.mesh.material.map).map((m) => {
+      const img = m.mesh.material.map.image;
+      const d = img.getContext('2d', { willReadFrequently: true })
+        .getImageData(0, 0, img.width, img.height).data;
+      let h = 2166136261;
+      for (let i = 0; i < d.length; i += 997) { h ^= d[i]; h = Math.imul(h, 16777619); }
+      return m.node.name + ':' + (h >>> 0);
+    });
+  }
+
+  return { open, close, isOpen, page, state, faces };
 })();
 
 window.Orrery = Orrery;

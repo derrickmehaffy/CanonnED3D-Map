@@ -9,6 +9,14 @@ import { stubDataHosts } from './helpers.mjs';
 
 const API = '**/us-central1-canonn-api-236217.cloudfunctions.net/**';
 
+/** Everything about how the scene is drawn lives behind one button. */
+async function openView(page) {
+  if (!(await page.locator('.orrery.view-open').count())) {
+    await page.locator('#orr-vopen').click();
+  }
+  await expect(page.locator('#orr-drawer')).toBeVisible();
+}
+
 /* A star, a planet on a one-year circle, and a moon of that planet. Small
    enough that every assertion below is a number this file chose. */
 const SYSTEM = {
@@ -444,20 +452,22 @@ test('what gets drawn is under the reader\'s control', async ({ page }) => {
   await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
 
-  const orbitsDrawn = () => page.evaluate(() =>
-    window.__orrOrbits ? window.__orrOrbits() : null);
+  await openView(page);
 
   // Three states, because a forty-body system draws forty ellipses and the
-  // planets disappear into their own moons.
-  await expect(page.locator('#orr-orbits')).toHaveText('Orbits: all');
+  // planets disappear into their own moons. Each row states its own value in
+  // words, so the drawer reads without relying on colour.
+  const orbits = page.locator('#orr-orbits b');
+  await expect(orbits).toHaveText('all');
   await page.locator('#orr-orbits').click();
-  await expect(page.locator('#orr-orbits')).toHaveText('Orbits: planets');
+  await expect(orbits).toHaveText('planets only');
   await page.locator('#orr-orbits').click();
-  await expect(page.locator('#orr-orbits')).toHaveText('Orbits: none');
+  await expect(orbits).toHaveText('none');
 
   await expect(page.locator('#orr-labels')).not.toHaveClass(/hide/);
   await page.locator('#orr-labl').click();
   await expect(page.locator('#orr-labels')).toHaveClass(/hide/);
+  await expect(page.locator('#orr-labl b')).toHaveText('off');
 });
 
 /* distanceToArrival in light-seconds is what a commander actually asks about a
@@ -631,8 +641,10 @@ test('you can get right up to a body at true scale', async ({ page }) => {
   await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
 
+  await openView(page);
   await page.locator('#orr-true').click();
   await expect(page.locator('#orr-true')).toHaveClass(/on/);
+  await page.locator('#orr-vclose').click();
   await page.locator('.orr-row[data-id="1"]').click();
   await page.waitForTimeout(600);
 
@@ -689,6 +701,7 @@ test('a body rides on its own orbit line, at either scale', async ({ page }) => 
   // being something you can see.
   expect(await miss(), 'spread').toBeLessThan(1);
 
+  await openView(page);
   await page.locator('#orr-true').click();
   await expect(page.locator('#orr-true')).toHaveClass(/on/);
   await page.waitForTimeout(500);
@@ -842,7 +855,7 @@ test('a body keeps the same face between visits', async ({ page }) => {
     // Read the generated canvas back off the texture the body is wearing.
     return page.evaluate(() => {
       const st = window.Orrery.state();
-      return st.faces;
+      return window.Orrery.faces();
     });
   };
 
@@ -850,4 +863,86 @@ test('a body keeps the same face between visits', async ({ page }) => {
   const second = await faceOf();
   expect(first.length).toBeGreaterThan(0);
   expect(second, 'the same worlds, painted the same way').toEqual(first);
+});
+
+/* An orrery answers three questions — which system, when, and how it is drawn
+   — and its controls belong where the answers do. The third group had no
+   home: projection sat in the header, scale in the time bar, and orbits,
+   names and follow floated over the render. All of it is in one drawer now,
+   and the header and time bar hold only what they are about. */
+test('how the scene is drawn lives in one place', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+
+  // Nothing about drawing is loose in the header or the time bar.
+  await expect(page.locator('.orr-top #orr-3d')).toHaveCount(0);
+  await expect(page.locator('.orr-foot #orr-true')).toHaveCount(0);
+  await expect(page.locator('#orr-drawer')).toBeHidden();
+
+  await openView(page);
+  for (const id of ['orr-3d', 'orr-2d', 'orr-spread', 'orr-true',
+                    'orr-orbits', 'orr-labl', 'orr-follow',
+                    'orr-sky-galaxy', 'orr-sky-stars', 'orr-sky-none',
+                    'orr-amb', 'orr-glow', 'orr-reset']) {
+    await expect(page.locator('#orr-drawer #' + id), id).toHaveCount(1);
+  }
+
+  // Escape closes the drawer before it closes the orrery.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#orr-drawer')).toBeHidden();
+  await expect(page.locator('.orrery.open')).toHaveCount(1);
+});
+
+/* The sky is computed from where the system actually is, not pasted on: a
+   galaxy sampled around Sagittarius A* and then looked at from the system's
+   own coordinates. Sol is 25,900 ly out and sees it one way; somewhere else
+   sees it another. */
+test('the sky is built from the system\'s position', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page, { ...SYSTEM, coords: { x: 0, y: 0, z: 0 } });
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+  await openView(page);
+
+  // It states the one fact nothing else here tells you: where the core is.
+  await expect(page.locator('#orr-corebear')).toContainText('25,900 ly');
+
+  await page.locator('#orr-sky-galaxy').click();
+  await expect.poll(() => page.evaluate(() => window.Orrery.state().sky.mode))
+    .toBe('galaxy');
+  const galaxy = await page.evaluate(() => window.Orrery.state().sky);
+  expect(galaxy.points).toBeGreaterThan(1000);
+  // Direction only, carried out to sit beyond everything else in the scene.
+  expect(galaxy.scale).toBeGreaterThan(400);
+
+  await page.locator('#orr-sky-none').click();
+  await expect.poll(() => page.evaluate(() => window.Orrery.state().sky.points)).toBe(0);
+
+  // And the choice is remembered, because it is a preference not a mode.
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+  expect(await page.evaluate(() => window.Orrery.state().sky.mode)).toBe('none');
+});
+
+test('the light controls do something, and are remembered', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+  await openView(page);
+
+  await page.locator('#orr-amb').fill('80');
+  await page.locator('#orr-amb').dispatchEvent('input');
+  await page.locator('#orr-glow').fill('0');
+  await page.locator('#orr-glow').dispatchEvent('input');
+  expect(await page.evaluate(() => window.Orrery.state().ambient)).toBe(80);
+  expect(await page.evaluate(() => window.Orrery.state().glow)).toBe(0);
+
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+  const back = await page.evaluate(() => window.Orrery.state());
+  expect(back.ambient).toBe(80);
+  expect(back.glow).toBe(0);
 });

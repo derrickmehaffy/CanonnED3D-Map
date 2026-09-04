@@ -156,15 +156,68 @@ body.orrery-open .app{visibility:hidden}
 .orr-label.on{color:var(--ion,#4DE3E1)}
 .orr-label.off{display:none}
 
-/* What to draw, kept by the view it acts on rather than in the time bar. */
-.orr-tools{position:absolute;right:12px;top:12px;display:flex;flex-wrap:wrap;
-  justify-content:flex-end;gap:4px;max-width:60%}
-.orr-tools button{padding:4px 9px;border:1px solid var(--rule,#1B242E);
-  background:rgba(12,17,22,.82);font-family:var(--cond,sans-serif);font-size:10.5px;
-  font-weight:600;color:var(--dimmer,#6E7F8D);cursor:pointer;white-space:nowrap;
-  opacity:.72}
-.orr-tools button:hover{border-color:var(--dim,#93A3B1);color:var(--text,#CAD4DC);opacity:1}
-.orr-tools button.on{color:var(--dim,#93A3B1);opacity:1}
+/* ── the view drawer ────────────────────────────────────────────────────────
+   An orrery answers three questions, and its controls belong where the answers
+   do: which system (the header), when (the time bar), and how it is drawn.
+   That third group had no home — projection sat in the header, scale in the
+   time bar, and orbits, names and follow floated over the render as a row of
+   chips that was about to become seven. All of it lives here now. */
+.orr-vbtn{position:absolute;right:12px;top:12px;padding:5px 13px;
+  border:1px solid var(--rule,#1B242E);background:rgba(12,17,22,.86);
+  font-family:var(--cond,sans-serif);font-size:11.5px;font-weight:600;
+  letter-spacing:.04em;color:var(--dim,#93A3B1);cursor:pointer;z-index:3}
+.orr-vbtn:hover{border-color:var(--dim,#93A3B1);color:var(--text,#CAD4DC)}
+.orr-vbtn.on{border-color:var(--amber,#FF9D00);color:var(--amber,#FF9D00)}
+
+.orr-drawer{position:absolute;right:12px;top:12px;width:250px;z-index:4;
+  background:var(--panel,#0C1116);border:1px solid var(--rule,#1B242E);
+  box-shadow:0 14px 40px rgba(0,0,0,.7);display:none;
+  max-height:calc(100% - 24px);overflow-y:auto}
+.view-open .orr-drawer{display:block}
+.view-open .orr-vbtn{display:none}
+.orr-d-h{display:flex;align-items:center;justify-content:space-between;
+  padding:9px 12px;border-bottom:1px solid var(--rule,#1B242E);
+  font-family:var(--cond,sans-serif);font-size:11.5px;font-weight:600;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--dim,#93A3B1)}
+.orr-d-h button{background:none;border:0;color:var(--dimmer,#6E7F8D);
+  font-size:17px;line-height:1;cursor:pointer;padding:0 2px}
+.orr-d-h button:hover{color:var(--text,#CAD4DC)}
+.orr-d-s{padding:10px 12px;border-bottom:1px solid var(--rule,#1B242E)}
+.orr-d-s h4{margin:0 0 7px;font-family:var(--cond,sans-serif);font-size:9px;
+  font-weight:600;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--dimmer,#6E7F8D)}
+
+/* Two-state pairs stay segmented, because they are a choice between modes. */
+.orr-seg{display:flex;border:1px solid var(--rule,#1B242E)}
+.orr-seg button{flex:1;padding:5px 8px;background:none;border:0;
+  font-family:var(--cond,sans-serif);font-size:11px;font-weight:600;
+  color:var(--dimmer,#6E7F8D);cursor:pointer}
+.orr-seg button + button{border-left:1px solid var(--rule,#1B242E)}
+.orr-seg button.on{background:var(--amber,#FF9D00);color:#0B0700}
+
+/* Everything else is a row that states its own value, so it reads without
+   relying on colour to carry the state. */
+.orr-opt{display:flex;width:100%;align-items:baseline;justify-content:space-between;
+  gap:10px;padding:5px 7px;background:none;border:0;cursor:pointer;text-align:left}
+.orr-opt span{font-family:var(--cond,sans-serif);font-size:11.5px;color:var(--dim,#93A3B1)}
+.orr-opt b{font-family:var(--mono,monospace);font-size:10px;font-weight:500;
+  color:var(--dimmer,#6E7F8D)}
+.orr-opt:hover{background:var(--panel-2,#111820)}
+.orr-opt:hover span{color:var(--text,#CAD4DC)}
+.orr-opt.on span{color:var(--text,#CAD4DC)}
+.orr-opt.on b{color:var(--ion,#4DE3E1)}
+.orr-note{padding:2px 7px 4px;font-family:var(--mono,monospace);font-size:9px;
+  line-height:1.6;color:var(--dimmer,#6E7F8D)}
+
+.orr-sl{display:flex;align-items:center;gap:10px;padding:3px 7px}
+.orr-sl span{flex:none;width:66px;font-family:var(--cond,sans-serif);font-size:11px;
+  color:var(--dim,#93A3B1)}
+.orr-sl input{flex:1;min-width:0;accent-color:var(--amber,#FF9D00);cursor:pointer}
+.orr-d-reset{display:block;width:100%;padding:9px;background:none;border:0;
+  font-family:var(--cond,sans-serif);font-size:11px;font-weight:600;
+  color:var(--dimmer,#6E7F8D);cursor:pointer}
+.orr-d-reset:hover{color:var(--amber,#FF9D00)}
+
 .orr-labels.hide{display:none}
 
 .orr-legend{position:absolute;left:14px;bottom:12px;font-family:var(--mono,monospace);
@@ -277,11 +330,6 @@ body.orrery-open .app{visibility:hidden}
   color:var(--dimmer,#6E7F8D);background:none;cursor:pointer}
 #orr-now:hover{border-color:var(--ion,#4DE3E1);color:var(--ion,#4DE3E1)}
 
-.orr-scale{display:flex;border:1px solid var(--rule,#1B242E)}
-.orr-scale button{padding:4px 10px;font-family:var(--cond,sans-serif);font-size:10.5px;
-  font-weight:600;color:var(--dimmer,#6E7F8D);background:none;border:0;cursor:pointer}
-.orr-scale button + button{border-left:1px solid var(--rule,#1B242E)}
-.orr-scale button.on{color:var(--amber,#FF9D00)}
 
 .orrery :focus-visible{outline:2px solid var(--amber,#FF9D00);outline-offset:2px}
 
@@ -303,11 +351,11 @@ body.orrery-open .app{visibility:hidden}
   .orr-spine{display:none}
 }
 @media (max-width:820px){
+  .orr-drawer{width:auto;left:12px}
   /* No room for two rails beside a model worth looking at. The list is how
      you find a body, so it goes; the detail moves under the view rather than
      squeezing it to a strip, which is what it did before. */
   .orr-left{display:none}
-  .orr-scale{display:none}
   .orr-mid{flex-direction:column}
   .orr-stage{flex:1;min-height:0}
   /* A definite height, not a cap: .orr-facts is flex:1 inside it, and inside
@@ -315,7 +363,6 @@ body.orrery-open .app{visibility:hidden}
      collapsed to 19px. */
   .orr-right{width:auto;flex:none;height:42%;border-left:0;
     border-top:1px solid var(--rule,#1B242E)}
-  .orr-tools{max-width:none;left:12px;justify-content:flex-start}
   .orr-legend{display:none}
 }
 @media (max-width:560px){
