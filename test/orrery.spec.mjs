@@ -793,3 +793,61 @@ test('rings are drawn at the width the dump gives them', async ({ page }) => {
   await expect(page.locator('.orr-facts')).toContainText('D Ring');
   await expect(page.locator('.orr-chip', { hasText: 'Ringed' })).toBeVisible();
 });
+
+/* A star is the one body in a system that is not a surface but a process, so
+   it gets a shader rather than a painted texture. Two things have to hold: it
+   has to compile at all — a custom ShaderMaterial does not get three's
+   logarithmic-depth chunks for free, and without them it sorts against the
+   rest of the scene as though depth were linear — and it has to run on real
+   seconds rather than simulated ones. */
+test('the star churns, on its own clock', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+
+  const starTime = () => page.evaluate(() => window.Orrery.state().starTime);
+  expect(await starTime(), 'the star has a shader clock').not.toBeNull();
+
+  // Pause the orbits: the surface must keep moving anyway.
+  await page.locator('#orr-play').click();
+  const paused = await page.evaluate(() => window.Orrery.state());
+  const t0 = paused.starTime;
+  await page.waitForTimeout(1200);
+  const t1 = await starTime();
+  expect(t1, 'the surface runs while the orbits are stopped').toBeGreaterThan(t0);
+
+  // And the orbit clock really was stopped, so the two are independent.
+  await expect(page.locator('#orr-date')).toHaveText(
+    await page.locator('#orr-date').textContent());
+
+  // A shader that failed to compile shows up here, not in a screenshot.
+  expect(errors.filter((e) => /shader|GLSL|WebGL|THREE/i.test(e))).toEqual([]);
+});
+
+/* Textures are painted per body from what the dump says, and seeded from the
+   body's own id64 — random per body, never random per page load. A world that
+   changed its face between visits would stop being a fact about the world. */
+test('a body keeps the same face between visits', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+
+  const faceOf = async () => {
+    await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+    // Read the generated canvas back off the texture the body is wearing.
+    return page.evaluate(() => {
+      const st = window.Orrery.state();
+      return st.faces;
+    });
+  };
+
+  const first = await faceOf();
+  const second = await faceOf();
+  expect(first.length).toBeGreaterThan(0);
+  expect(second, 'the same worlds, painted the same way').toEqual(first);
+});

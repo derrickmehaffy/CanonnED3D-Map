@@ -124,6 +124,309 @@ const RING_TINT = {
   'Metal Rich': 0xC2A16A
 };
 
+/* ── stars ──────────────────────────────────────────────────────────────────
+   A star is the one body in a system that is not a surface but a process, so
+   it gets a shader rather than a painted texture: convection cells that churn
+   rather than a picture that sits still.
+
+   How fast and how fine comes from the class. A main-sequence star turns over
+   slowly in broad cells; a neutron star is thirty kilometres of degenerate
+   matter spinning hundreds of times a second, and reads as something far
+   tighter and far more violent. Both run on real seconds rather than
+   simulated ones — the surface should not start strobing because you asked
+   the orbits to run at a year a second.
+
+   Written as GLSL1 because that is what three's ShaderMaterial compiles by
+   default, and it pulls in the logarithmic-depth chunks by hand: a custom
+   shader does not get them for free, and without them a star would sort
+   against everything else in the scene as though the depth buffer were
+   linear. */
+
+const STAR_VERT = [
+  'varying vec3 vPos;',
+  '#include <common>',
+  '#include <logdepthbuf_pars_vertex>',
+  'void main() {',
+  '  vPos = position;',
+  '  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
+  '  #include <logdepthbuf_vertex>',
+  '}'
+].join('\n');
+
+const STAR_FRAG = [
+  'uniform vec3 uColor;',
+  'uniform float uTime;',
+  'uniform float uScale;',
+  'uniform float uSpeed;',
+  'uniform float uContrast;',
+  'varying vec3 vPos;',
+  '#include <common>',
+  '#include <logdepthbuf_pars_fragment>',
+
+  'float hash(vec3 p) {',
+  '  return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453123);',
+  '}',
+  'float vnoise(vec3 p) {',
+  '  vec3 i = floor(p), f = fract(p);',
+  '  f = f * f * (3.0 - 2.0 * f);',
+  '  return mix(mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x),',
+  '                 mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),',
+  '             mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),',
+  '                 mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z);',
+  '}',
+  'float fbm(vec3 p) {',
+  '  float v = 0.0, a = 0.5;',
+  '  for (int i = 0; i < 4; i++) { v += a * vnoise(p); p *= 2.03; a *= 0.5; }',
+  '  return v;',
+  '}',
+
+  'void main() {',
+  '  vec3 p = normalize(vPos) * uScale;',
+  '  float t = uTime * uSpeed;',
+  // Two layers drifting against each other, so cells churn rather than slide.
+  '  float n = fbm(p + vec3(0.0, t, 0.0));',
+  '  n = mix(n, fbm(p * 2.13 - vec3(t * 0.63)), 0.45);',
+  '  vec3 col = uColor * (0.62 + n * 0.85);',
+  // The brightest cells run hotter, which is what gives granulation its bite.
+  '  col += uColor * pow(max(n - 0.54, 0.0) * 2.3, uContrast);',
+  '  gl_FragColor = vec4(col, 1.0);',
+  '  #include <logdepthbuf_fragment>',
+  '  #include <tonemapping_fragment>',
+  '  #include <colorspace_fragment>',
+  '}'
+].join('\n');
+
+/** How a class of star behaves, in the shader's terms. */
+function starLook(sub, cls) {
+  const s = String(sub || '').toLowerCase();
+  if (s.includes('neutron')) return { scale: 26, speed: 2.6, contrast: 3.4 };
+  if (s.includes('white dwarf')) return { scale: 16, speed: 0.9, contrast: 3.0 };
+  if (s.includes('black hole')) return { scale: 8, speed: 0.15, contrast: 1.2 };
+  if (s.includes('brown dwarf') || /^[LTY]/.test(cls || '')) {
+    return { scale: 5.5, speed: 0.05, contrast: 1.6 };   // barely convecting
+  }
+  if (/^[OB]/.test(cls || '')) return { scale: 11, speed: 0.34, contrast: 2.6 };
+  return { scale: 7.5, speed: 0.16, contrast: 2.2 };      // main sequence
+}
+
+function starMaterial(node, tint) {
+  const look = starLook(node.sub, node.raw.spectralClass);
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uColor: { value: new THREE.Color(tint) },
+      uTime: { value: 0 },
+      uScale: { value: look.scale },
+      uSpeed: { value: look.speed },
+      uContrast: { value: look.contrast }
+    },
+    vertexShader: STAR_VERT,
+    fragmentShader: STAR_FRAG
+  });
+}
+
+/* ── surfaces ───────────────────────────────────────────────────────────────
+   Textures are painted, not photographed.
+
+   Elite has four hundred billion systems, and the dump describes a body by
+   class rather than by appearance. A photograph of Jupiter on some other
+   system's Class I gas giant would be a fabrication dressed up as data, and
+   shipping real imagery for every world would run to terabytes. So each body
+   gets a surface painted from what the dump actually says about it — its
+   class, and where the data supports it its atmosphere, volcanism and
+   temperature.
+
+   Seeded from the body's own id64, so a given world looks the same every time
+   anyone visits it. Random per body, never random per page load: a planet
+   that changed its face between visits would stop being a fact about the
+   planet. */
+
+/** Small, fast, and the same sequence for the same body, forever. */
+function seeded(id) {
+  let h = 2166136261;
+  const str = String(id || 'unnamed');
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return () => {
+    h += 0x6D2B79F5;
+    let t = h;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const hsl = (h, s, l, a) => 'hsla(' + h + ',' + s + '%,' + l + '%,' + (a === undefined ? 1 : a) + ')';
+
+/** The base tint as HSL, so a class's own palette can be varied around it. */
+function baseHsl(hex) {
+  const c = new THREE.Color(hex);
+  const o = {};
+  c.getHSL(o);
+  return { h: o.h * 360, s: o.s * 100, l: o.l * 100 };
+}
+
+/** Latitude bands, jittered — how every gas giant reads at a glance. */
+function paintBands(ctx, w, h, rnd, b, count) {
+  for (let i = 0; i < count; i++) {
+    const y = rnd() * h;
+    const thick = h * (0.02 + rnd() * 0.13);
+    const dl = (rnd() - 0.5) * 52;
+    ctx.fillStyle = hsl(b.h + (rnd() - 0.5) * 20, b.s * (0.6 + rnd() * 0.8),
+                        Math.max(6, Math.min(92, b.l + dl)), 0.8);
+    // Drawn as a run of short segments so the edges waver instead of ruling.
+    const steps = 60;
+    for (let sx = 0; sx < steps; sx++) {
+      const wob = Math.sin(sx / steps * Math.PI * 2 * (1 + rnd())) * thick * 0.35;
+      ctx.fillRect((sx / steps) * w, y + wob, w / steps + 1, thick);
+    }
+  }
+}
+
+/** Soft patches — continents, ice fields, mare, whatever the class calls it. */
+function paintBlobs(ctx, w, h, rnd, b, count, size, dl, alpha) {
+  for (let i = 0; i < count; i++) {
+    const x = rnd() * w, y = rnd() * h;
+    const r = size * (0.4 + rnd() * 1.6);
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    const col = hsl(b.h + (rnd() - 0.5) * 22, b.s * (0.6 + rnd() * 0.7),
+                    Math.max(4, Math.min(95, b.l + dl * (0.4 + rnd()))), alpha);
+    g.addColorStop(0, col);
+    g.addColorStop(1, hsl(b.h, b.s, b.l, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    // Wrap, so nothing has a seam down the back.
+    if (x < r) ctx.fillRect(x - r + w, y - r, r * 2, r * 2);
+    if (x > w - r) ctx.fillRect(x - r - w, y - r, r * 2, r * 2);
+  }
+}
+
+/** Craters, for anything with no atmosphere to weather them away. */
+function paintCraters(ctx, w, h, rnd, b, count) {
+  for (let i = 0; i < count; i++) {
+    const x = rnd() * w, y = rnd() * h, r = 1 + rnd() * (h * 0.035);
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = hsl(b.h, b.s * 0.8, Math.max(3, b.l - 10 - rnd() * 12), 0.5);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x - r * 0.18, y - r * 0.18, r * 0.82, 0, Math.PI * 2);
+    ctx.fillStyle = hsl(b.h, b.s * 0.7, Math.min(96, b.l + 6 + rnd() * 10), 0.28);
+    ctx.fill();
+  }
+}
+
+const TEX_CACHE = new Map();
+
+function bodyTexture(n) {
+  const key = n.raw.id64 || n.name;
+  if (TEX_CACHE.has(key)) return TEX_CACHE.get(key);
+
+  const rnd = seeded(key);
+  const b = baseHsl(tintOf(n.sub));
+  const sub = String(n.sub || '').toLowerCase();
+  const w = 256, h = 128;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+
+  ctx.fillStyle = hsl(b.h, b.s, b.l);
+  ctx.fillRect(0, 0, w, h);
+
+  if (sub.includes('gas giant') || sub.includes('water giant')) {
+    // Bands, and a storm or two. The count varies per body so two Class I
+    // giants in the same system are not the same picture.
+    paintBands(ctx, w, h, rnd, b, 16 + Math.floor(rnd() * 14));
+    const storms = Math.floor(rnd() * 3);
+    for (let i = 0; i < storms; i++) {
+      const x = rnd() * w, y = h * (0.25 + rnd() * 0.5), r = h * (0.05 + rnd() * 0.07);
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, hsl(b.h + 18, Math.min(100, b.s * 1.4), b.l + 14, 0.8));
+      g.addColorStop(1, hsl(b.h, b.s, b.l, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(x, y, r * 1.8, r, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (sub.includes('earth-like') || sub.includes('water world')) {
+    /* Ocean first, then land on top of it. Painting an ocean world out of a
+       single green produced a green ball with nothing on it — water and land
+       are different colours, and that difference is the whole reason the
+       class is recognisable at a glance. */
+    const ocean = { h: 204, s: 52, l: 26 };
+    ctx.fillStyle = hsl(ocean.h, ocean.s, ocean.l);
+    ctx.fillRect(0, 0, w, h);
+    paintBlobs(ctx, w, h, rnd, ocean, 12, h * 0.22, 10, 0.5);
+
+    // How much land there is varies per world; a water world keeps less.
+    const land = { h: 96 + rnd() * 30, s: 30 + rnd() * 22, l: 30 + rnd() * 10 };
+    const count = sub.includes('water world')
+      ? 4 + Math.floor(rnd() * 5) : 12 + Math.floor(rnd() * 12);
+    paintBlobs(ctx, w, h, rnd, land, count, h * 0.15, 6, 0.95);
+    paintBlobs(ctx, w, h, rnd, { h: land.h - 40, s: 26, l: 42 },
+               Math.floor(count / 2), h * 0.08, 8, 0.55);   // arid ground
+
+    // Ice at both poles.
+    ['top', 'bottom'].forEach((edge) => {
+      const g = ctx.createLinearGradient(0, edge === 'top' ? 0 : h,
+                                         0, edge === 'top' ? h * 0.2 : h * 0.8);
+      g.addColorStop(0, hsl(198, 14, 94, 0.9));
+      g.addColorStop(1, hsl(198, 14, 94, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(0, edge === 'top' ? 0 : h * 0.8, w, h * 0.2);
+    });
+  } else if (sub.includes('ammonia')) {
+    paintBands(ctx, w, h, rnd, b, 8 + Math.floor(rnd() * 8));
+    paintBlobs(ctx, w, h, rnd, b, 10, h * 0.12, -14, 0.4);
+  } else if (sub.includes('ice') || sub.includes('icy')) {
+    paintBlobs(ctx, w, h, rnd, b, 16, h * 0.15, 14, 0.4);
+    paintCraters(ctx, w, h, rnd, b, 30 + Math.floor(rnd() * 50));
+  } else {
+    // Rock, metal and everything else the dump has no better word for.
+    paintBlobs(ctx, w, h, rnd, b, 14, h * 0.18, -12, 0.45);
+    paintCraters(ctx, w, h, rnd, b, 40 + Math.floor(rnd() * 70));
+  }
+
+  /* What the dump knows, showing on the surface. A body with a real
+     atmosphere gets weather over it; one with active volcanism gets its
+     hotspots. Both come from fields, not from taste. */
+  const atmo = n.raw.atmosphereComposition;
+  if (atmo && Object.keys(atmo).length && n.raw.surfacePressure > 0.02) {
+    const decks = 14 + Math.floor(rnd() * 14);
+    for (let i = 0; i < decks; i++) {
+      const x = rnd() * w, y = rnd() * h;
+      const rx = w * (0.05 + rnd() * 0.14), ry = h * (0.02 + rnd() * 0.04);
+      const g = ctx.createRadialGradient(x, y, 0, x, y, rx);
+      g.addColorStop(0, hsl(0, 0, 99, 0.34 + rnd() * 0.3));
+      g.addColorStop(1, hsl(0, 0, 99, 0));
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(1, ry / rx);
+      ctx.translate(-x, -y);
+      ctx.fillStyle = g;
+      ctx.fillRect(x - rx, y - rx, rx * 2, rx * 2);
+      ctx.restore();
+    }
+  }
+  if (/major|magma|lava/i.test(n.raw.volcanismType || '')) {
+    for (let i = 0; i < 8; i++) {
+      const x = rnd() * w, y = rnd() * h, r = h * (0.02 + rnd() * 0.05);
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, hsl(18, 90, 58, 0.75));
+      g.addColorStop(1, hsl(18, 90, 40, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+  }
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  TEX_CACHE.set(key, tex);
+  return tex;
+}
+
 function tintOf(sub) {
   if (TINT[sub]) return TINT[sub];
   const s = String(sub || '').toLowerCase();
@@ -363,7 +666,7 @@ const Orrery = (function () {
      the sphere underneath is still the honest one. */
   let pips = null, pipNodes = [];
   let model = null, meshes = [], loop = 0, lastFrame = 0;
-  let simDays = 0, rateIx = START_RATE, playing = true;
+  let simDays = 0, rateIx = START_RATE, playing = true, wallClock = 0;
   let mode3d = true, trueDistance = false, selected = null;
   /* What to draw, and whether this is a page or an overlay. Orbit paths get
      three states rather than two: a forty-body system draws forty ellipses,
@@ -822,9 +1125,10 @@ const Orrery = (function () {
         const isStar = n.type === 'Star';
         const geo = new THREE.SphereGeometry(n.drawR, isStar ? 32 : 20, isStar ? 24 : 14);
         const mat = isStar
-          // The star is its own light source, so it is not lit by one.
-          ? new THREE.MeshBasicMaterial({ color: starTint })
-          : new THREE.MeshLambertMaterial({ color: tintOf(n.sub) });
+          // The star is its own light source, so it is not lit by one — it
+          // makes its own, and churns while it does it.
+          ? starMaterial(n, starTint)
+          : new THREE.MeshLambertMaterial({ map: bodyTexture(n) });
         entry.mesh = new THREE.Mesh(geo, mat);
         entry.mesh.userData.node = n;
         scene.add(entry.mesh);
@@ -1099,6 +1403,11 @@ const Orrery = (function () {
       }
       if (m.line) m.line.position.copy(n.parent ? n.parent._pos : ORIGIN);
       if (m.rings) m.rings.position.copy(n._pos);
+      // Real seconds, not simulated ones: a star's surface should not strobe
+      // because the orbits were asked to run at a year a second.
+      if (m.mesh && m.mesh.material.uniforms && m.mesh.material.uniforms.uTime) {
+        m.mesh.material.uniforms.uTime.value = wallClock;
+      }
     });
     movePips();
 
@@ -1142,6 +1451,7 @@ const Orrery = (function () {
     loop = requestAnimationFrame(animate);
     const dt = lastFrame ? Math.min((now - lastFrame) / 1000, 0.1) : 0;
     lastFrame = now;
+    wallClock += dt;
     draw(dt);
   }
 
@@ -1620,6 +1930,25 @@ const Orrery = (function () {
       near: cam3.near,
       bodies: model ? model.all.length : 0,
       logDepth: !!(renderer && renderer.capabilities.logarithmicDepthBuffer),
+      // The star's own clock, in real seconds — deliberately not the orbit
+      // clock, so its surface does not strobe when time is run fast.
+      /* A fingerprint of each painted surface, so a test can prove a world
+         wears the same face on a second visit rather than being re-rolled. */
+      faces: meshes.filter((m) => m.mesh && m.mesh.material.map)
+        .map((m) => {
+          const img = m.mesh.material.map.image;
+          const d = img.getContext('2d').getImageData(0, 0, img.width, img.height).data;
+          let h = 2166136261;
+          for (let i = 0; i < d.length; i += 997) {
+            h ^= d[i]; h = Math.imul(h, 16777619);
+          }
+          return m.node.name + ':' + (h >>> 0);
+        }),
+      starTime: (() => {
+        const m = model && meshes.filter((x) => x.node === model.star)[0];
+        const u = m && m.mesh && m.mesh.material.uniforms;
+        return u && u.uTime ? u.uTime.value : null;
+      })(),
       /* The selected body's ring system, in that body's own radii — the units
          the dump does NOT give it in, which is where the factor of a thousand
          between metres and kilometres would show up. */
