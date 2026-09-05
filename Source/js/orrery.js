@@ -4125,10 +4125,14 @@ const Orrery = (function () {
       row.click();
     };
 
+    /* Mouse words on a device with no mouse are no help at all. */
+    const touch = window.matchMedia('(hover: none)').matches;
     panel.querySelector('#orr-legend').innerHTML =
       '<b>' + model.all.filter((n) => n.drawR).length + '</b> bodies &middot; ' +
-      'drag to orbit &middot; scroll to zoom &middot; click a body' +
-      '<br><span class="dim">space pauses &middot; , and . change speed</span>';
+      (touch
+        ? 'drag to orbit &middot; pinch to zoom &middot; tap a body'
+        : 'drag to orbit &middot; scroll to zoom &middot; click a body' +
+          '<br><span class="dim">space pauses &middot; , and . change speed</span>');
   }
 
   /* ── open / close ─────────────────────────────────────────────────────── */
@@ -4164,7 +4168,10 @@ const Orrery = (function () {
     }
 
     setRate(START_RATE);
-    setPlaying(true);
+    /* Somebody who has asked their machine for less movement has asked for
+       less movement. The orbits still run the moment they press play; they
+       just do not start running at a day a second without being asked. */
+    setPlaying(!window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     simDays = 0;
     lastFrame = 0;
 
@@ -4174,8 +4181,24 @@ const Orrery = (function () {
       // and asking for both at once costs nothing over asking for the dump.
       [sys] = await Promise.all([fetchSystem(name, id64), spectralTable()]);
     } catch (err) {
-      stopBoot('bad',
-        name + ' is not in Canonn’s system dump, so there is nothing to model yet.');
+      /* A dead end told the reader what was wrong and left them there. The
+         two things they might actually want next are another system and the
+         tool that knows about every system, so both are offered. */
+      stopBoot('bad', '');
+      panel.querySelector('#orr-msg').innerHTML =
+        '<div class="orr-lost"><b>' + esc(name) + '</b>' +
+        '<p>Canonn has no dump for this system, so there is nothing to model yet. ' +
+        'That usually means nobody has scanned it and sent it in.</p>' +
+        '<div class="orr-lost-do">' +
+        (standalone ? '<button data-act="find">Look for another system</button>' : '') +
+        '<a href="https://signals.canonn.tech/?system=' + encodeURIComponent(name) +
+        '" target="_blank" rel="noopener">Try it in Signals &#8599;</a>' +
+        '</div></div>';
+      panel.querySelector('#orr-msg').onclick = (e) => {
+        if (!e.target.closest('[data-act="find"]')) return;
+        close();
+        panel.querySelector('#orr-q').focus();
+      };
       return;
     }
     if (!isOpen()) return;                    // closed while we were fetching

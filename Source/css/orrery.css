@@ -56,7 +56,9 @@ body.orrery-open .app{visibility:hidden}
 .orr-page:not(.has-system) .orr-empty{display:flex}
 
 /* top */
-.orr-top{display:flex;align-items:center;gap:12px;min-height:46px;padding:0 12px;
+.orr-top{display:flex;align-items:center;gap:12px;min-height:46px;
+  padding:env(safe-area-inset-top) max(12px,env(safe-area-inset-right)) 0
+          max(12px,env(safe-area-inset-left));
   border-bottom:1px solid var(--rule,#1B242E);background:var(--panel,#0C1116);
   position:relative;z-index:5}
 .orr-home{align-items:center;gap:9px;color:var(--amber,#FF9D00);text-decoration:none;flex:none}
@@ -144,7 +146,7 @@ body.orrery-open .app{visibility:hidden}
   cursor:pointer;font-family:var(--cond,sans-serif);font-size:9px;letter-spacing:.16em;
   text-transform:uppercase;color:var(--dimmer,#6E7F8D)}
 .orr-sp-lb:hover{color:var(--amber,#FF9D00)}
-.orr-sp-lb i{font-style:normal;font-size:8px;letter-spacing:0}
+.orr-sp-lb i{font-style:normal;font-size:9.5px;letter-spacing:0}
 .orr-sp-max{flex:none;font-family:var(--mono,monospace);font-size:9.5px;
   color:var(--dimmer,#6E7F8D);font-variant-numeric:tabular-nums}
 .orr-sp-ax{position:relative;flex:none;height:15px;
@@ -169,7 +171,7 @@ body.orrery-open .app{visibility:hidden}
 .orr-sp-de .tie{position:absolute;height:1px;background:var(--rule,#1B242E);
   pointer-events:none}
 .orr-sp-de .lb{position:absolute;display:block;max-width:200px;
-  padding:0 4px 0 6px;margin:0;background:none;border:0;text-align:left;
+  padding:4px 4px 4px 6px;margin:-4px 0 0;background:none;border:0;text-align:left;
   font-family:var(--cond,sans-serif);font-size:10.5px;font-weight:500;
   letter-spacing:.01em;line-height:12px;white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis;color:var(--dim,#93A3B1);cursor:pointer}
@@ -178,11 +180,17 @@ body.orrery-open .app{visibility:hidden}
 .orr-sp-de .lb:hover{color:var(--amber,#FF9D00)}
 .orr-sp-de .lb.on{color:var(--amber,#FF9D00)}
 .orr-sp-de .lb.on,.orr-sp-de .lb:hover{background:var(--panel,#0C1116)}
-.orr-sp-ax .tk{position:absolute;top:9px;font-family:var(--mono,monospace);font-size:8px;
+.orr-sp-ax .tk{position:absolute;top:9px;font-family:var(--mono,monospace);font-size:9.5px;
   color:var(--dimmer,#6E7F8D);transform:translateX(-50%);pointer-events:none}
+/* A moon's pip is five pixels across, which is a target nobody can hit with a
+   thumb and most people miss with a mouse. The dot stays the size it is —
+   forty of them at 24px would be a solid bar — and gets an invisible target
+   around it instead. */
 .orr-sp-ax .pip{position:absolute;top:3px;width:8px;height:8px;margin-left:-4px;
   border-radius:50%;background:var(--c,#8B8579);border:0;padding:0;cursor:pointer}
 .orr-sp-ax .pip.moon{top:5px;width:5px;height:5px;margin-left:-2.5px;opacity:.8}
+.orr-sp-ax .pip::after{content:"";position:absolute;left:50%;top:50%;
+  width:24px;height:24px;transform:translate(-50%,-50%)}
 .orr-sp-ax .pip:hover{box-shadow:0 0 0 3px rgba(255,157,0,.25)}
 .orr-sp-ax .pip.on{box-shadow:0 0 0 2px var(--void,#05070A),0 0 0 4px var(--amber,#FF9D00)}
 /* Stations sit under the axis rather than on it: they have a real distance,
@@ -199,7 +207,7 @@ body.orrery-open .app{visibility:hidden}
 .orr-row.stn.ground .dot{background:none;box-shadow:inset 0 0 0 1.5px var(--ion,#4DE3E1)}
 .orr-row.stn .nm{font-size:10.5px;color:var(--dimmer,#6E7F8D)}
 .orr-row.stn:hover .nm{color:var(--ion,#4DE3E1)}
-.orr-row .pad{flex:none;font-style:normal;font-family:var(--mono,monospace);font-size:8.5px;
+.orr-row .pad{flex:none;font-style:normal;font-family:var(--mono,monospace);font-size:9.5px;
   color:var(--dimmer,#6E7F8D);border:1px solid var(--rule,#1B242E);padding:0 3px}
 /* What is on the body, marked on the row. Finding the one Guardian site in a
    system of twenty-two was twenty-two clicks; now it is a glance. */
@@ -245,6 +253,21 @@ body.orrery-open .app{visibility:hidden}
 }
 .orr-msg.gone{display:none}
 .orr-msg.bad{color:var(--dim,#93A3B1)}
+/* A system Canonn has never been sent. Telling a reader that and stopping is
+   a dead end; the two things they might want next are another system and the
+   tool that knows about every one of them. */
+.orr-lost{max-width:44ch;text-align:center}
+.orr-lost b{display:block;font-family:var(--cond,sans-serif);font-size:20px;font-weight:600;
+  color:#E4EBF1}
+.orr-lost p{margin:9px 0 0;font-family:var(--sans,sans-serif);font-size:13.5px;line-height:1.6;
+  color:var(--dim,#93A3B1)}
+.orr-lost-do{display:flex;flex-wrap:wrap;justify-content:center;gap:7px;margin-top:16px}
+.orr-lost-do button,.orr-lost-do a{padding:7px 13px;border:1px solid var(--rule,#1B242E);
+  background:none;text-decoration:none;font-family:var(--cond,sans-serif);font-size:11.5px;
+  font-weight:600;color:var(--dim,#93A3B1);cursor:pointer}
+.orr-lost-do button:hover{border-color:var(--amber,#FF9D00);color:var(--amber,#FF9D00)}
+.orr-lost-do a{border-color:#2E6E6D;color:var(--ion,#4DE3E1)}
+.orr-lost-do a:hover{background:var(--ion,#4DE3E1);color:#04100F}
 /* Names over the view: the star, what orbits it directly, and the selection.
    Positioned by projecting the body each frame, so they never scale or blur
    the way an in-scene sprite would. */
@@ -373,7 +396,7 @@ body.orr-dragging{user-select:none}
 .orr-key-r i.sg.hum{background:var(--hum);opacity:.6}
 .orr-key-r i.stn{width:6px;height:6px;background:var(--ion,#4DE3E1);margin:0 3px}
 .orr-key-r i.stn.hollow{background:none;box-shadow:inset 0 0 0 1.5px var(--ion,#4DE3E1)}
-.orr-key-r i.pad{font-family:var(--mono,monospace);font-size:8.5px;
+.orr-key-r i.pad{font-family:var(--mono,monospace);font-size:9.5px;
   color:var(--dimmer,#6E7F8D);border:1px solid var(--rule,#1B242E);padding:0 3px;width:auto}
 .light-open #orr-light{border-color:var(--amber,#FF9D00);color:var(--amber,#FF9D00)}
 .orr-sl{display:flex;align-items:center;gap:10px;padding:3px 0;cursor:pointer}
@@ -635,7 +658,12 @@ body.orr-dragging{user-select:none}
 .orr-seeds button:hover{border-color:var(--amber,#FF9D00);color:var(--amber,#FF9D00)}
 
 /* the clock */
-.orr-foot{display:flex;align-items:center;gap:18px;min-height:42px;padding:0 12px;
+/* Notched phones keep a strip at the bottom for the home indicator and a
+   corner or two at the top. Without this the time bar sits under the
+   indicator and the close button under the camera. */
+.orr-foot{display:flex;align-items:center;gap:18px;min-height:42px;
+  padding:0 max(12px,env(safe-area-inset-right)) env(safe-area-inset-bottom)
+          max(12px,env(safe-area-inset-left));
   border-top:1px solid var(--rule,#1B242E);background:var(--panel,#0C1116)}
 .orr-time{display:flex;align-items:center;gap:6px}
 .orr-time button{width:30px;height:24px;display:grid;place-items:center;

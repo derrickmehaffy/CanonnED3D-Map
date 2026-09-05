@@ -2001,6 +2001,80 @@ test('a world with air is drawn with air', async ({ page }) => {
   expect(air.filter((a) => a.name === 'Testholm')[0].air).toBe(false);
 });
 
+/* Four small things that were each somebody's bad afternoon. */
+
+test('a system nobody has scanned is not a dead end', async ({ page }) => {
+  await stubDataHosts(page);
+  await page.route(API, (route) => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify({ min_max: [] }) }));
+  await page.goto('/orrery.html?system=Nowhere%20At%20All', { waitUntil: 'domcontentloaded' });
+
+  const msg = page.locator('#orr-msg');
+  await expect(msg).toHaveClass(/bad/, { timeout: 30_000 });
+  await expect(msg).toContainText('Nowhere At All');
+  // The tool that knows about every system, and this one by name.
+  await expect(msg.locator('a[href*="signals.canonn.tech"]'))
+    .toHaveAttribute('href', /system=Nowhere%20At%20All/);
+
+  // And a way back to looking, rather than a sentence and a blank screen.
+  await page.locator('#orr-msg [data-act="find"]').click();
+  await expect(page.locator('.orr-empty')).toBeVisible();
+  await expect(page.locator('#orr-q')).toBeFocused();
+});
+
+test('asking for less movement gets less movement', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+
+  // Not running by itself. It still runs the moment anybody presses play.
+  await expect(page.locator('#orr-play')).toHaveClass(/paused/);
+  const date = await page.locator('#orr-date').textContent();
+  await page.waitForTimeout(900);
+  expect(await page.locator('#orr-date').textContent()).toBe(date);
+
+  await page.locator('#orr-play').click();
+  await expect.poll(() => page.locator('#orr-date').textContent(), { timeout: 10_000 })
+    .not.toBe(date);
+});
+
+test('the marks on the distance axis can be hit', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+
+  /* A moon's pip is five pixels of dot. Forty of them at the accessible
+     minimum would be a solid bar, so the dot stays small and carries an
+     invisible target around it. */
+  const reach = await page.locator('.orr-sp-ax .pip.moon').first().evaluate((el) => {
+    const cs = getComputedStyle(el, '::after');
+    return { w: parseFloat(cs.width), h: parseFloat(cs.height) };
+  });
+  expect(reach.w).toBeGreaterThanOrEqual(24);
+  expect(reach.h).toBeGreaterThanOrEqual(24);
+
+  // And it is the moon that gets picked, not merely something.
+  const pip = page.locator('.orr-sp-ax .pip[data-id="2"]');
+  const b = await pip.boundingBox();
+  await page.mouse.click(b.x + b.width / 2 + 8, b.y + b.height / 2);
+  await expect.poll(() => page.evaluate(() => window.Orrery.state().selected),
+    { timeout: 10_000 }).toBe('Testholm 1 a');
+});
+
+test('nothing is set smaller than it can be read at', async () => {
+  const css = readFileSync('Source/css/orrery.css', 'utf8');
+  const sizes = [...css.matchAll(/font-size:([0-9.]+)px/g)].map((m) => parseFloat(m[1]));
+  expect(sizes.length).toBeGreaterThan(30);
+  /* Twenty-five rules sat below ten pixels and two of them at eight, which
+     reads as density on a big monitor and as nothing at all on a laptop. Nine
+     is the floor, and what is left there is uppercase micro-labelling with
+     letter-spacing, which reads a size larger than it is set. */
+  expect(Math.min(...sizes), 'the smallest type in the stylesheet').toBeGreaterThanOrEqual(9);
+});
+
 /* A link someone typed or pasted in caps is a link to the same system. The
    typeahead is a prefix search over canonical names, so the guard against a
    near-match has to compare letters rather than case. */
