@@ -91,10 +91,24 @@ body.orrery-open .app{visibility:hidden}
   background:rgba(255,157,0,.07);font-family:var(--cond,sans-serif);font-size:10px;
   font-weight:600;letter-spacing:.14em;text-transform:uppercase;cursor:help}
 
-.orr-tb{padding:5px 10px;border:1px solid var(--rule,#1B242E);background:none;
+.orr-tb{display:flex;align-items:center;gap:5px;padding:5px 10px;
+  border:1px solid var(--rule,#1B242E);background:none;text-decoration:none;
   font-family:var(--cond,sans-serif);font-size:11.5px;font-weight:600;
   color:var(--dim,#93A3B1);cursor:pointer;white-space:nowrap;flex:none}
-.orr-tb:hover{border-color:var(--ion,#4DE3E1);color:var(--ion,#4DE3E1)}
+.orr-tb:hover{border-color:var(--dim,#93A3B1);color:var(--text,#CAD4DC)}
+/* Signals is where this system goes on being investigated after the orrery
+   has shown you its shape, so it gets the ion the rest of the interface uses
+   for a way out to another tool — and the arrow that says it leaves. */
+#orr-signals{border-color:#2E6E6D;color:var(--ion,#4DE3E1)}
+#orr-signals:hover{background:var(--ion,#4DE3E1);border-color:var(--ion,#4DE3E1);
+  color:#04100F}
+#orr-signals span{font-size:9px;opacity:.8}
+/* Canonn runs on donations and the link to them was the same grey as
+   everything else. It is the one thing on this bar that is asking for
+   something, so it is the one thing that looks like it. */
+.orr-tb.donate{background:var(--amber,#FF9D00);border-color:var(--amber,#FF9D00);
+  color:#0B0700}
+.orr-tb.donate:hover{background:#FFB233;border-color:#FFB233;color:#0B0700}
 .orr-back{display:flex;align-items:center;gap:7px;border:1px solid var(--rule,#1B242E);
   padding:5px 11px;font-family:var(--cond,'IBM Plex Sans Condensed',sans-serif);
   font-size:12px;font-weight:600;color:var(--dim,#93A3B1);
@@ -137,21 +151,29 @@ body.orrery-open .app{visibility:hidden}
    detail, it is more empty band. Past the height a row of names fits in, the
    axis names what is on it — packed into as many lanes as it takes for none
    of them to overlap. */
-.orr-sp-de{position:relative;flex:1;min-height:0;margin-top:9px;overflow-y:auto;
-  scrollbar-width:thin;scrollbar-color:var(--rule,#1B242E) transparent}
-.orr-sp-de::after{content:"";display:block;height:calc(var(--lanes,1) * 15px)}
-.orr-sp-de::-webkit-scrollbar{width:8px}
-.orr-sp-de::-webkit-scrollbar-thumb{background:var(--rule,#1B242E);
-  border:2px solid var(--panel,#0C1116)}
-.orr-sp-de .lb{position:absolute;display:block;max-width:190px;padding:0 3px 0 8px;
-  font-family:var(--mono,monospace);font-size:9px;line-height:13px;white-space:nowrap;
+.orr-sp-de{position:relative;flex:1;min-height:0;margin-top:9px;overflow:hidden}
+/* What it is still holding back, and how to ask for it. */
+.orr-sp-de .more{position:absolute;right:0;bottom:0;padding:1px 5px;
+  background:var(--panel,#0C1116);font-family:var(--cond,sans-serif);font-size:9.5px;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--dimmer,#6E7F8D)}
+/* A stem from the axis down to each name, so a hundred names read as an
+   annotated ruler rather than as text scattered over a band. Without them
+   every label was floating at an arbitrary height with nothing tying it to
+   the distance it was supposed to be marking. */
+.orr-sp-de .stem{position:absolute;top:0;width:1px;background:var(--c,#2A3540);
+  opacity:.32;pointer-events:none}
+.orr-sp-de .tie{position:absolute;height:1px;background:var(--rule,#1B242E);
+  pointer-events:none}
+.orr-sp-de .lb{position:absolute;display:block;max-width:200px;
+  padding:0 4px 0 6px;margin:0;background:none;border:0;text-align:left;
+  font-family:var(--cond,sans-serif);font-size:10.5px;font-weight:500;
+  letter-spacing:.01em;line-height:12px;white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis;color:var(--dim,#93A3B1);cursor:pointer}
-.orr-sp-de .lb::before{content:"";position:absolute;left:1px;top:5px;width:4px;height:4px;
-  border-radius:50%;background:var(--c,#8B8579)}
-.orr-sp-de .lb.port{color:var(--dimmer,#6E7F8D)}
-.orr-sp-de .lb.port::before{border-radius:0;background:var(--ion,#4DE3E1)}
+.orr-sp-de .lb.port{color:var(--dimmer,#6E7F8D);font-family:var(--mono,monospace);
+  font-size:9.5px}
 .orr-sp-de .lb:hover{color:var(--amber,#FF9D00)}
 .orr-sp-de .lb.on{color:var(--amber,#FF9D00)}
+.orr-sp-de .lb.on,.orr-sp-de .lb:hover{background:var(--panel,#0C1116)}
 .orr-sp-ax .tk{position:absolute;top:9px;font-family:var(--mono,monospace);font-size:8px;
   color:var(--dimmer,#6E7F8D);transform:translateX(-50%);pointer-events:none}
 .orr-sp-ax .pip{position:absolute;top:3px;width:8px;height:8px;margin-left:-4px;
@@ -190,7 +212,33 @@ body.orrery-open .app{visibility:hidden}
 .orr-stage canvas{display:block;width:100%;height:100%}
 .orr-msg{position:absolute;inset:0;display:grid;place-items:center;padding:0 40px;
   text-align:center;font-family:var(--mono,monospace);font-size:12px;
-  color:var(--dimmer,#6E7F8D);background:var(--void,#05070A)}
+  color:var(--dimmer,#6E7F8D);background:var(--void,#05070A);z-index:4}
+
+/* The same boot screen every map page shows, because this is the same
+   building — the R&D banner assembling itself, an amber sweep, and a line
+   saying what is being waited on. It was a sentence in grey monospace. */
+.orr-boot{display:flex;flex-direction:column;align-items:center;gap:34px}
+/* The banner is 1600x400 with the atom centred in a lot of empty canvas, so
+   the SVG is scaled up rather than the box widened: that keeps the limpets'
+   fly-in on screen. Nothing is shown until the animation has actually
+   arrived, so the fallback wordmark never flashes underneath it. */
+.orr-boot-logo{display:none;width:min(460px,52vw);aspect-ratio:4/1;
+  clip-path:inset(-100% 0 -100% 0)}
+.orr-boot-logo.ready{display:block}
+.orr-boot-logo svg{display:block;width:100%;height:100%;transform:scale(1.5)}
+.orr-boot-word{font-family:var(--cond,sans-serif);font-size:20px;font-weight:600;
+  letter-spacing:.18em;text-transform:uppercase;color:var(--amber,#FF9D00)}
+.orr-boot-logo.ready + .orr-boot-word{display:none}
+.orr-boot-bar{width:min(240px,40vw);height:2px;background:var(--rule,#1B242E);
+  overflow:hidden}
+.orr-boot-bar i{display:block;height:100%;width:35%;background:var(--amber,#FF9D00);
+  animation:orrsweep 1.15s cubic-bezier(.6,0,.35,1) infinite}
+@keyframes orrsweep{0%{transform:translateX(-100%)}100%{transform:translateX(386%)}}
+.orr-boot-msg{margin:0;font-family:var(--mono,monospace);font-size:11px;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--dim,#93A3B1)}
+@media (prefers-reduced-motion:reduce){
+  .orr-boot-bar i{animation:none;width:100%}
+}
 .orr-msg.gone{display:none}
 .orr-msg.bad{color:var(--dim,#93A3B1)}
 /* Names over the view: the star, what orbits it directly, and the selection.
@@ -264,21 +312,36 @@ body.orr-dragging{user-select:none}
 
 /* Everything else states its own value, so it reads without relying on colour
    to carry the state — and so a three-state control can be one button that
-   steps rather than three that have to be told apart. */
-.orr-opt{display:flex;align-items:baseline;gap:7px;padding:4px 8px;
-  background:none;border:1px solid transparent;cursor:pointer;text-align:left}
-.orr-opt:hover{border-color:var(--rule,#1B242E)}
-.orr-opt span{font-family:var(--cond,sans-serif);font-size:11.5px;color:var(--dim,#93A3B1)}
-.orr-opt b{font-family:var(--mono,monospace);font-size:10px;font-weight:500;
+   steps rather than three that have to be told apart.
+
+   Built as a name and a readout welded together, which is what they are, and
+   given the same border and the same height as the segmented pairs beside
+   them: as loose text with a border only on hover they read as labels rather
+   than as things you could press. */
+.orr-opt{display:flex;align-items:stretch;padding:0;background:none;
+  border:1px solid var(--rule,#1B242E);cursor:pointer;text-align:left;overflow:hidden}
+.orr-opt span{display:flex;align-items:center;padding:4px 8px;
+  font-family:var(--cond,sans-serif);font-size:11px;font-weight:600;
+  letter-spacing:.02em;color:var(--dim,#93A3B1)}
+.orr-opt b{display:flex;align-items:center;padding:4px 8px;
+  border-left:1px solid var(--rule,#1B242E);background:rgba(255,255,255,.045);
+  font-family:var(--mono,monospace);font-size:10px;font-weight:500;
   color:var(--dimmer,#6E7F8D)}
+.orr-opt:hover{border-color:var(--dim,#93A3B1)}
+.orr-opt:hover b{border-left-color:var(--dim,#93A3B1)}
 .orr-opt:hover span{color:var(--text,#CAD4DC)}
 .orr-opt.on span{color:var(--text,#CAD4DC)}
 .orr-opt.on b{color:var(--ion,#4DE3E1)}
 /* Settings, not controls: set once to taste and then left alone, so they
    keep a box of their own rather than crowding the six things a reader
    changes while reading. */
-.orr-pop-w{position:relative;flex:none}
-.orr-pop{position:absolute;right:0;top:calc(100% + 5px);z-index:9;width:212px;
+/* Fixed, not absolute, and placed by script.
+
+   The strip scrolls sideways when a window is too narrow to hold it, and
+   overflow-x:auto computes overflow-y to auto as well — so a box positioned
+   below the strip was clipped out of existence by its own parent. It opened
+   every time; there was simply nothing to see. */
+.orr-pop{position:fixed;z-index:65;width:212px;
   display:none;padding:8px 10px;background:var(--panel,#0C1116);
   border:1px solid var(--rule,#1B242E);box-shadow:0 14px 40px rgba(0,0,0,.7)}
 .light-open .orr-pop{display:block}
@@ -326,9 +389,15 @@ body.orr-dragging{user-select:none}
 .orr-s-t{font-family:var(--cond,sans-serif);font-size:9.5px;
   letter-spacing:.16em;text-transform:uppercase;color:var(--dimmer,#6E7F8D)}
 .orr-s-h{display:flex;align-items:center;gap:8px;padding:10px 13px 8px}
-.orr-s-tog{flex:none;padding:2px 6px;background:none;border:1px solid var(--rule,#1B242E);
-  color:var(--dimmer,#6E7F8D);font-size:9px;line-height:1.4;cursor:pointer}
+/* Labelled. It was a teal diamond, which tells a reader nothing about what
+   pressing it will do — and the list it hides is sixty-seven rows long. */
+.orr-s-tog{flex:none;display:flex;align-items:center;gap:5px;padding:3px 7px;
+  background:none;border:1px solid var(--rule,#1B242E);color:var(--dimmer,#6E7F8D);
+  font-family:var(--cond,sans-serif);font-size:10.5px;font-weight:600;cursor:pointer}
+.orr-s-tog::before{content:"";width:5px;height:5px;background:currentColor}
 .orr-s-tog.on{border-color:#2E6E6D;color:var(--ion,#4DE3E1)}
+.orr-s-tog:not(.on)::before{background:none;box-shadow:inset 0 0 0 1px currentColor}
+.orr-s-tog:hover{border-color:var(--dim,#93A3B1)}
 .orr-filter{flex:1;min-width:0;background:var(--void,#05070A);
   border:1px solid var(--rule,#1B242E);color:var(--text,#CAD4DC);
   font-family:var(--mono,monospace);font-size:10.5px;padding:3px 7px}

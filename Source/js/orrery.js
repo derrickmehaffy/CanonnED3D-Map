@@ -1082,9 +1082,43 @@ function buildModel(sys) {
   nodes.forEach((n) => {
     (n.raw.stations || []).forEach((st) => { if (st && st.name) ports.push({ st, on: n }); });
   });
-  (sys.stations || []).forEach((st) => { if (st && st.name) ports.push({ st, on: null }); });
+  (sys.stations || []).forEach((st) => {
+    if (st && st.name) ports.push({ st, on: nearBody(st, nodes), guessed: true });
+  });
 
   return { name: sys.name, star: root, all: [...nodes.values()], ports, epoch, sys };
+}
+
+/* Which body a loose station is actually at.
+
+   The dump's system-level list is the stations it does not attach to a body,
+   and it gives no body reference at all — but almost none of them are really
+   floating in the middle of a system. They are in orbit around something, and
+   the one join the data does give is the distance to arrival: a station and
+   the body it orbits are, to a few light-seconds, the same distance out.
+
+   Nearest in light-seconds is not good enough on its own. Columbus is 1.26 Ls
+   from Io and 1.47 from Jupiter, and it orbits Jupiter — 377,000 km is two
+   hundred Io radii and nowhere near Io, while 440,000 km is six Jupiter radii
+   and exactly where a station sits. So the distance is measured in the body's
+   own radii, which is the scale a station orbit is actually set by. On Sol
+   that places all ten correctly, Galileo at Luna rather than Earth included.
+
+   It is still an inference, so it is marked as one and the reader is told. */
+const LS_KM = 299792.458;
+
+function nearBody(st, nodes) {
+  const ls = st.distanceToArrival;
+  if (typeof ls !== 'number') return null;
+  let best = null, score = Infinity;
+  nodes.forEach((n) => {
+    const d = n.raw.distanceToArrival;
+    if (typeof d !== 'number' || !n.km || n.type === 'Star') return;
+    const off = Math.abs(d - ls);
+    const radii = (off * LS_KM) / n.km;
+    if (radii < score && radii < 250 && off < 3) { score = radii; best = n; }
+  });
+  return best;
 }
 
 function parseEpoch(s) {
@@ -1341,8 +1375,7 @@ const Orrery = (function () {
          listed Mercury sits eleven rows below the star. They belong here —
          they are things in the system — but a reader looking for a body
          should be able to put them away for a moment. */
-      '      <button class="orr-s-tog on" id="orr-stations" aria-pressed="true"',
-      '              title="Show the stations">&#9670;</button>',
+      '      <button class="orr-s-tog on" id="orr-stations" aria-pressed="true">Stations</button>',
       '      <input id="orr-filter" class="orr-filter" type="text" autocomplete="off"',
       '             spellcheck="false" placeholder="Filter" aria-label="Filter bodies">',
       '    </div>',
@@ -1380,18 +1413,11 @@ const Orrery = (function () {
          controls, and putting them in the same row as the six things a reader
          changes while reading makes all eight harder to find. So these two
          keep a box of their own. */
-      '      <div class="orr-pop-w">',
-      '        <button class="orr-tb" id="orr-light" aria-haspopup="true" aria-expanded="false">Light</button>',
-      '        <div class="orr-pop" id="orr-light-p" role="group" aria-label="Light">',
-      '          <label class="orr-sl"><span>Ambient</span>',
-      '            <input id="orr-amb" type="range" min="0" max="100" value="30"></label>',
-      '          <label class="orr-sl"><span>Star glow</span>',
-      '            <input id="orr-glow" type="range" min="0" max="100" value="60"></label>',
-      '        </div>',
-      '      </div>',
+      '      <button class="orr-tb" id="orr-light" aria-haspopup="true"',
+      '              aria-expanded="false" title="How bright the scene is lit">Light</button>',
       '      <button class="orr-tb" id="orr-reset">Frame the system</button>',
       '    </div>',
-      '    <div class="orr-msg" id="orr-msg">Reading the system dump&#8230;</div>',
+      '    <div class="orr-msg" id="orr-msg" role="status" aria-live="polite"></div>',
       '    <div class="orr-legend" id="orr-legend"></div>',
       '  </div>',
       '    <div class="orr-grip orr-grip-l" id="orr-grip-l" role="separator"',
@@ -1429,6 +1455,19 @@ const Orrery = (function () {
       '    </div>',
       '    <div class="orr-m-b" id="orr-m-b"></div>',
       '  </div>',
+      '</div>',
+
+      /* Outside the strip, deliberately. It is placed by script against the
+         button, and a fixed box is positioned against the viewport only if
+         nothing above it has a transform, a filter or a backdrop-filter —
+         the strip has all three concerns and a backdrop blur, which made it
+         the containing block and threw the box hundreds of pixels down the
+         page. Its overflow clipped it out of existence for good measure. */
+      '<div class="orr-pop" id="orr-light-p" role="group" aria-label="Light">',
+      '  <label class="orr-sl"><span>Ambient</span>',
+      '    <input id="orr-amb" type="range" min="0" max="100" value="30"></label>',
+      '  <label class="orr-sl"><span>Star glow</span>',
+      '    <input id="orr-glow" type="range" min="0" max="100" value="60"></label>',
       '</div>',
 
       '<div class="orr-empty" id="orr-empty">',
@@ -1492,6 +1531,86 @@ const Orrery = (function () {
     initGL();
   }
 
+  /* ── waiting ──────────────────────────────────────────────────────────────
+     The same boot screen every map page shows, because this is the same
+     building: the R&D banner assembling itself, an amber sweep, and a line
+     saying what is being waited on. It was a sentence in a grey monospace.
+
+     The animation is bodymovin and a 420 KB banner. On a map page both are
+     already loaded and this costs nothing; on the orrery's own page they are
+     fetched the first time somebody actually opens a system, alongside the
+     dump, and cached from then on. Until they arrive — and if they never do —
+     the wordmark and the sweep carry it, which is exactly what the map pages
+     fall back to themselves. */
+
+  let boot = null, bootAsked = null;
+
+  function bootLoader() {
+    return '<div class="orr-boot">' +
+      '<div class="orr-boot-logo" id="orr-bootlogo"></div>' +
+      '<div class="orr-boot-word">Canonn R&amp;D</div>' +
+      '<div class="orr-boot-bar"><i></i></div>' +
+      '<p class="orr-boot-msg" id="orr-bootmsg"></p>' +
+    '</div>';
+  }
+
+  function bodymovin() {
+    if (window.bodymovin) return Promise.resolve(window.bodymovin);
+    if (!bootAsked) {
+      bootAsked = new Promise((ok, no) => {
+        const el = document.createElement('script');
+        el.src = 'vendor/bodymovin/bodymovin.min.js';
+        el.onload = () => ok(window.bodymovin);
+        el.onerror = no;
+        document.head.appendChild(el);
+      }).catch(() => null);
+    }
+    return bootAsked;
+  }
+
+  /* Frame 0 is empty and the limpets have assembled the atom by 300, so the
+     build runs once and then holds on the formed logo, which orbits. Same
+     segments the console uses, for the same reason: looped from the top it
+     would be blank for most of a short wait. */
+  const ASSEMBLE = [110, 400], SUSTAIN = [300, 400];
+
+  function playBoot(text) {
+    const el = panel.querySelector('#orr-msg');
+    el.className = 'orr-msg';
+    el.innerHTML = bootLoader();
+    el.querySelector('#orr-bootmsg').textContent = text;
+    if (boot) { try { boot.destroy(); } catch (e) {} boot = null; }
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    bodymovin().then((bm) => {
+      const host = panel && panel.querySelector('#orr-bootlogo');
+      if (!bm || !host || !host.isConnected) return;
+      try {
+        boot = bm.loadAnimation({
+          container: host, renderer: 'svg', loop: false, autoplay: false,
+          rendererSettings: { progressiveLoad: false },
+          path: 'data/rd-banner-v2-1.json'
+        });
+        boot.addEventListener('DOMLoaded', () => {
+          if (!boot) return;
+          host.classList.add('ready');
+          boot.addEventListener('complete', () => {
+            if (!boot) return;
+            boot.loop = true;
+            boot.playSegments([SUSTAIN], true);
+          });
+          boot.playSegments([ASSEMBLE], true);
+        });
+      } catch (e) { boot = null; }
+    });
+  }
+
+  function stopBoot(cls, text) {
+    const el = panel.querySelector('#orr-msg');
+    if (boot) { try { boot.destroy(); } catch (e) {} boot = null; }
+    el.className = 'orr-msg ' + cls;
+    el.textContent = text || '';
+  }
+
   /* ── the tools menu ───────────────────────────────────────────────────────
      Canonn is a dozen tools and the map links out to a handful of them; the
      orrery linked to none, so arriving here was a way of leaving the rest of
@@ -1517,7 +1636,17 @@ const Orrery = (function () {
 
   function showLight(on) {
     panel.classList.toggle('light-open', !!on);
-    panel.querySelector('#orr-light').setAttribute('aria-expanded', on ? 'true' : 'false');
+    const btn = panel.querySelector('#orr-light');
+    btn.setAttribute('aria-expanded', on ? 'true' : 'false');
+    if (!on) return;
+    /* Placed here rather than in the stylesheet, because the box is fixed:
+       the strip scrolls sideways on a narrow window, and an element inside
+       something that scrolls is clipped by it. */
+    const r = btn.getBoundingClientRect();
+    const pop = panel.querySelector('#orr-light-p');
+    pop.style.top = Math.round(r.bottom + 5) + 'px';
+    pop.style.left = Math.round(Math.max(8, Math.min(
+      window.innerWidth - 220, r.right - 212))) + 'px';
   }
 
   function showMenu(on) {
@@ -1762,31 +1891,44 @@ const Orrery = (function () {
      it is a system where some of them are going to be below the fold. */
   function toggleSpine() {
     if (spineTall()) { setSpine(COMPACT); drawSpine(); return; }
-    setSpine(spineMax());
-    drawSpine();
-    setSpine(Math.min(spineMax(), COMPACT + 9 + lastLanes * LANE + 6));
+    /* Six lanes, which is a readable handful rather than the thirty Sol's
+       hundred and three would take. Past that it is the reader's call: the
+       axis says how many names it is still holding back, and dragging it
+       down is what asks for them. */
+    setSpine(COMPACT + 12 + 6 * LANE);
     drawSpine();
   }
 
-  /* Greedy lane packing: names in distance order, each dropped into the first
-     lane whose last name has already ended. Monospace, so a character is a
-     known width and no measuring pass is needed. */
-  let lastLanes = 1;
+  /* Lane packing, by what is worth naming rather than by what comes first.
 
-  function laneOut(items, width) {
+     Sol has a hundred and three things on this axis and packing all of them
+     took thirty lanes — a wall of small text, which is not detail, it is
+     noise. So the lanes are however many the reader has given it room for,
+     and they are filled in order of what a person is looking for: the star,
+     then what orbits it, then moons, then stations. Whatever does not fit
+     keeps its pip on the axis and loses only its name.
+
+     A label starts at the exact position of the thing it names, so the stem
+     drawn up to the axis meets its leading edge and the two are visibly the
+     same object. */
+  function laneOut(items, width, maxLanes) {
     const lanes = [];
-    items.forEach((it) => {
-      const w = it.text.length * 5.3 + 10;
-      const x = Math.min(it.at * width, width - w);
-      let k = 0;
-      while (k < lanes.length && lanes[k] > x - 4) k++;
-      if (k === lanes.length) lanes.push(0);
-      lanes[k] = x + w;
-      it.x = Math.max(0, x);
-      it.lane = k;
+    let shown = 0;
+    items.slice().sort((a, b) => a.rank - b.rank || a.at - b.at).forEach((it) => {
+      const w = it.text.length * 5.6 + 12;
+      const x = Math.max(0, Math.min(it.at * width, width - w));
+      for (let k = 0; k < maxLanes; k++) {
+        if (!lanes[k]) lanes[k] = [];
+        if (lanes[k].some((s) => x < s[1] + 4 && s[0] < x + w + 4)) continue;
+        lanes[k].push([x, x + w]);
+        it.x = x;
+        it.lane = k;
+        shown++;
+        return;
+      }
+      it.lane = -1;                      // no room; the pip still marks it
     });
-    lastLanes = Math.max(1, lanes.length);
-    return lastLanes;
+    return shown;
   }
 
   function drawSpine() {
@@ -1865,26 +2007,50 @@ const Orrery = (function () {
      you what is in each of them, which is the question a commander is
      actually asking when they look at how far the fly-out is. */
   function detailRows(withLs, withPorts, at, lsOf) {
-    const width = panel.querySelector('#orr-spine').getBoundingClientRect().width - 28 || 900;
+    const host = panel.querySelector('#orr-spine');
+    const width = host.getBoundingClientRect().width - 28 || 900;
+    /* However many lanes the height allows. Dragging it taller is what asks
+       for more names, which is the whole point of it being resizable. */
+    const room = host.getBoundingClientRect().height - COMPACT - 12;
+    const maxLanes = Math.max(1, Math.floor(room / LANE));
+
     const items = withLs.map((n) => ({
       at: at(lsOf(n)), ls: lsOf(n), kind: 'body', node: n,
+      // The star, then what orbits it, then moons of those, then stations.
+      rank: n === model.star ? 0 : !n.parent || n.parent === model.star ? 1 : 2,
+      tint: n.type === 'Star' ? '#' + starColour(n).getHexString()
+                              : '#' + new THREE.Color(tintOf(n.sub)).getHexString(),
       text: shortName(n)
     })).concat(withPorts.map((p) => ({
       at: at(p.st.distanceToArrival), ls: p.st.distanceToArrival, kind: 'port', port: p,
-      text: p.st.name
-    }))).sort((a, b) => a.at - b.at);
+      rank: 3, text: p.st.name
+    })));
 
-    const lanes = laneOut(items, width);
-    return '<div class="orr-sp-de" style="--lanes:' + lanes + '">' + items.map((it) =>
-      '<span class="lb ' + it.kind + (it.node && selected === it.node ? ' on' : '') + '" ' +
-      (it.kind === 'body'
-        ? 'data-id="' + it.node.id + '" style="--c:' +
-          (it.node.type === 'Star' ? '#' + starColour(it.node).getHexString()
-            : '#' + new THREE.Color(tintOf(it.node.sub)).getHexString()) + ';'
-        : 'data-port="' + (model.ports || []).indexOf(it.port) + '" style="') +
-      'left:' + it.x + 'px;top:' + (it.lane * LANE) + 'px" ' +
-      'title="' + esc(it.text) + ' — ' + Math.round(it.ls).toLocaleString() + ' Ls">' +
-      esc(it.text) + '</span>').join('') + '</div>';
+    const shown = laneOut(items, width, maxLanes);
+    const hidden = items.length - shown;
+
+    /* Each name is joined to its place on the axis by a stem, so they read as
+       an annotated ruler rather than as text floating over a band. Where a
+       name has been nudged left to keep it on screen the stem turns and runs
+       along to it, rather than lying about where the thing is. */
+    return '<div class="orr-sp-de">' + items.filter((it) => it.lane >= 0).map((it) => {
+      const x = Math.round(it.at * width);
+      const y = it.lane * LANE;
+      const tag = it.kind === 'body'
+        ? 'data-id="' + it.node.id + '" style="--c:' + it.tint + ';'
+        : 'data-port="' + (model.ports || []).indexOf(it.port) + '" style="';
+      return '<i class="stem" style="left:' + x + 'px;height:' + (y + 6) + 'px' +
+          (it.kind === 'body' ? ';--c:' + it.tint : '') + '"></i>' +
+        (Math.abs(x - it.x) > 1
+          ? '<i class="tie" style="left:' + Math.min(x, it.x) + 'px;top:' + (y + 5) +
+            'px;width:' + Math.abs(x - it.x) + 'px"></i>' : '') +
+        '<button class="lb ' + it.kind + (it.node && selected === it.node ? ' on' : '') +
+        '" ' + tag + 'left:' + it.x + 'px;top:' + y + 'px" ' +
+        'title="' + esc(it.text) + ' \u2014 ' + Math.round(it.ls).toLocaleString() + ' Ls">' +
+        esc(it.text) + '</button>';
+    }).join('') +
+      (hidden ? '<span class="more">' + hidden + ' more — drag down</span>' : '') +
+      '</div>';
   }
 
   function onKey(e) {
@@ -2298,7 +2464,7 @@ const Orrery = (function () {
     const el = panel.querySelector('#orr-stations');
     el.classList.toggle('on', on);
     el.setAttribute('aria-pressed', on ? 'true' : 'false');
-    el.title = on ? 'Hide the stations' : 'Show the stations';
+    el.title = on ? 'Listing the stations — hide them' : 'Stations are hidden — show them';
     renderList();
   }
 
@@ -2971,6 +3137,12 @@ const Orrery = (function () {
     panel.querySelector('#orr-m-sub').textContent =
       [st.type || (onGround(st) ? 'Surface settlement' : 'Station'),
        (onGround(st) ? 'on ' : 'at ') + where].join(' · ');
+    /* The dump does not say which body a system-level station belongs to, so
+       where it belongs was worked out from how far out it sits. Saying so is
+       the difference between a fact and a guess dressed as one. */
+    panel.querySelector('#orr-m-sub').title = p.guessed && p.on
+      ? 'Placed at ' + where + ' from its arrival distance — the dump lists it against the system, not the body.'
+      : '';
 
     let h = measures([
       ['Arrival', typeof st.distanceToArrival === 'number'
@@ -3318,7 +3490,9 @@ const Orrery = (function () {
       return '<div class="orr-row stn' + (onGround(st) ? ' ground' : '') +
         '" data-port="' + (model.ports || []).indexOf(p) + '" style="--depth:' + depth + '" ' +
         'role="button" tabindex="0" title="' + esc(st.name) + ' — ' +
-          esc(st.type || 'Surface settlement') + '">' +
+          esc(st.type || 'Surface settlement') +
+          (p.guessed && p.on ? ' — placed at ' + esc(shortName(p.on)) +
+            ' from its arrival distance; the dump does not say' : '') + '">' +
         '<span class="dot"></span>' +
         '<span class="nm">' + esc(st.name) + '</span>' +
         (pad ? '<i class="pad" title="Largest landing pad">' + pad + '</i>' : '') +
@@ -3375,8 +3549,7 @@ const Orrery = (function () {
     document.body.classList.add('orrery-open');
     panel.querySelector('#orr-name').textContent = name;
     panel.querySelector('#orr-sub').textContent = '';
-    panel.querySelector('#orr-msg').textContent = 'Reading the system dump…';
-    panel.querySelector('#orr-msg').className = 'orr-msg';
+    playBoot('Reading the system dump');
     panel.classList.add('has-system');
     panel.querySelector('#orr-spine').innerHTML = '';
 
@@ -3399,21 +3572,19 @@ const Orrery = (function () {
       // and asking for both at once costs nothing over asking for the dump.
       [sys] = await Promise.all([fetchSystem(name, id64), spectralTable()]);
     } catch (err) {
-      panel.querySelector('#orr-msg').className = 'orr-msg bad';
-      panel.querySelector('#orr-msg').textContent =
-        name + ' is not in Canonn’s system dump, so there is nothing to model yet.';
+      stopBoot('bad',
+        name + ' is not in Canonn’s system dump, so there is nothing to model yet.');
       return;
     }
     if (!isOpen()) return;                    // closed while we were fetching
 
     model = buildModel(sys);
     if (!model) {
-      panel.querySelector('#orr-msg').className = 'orr-msg bad';
-      panel.querySelector('#orr-msg').textContent = 'The dump has no bodies for ' + name + '.';
+      stopBoot('bad', 'The dump has no bodies for ' + name + '.');
       return;
     }
 
-    panel.querySelector('#orr-msg').className = 'orr-msg gone';
+    stopBoot('gone');
     panel.querySelector('#orr-sub').textContent =
       model.all.filter((n) => n.type === 'Planet').length + ' planets · ' +
       model.all.filter((n) => n.type === 'Star').length + ' star' +

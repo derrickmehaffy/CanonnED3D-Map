@@ -973,6 +973,19 @@ test('how the scene is drawn lives in one place', async ({ page }) => {
   await expect(page.locator('#orr-light-p #orr-amb')).toBeVisible();
   await expect(page.locator('#orr-light-p #orr-glow')).toBeVisible();
 
+  /* And it opens where the button is, which is not the same claim as its
+     class being toggled. It was clipped out of existence by the strip's own
+     overflow, and then — once fixed — thrown four hundred pixels down the
+     page by the strip's backdrop-filter, which makes it the containing block
+     for anything fixed inside it. Both times the control "worked". */
+  const btn = await page.locator('#orr-light').boundingBox();
+  const box = await page.locator('#orr-light-p').boundingBox();
+  expect(box.width).toBeGreaterThan(100);
+  expect(box.height).toBeGreaterThan(30);
+  expect(Math.abs(box.y - (btn.y + btn.height))).toBeLessThan(20);
+  expect(box.x + box.width).toBeGreaterThan(btn.x);
+  expect(box.x).toBeLessThan(btn.x + btn.width + 20);
+
   // Escape closes that box before it closes the orrery.
   await page.keyboard.press('Escape');
   await expect(page.locator('#orr-light-p')).toBeHidden();
@@ -1328,6 +1341,8 @@ test('the distance axis gains detail when it is given room', async ({ page }) =>
   await page.locator('#orr-sp-more').click();
   const tall = (await spine.boundingBox()).height;
   expect(tall).toBeGreaterThan(short + 20);
+  // A readable handful of lanes, not however many it takes to fit everything.
+  expect(tall).toBeLessThan(200);
 
   /* Every body and every station, against the distance it actually sits at —
      and packed into lanes, so two things at nearly the same distance are two
@@ -1357,6 +1372,56 @@ test('the distance axis gains detail when it is given room', async ({ page }) =>
   await page.locator('#orr-sp-more').click();
   await expect(page.locator('.orr-sp-de')).toHaveCount(0);
   expect((await spine.boundingBox()).height).toBeCloseTo(short, 0);
+});
+
+/* Sol puts a hundred and three things on this axis, and packing all of them
+   took thirty lanes of small text — which is not detail, it is noise. So the
+   lanes are however many the reader has given it room for, filled in the
+   order a person is looking for them: the star, then what orbits it, then
+   moons, then stations. What does not fit keeps its pip and loses its name,
+   and the axis says how many it is holding back. */
+test('the axis names what matters first, and says what it is holding back',
+  async ({ page }) => {
+  const crowd = JSON.parse(JSON.stringify(SYSTEM));
+  /* Twenty moons of Testholm 1, all at nearly the same distance, so nothing
+     but the lane cap can decide what gets named. */
+  for (let i = 0; i < 20; i++) {
+    crowd.bodies.push({
+      bodyId: 100 + i, type: 'Planet', name: 'Testholm 1 moon ' + i,
+      subType: 'Rocky body', parents: [{ Planet: 1 }, { Star: 0 }], radius: 900,
+      /* Spread in their orbits so every one of them is drawn and gets a pip;
+         crowded in arrival distance, which is the axis this is about, so
+         nothing but the lane cap can decide which of them gets named. */
+      semiMajorAxis: 0.002 + i * 0.0009, orbitalPeriod: 20 + i,
+      distanceToArrival: 500 + i * 0.4
+    });
+  }
+  await stubDataHosts(page);
+  await stubApi(page, crowd);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(23, { timeout: 60_000 });
+
+  await page.locator('#orr-sp-more').click();
+  const spine = page.locator('#orr-spine');
+  const opened = (await spine.boundingBox()).height;
+
+  // Everything is still on the axis; only the names are rationed.
+  await expect(page.locator('.orr-sp-ax .pip')).toHaveCount(23);
+  const named = await page.locator('.orr-sp-de .lb').count();
+  expect(named).toBeGreaterThan(2);
+  expect(named).toBeLessThan(23);
+  await expect(page.locator('.orr-sp-de .more')).toContainText(String(23 - named));
+
+  /* The star and the planet are what a reader is looking for, so they are
+     named before any of the twenty near-identical moons crowding them out. */
+  await expect(page.locator('.orr-sp-de .lb', { hasText: /^Testholm$/ })).toHaveCount(1);
+  await expect(page.locator('.orr-sp-de .lb', { hasText: /^1$/ })).toHaveCount(1);
+
+  // And dragging it taller is what asks for more of them.
+  await page.locator('#orr-grip-h').focus();
+  for (let i = 0; i < 4; i++) await page.keyboard.press('Shift+ArrowDown');
+  expect((await spine.boundingBox()).height).toBeGreaterThan(opened);
+  expect(await page.locator('.orr-sp-de .lb').count()).toBeGreaterThan(named);
 });
 
 /* A link someone typed or pasted in caps is a link to the same system. The
