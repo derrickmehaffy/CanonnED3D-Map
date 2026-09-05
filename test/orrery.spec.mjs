@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 import { stubDataHosts } from './helpers.mjs';
 
 /* The orrery models one system from Canonn's dump. These tests are in two
@@ -1199,23 +1200,35 @@ test('a black hole is a shadow with a ring, not a glowing ball', async ({ page }
     return {
       shadowPx: at.shadowPx,
       inside: band(0, 0.8),      // the shadow
-      ring: band(1.05, 2.2),     // immediately outside it
+      wound: band(1.05, 1.6),    // the far side of the sky, many times over
+      ring: band(1.8, 2.5),      // where the light piles up
       mid: band(3.0, 4.2),       // still under the lens, bent only gently
       sky: band(5.5, 8)          // past the lens, the sky itself
     };
   });
 
+  const seen = ' — ' + JSON.stringify(profile);
   expect(profile.shadowPx, 'a shadow big enough to measure').toBeGreaterThan(4);
-  expect(profile.inside, 'the shadow is dark').toBeLessThan(profile.sky);
-  expect(profile.ring, 'light is gathered just outside it')
-    .toBeGreaterThan(profile.inside * 2);
-  expect(profile.ring, 'and it is brighter than the sky it came from')
-    .toBeGreaterThan(profile.sky);
+  expect(profile.inside, 'the shadow is black' + seen).toBeLessThan(1);
+  expect(profile.ring, 'and light piles up just outside it' + seen)
+    .toBeGreaterThan(profile.sky * 1.08);
+
   /* Away from the ring the lens hands the sky back at the brightness it found
-     it: lensing moves light, it does not destroy it. A dark disc cut out of
-     the starfield here would mean the shader was averaging points into
-     nothing, which is what it did on the first attempt. */
-  expect(profile.mid).toBeGreaterThan(profile.sky * 0.4);
+     it. Lensing moves light, it does not destroy it, and this is the number
+     that says the shader is doing that: it sat at sixty percent while the sky
+     was a scatter of points, because demagnifying a point field drops the
+     points between samples, and it came up to parity the moment the sky
+     became a continuum with clouds in it. */
+  expect(profile.mid, 'surface brightness is conserved' + seen)
+    .toBeGreaterThan(profile.sky * 0.75);
+
+  /* Between the shadow and the ring is a darker band, and it should be there:
+     those rays wind past the hole several times before they leave, so what
+     they show is an average of the whole sky rather than of this part of it.
+     This system sits near the galactic core, where the local sky is brighter
+     than the galaxy's average — so the average reads as a gap. */
+  expect(profile.wound, 'the wound band is dimmer than its surroundings' + seen)
+    .toBeLessThan(profile.sky);
 
   expect(errors.filter((e) => /shader|GLSL|WebGL|THREE/i.test(e))).toEqual([]);
 });
@@ -1272,6 +1285,132 @@ test('each star is painted its own colour', async ({ page }) => {
 
   const dot = (id) => page.locator('.orr-row[data-id="' + id + '"]').locator('.dot')
     .evaluate((el) => getComputedStyle(el).backgroundColor);
-  // H is the black hole class; TTS6 is a T Tauri, and resolves under T.
   expect(await dot(0)).not.toBe(await dot(2));
+
+  /* And TTS6 is a T Tauri star, which is young and warm — not a T-class brown
+     dwarf, which is neither. Matching a spectral class on its first letter
+     painted every young star in this system the deep magenta of a body four
+     thousand degrees colder, and nothing noticed until each star started
+     being painted its own colour instead of the primary's. */
+  const [r, g, b] = (await dot(2)).match(/\d+/g).map(Number);
+  expect(r, 'a T Tauri is warm: ' + await dot(2)).toBeGreaterThan(200);
+  expect(g, 'not the magenta of a T dwarf').toBeGreaterThan(150);
+  expect(g).toBeGreaterThan(b);
+});
+
+/* ── the sky ────────────────────────────────────────────────────────────── */
+
+test('deep space is what you get without asking', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+  const sky = await page.evaluate(() => window.Orrery.state().sky);
+  expect(sky.mode).toBe('stars');
+  expect(sky.points).toBeGreaterThan(4000);
+  // A backdrop, not only a scatter of points: one image, and it is in use.
+  expect(sky.baked).toBe(2048);
+  expect(sky.isBackdrop).toBe(true);
+});
+
+/* Clouds are the difference between a sky and a handful of dots. They are
+   also the thing a screenshot would show and a state field would not, so this
+   reads the frame: with a sky the background carries structure, and with the
+   sky switched off the same region is flat. */
+test('the sky has weather in it', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page, { ...SYSTEM, coords: { x: 120, y: -30, z: 4200 } });
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+  await page.waitForTimeout(1200);
+
+  // A patch of the frame away from the star and its orbits.
+  const patch = () => page.evaluate(() => {
+    const img = window.Orrery.pixels(20, 20, 160, 120);
+    let sum = 0, sq = 0;
+    const n = img.w * img.h;
+    for (let i = 0; i < img.data.length; i += 4) {
+      const v = (img.data[i] + img.data[i + 1] + img.data[i + 2]) / 3;
+      sum += v; sq += v * v;
+    }
+    const mean = sum / n;
+    return { mean, sd: Math.sqrt(Math.max(0, sq / n - mean * mean)) };
+  });
+
+  const withSky = await patch();
+  await openView(page);
+  await page.locator('#orr-sky-none').click();
+  await expect.poll(() => page.evaluate(() => window.Orrery.state().sky.points)).toBe(0);
+  await page.waitForTimeout(400);
+  const empty = await patch();
+
+  expect(withSky.mean, 'space is lit').toBeGreaterThan(empty.mean + 2);
+  expect(withSky.sd, 'and it is not lit evenly').toBeGreaterThan(3);
+  expect(empty.sd, 'where an empty sky is flat').toBeLessThan(withSky.sd / 2);
+});
+
+/* The invariant the whole arrangement rests on: the backdrop and the sky a
+   black hole bends are one image, read the same way up.
+
+   They were not, and nothing said so. The lens used to have its own copy,
+   painted by JavaScript with row zero at the north pole and then sampled
+   through a texture three flips on upload — so it drew the sky upside down,
+   and a galactic band lying across the equator was symmetric enough to hide
+   it completely.
+
+   The fix is structural rather than arithmetic: there is no CPU-painted copy
+   any more, so there is no flip for two conventions to disagree about. One
+   shader writes the image and two readers read it — the lens, and three's own
+   background — and this pins the lens to the one three actually uses.
+
+   Checked against three's source rather than against a copy of it, because a
+   copy is exactly the thing that drifted. And checked as text, honestly,
+   because it cannot be checked by looking: the lens compresses a wide piece
+   of sky into a small disc, so reading it upside down changes the frame by
+   about six percent, which is well inside what a different machine's
+   rasteriser will do to the same scene. */
+test('the lens reads the sky the way three writes it', async ({ page }) => {
+  await stubDataHosts(page);
+  await page.goto('/orrery.html', { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => !!window.Orrery, { timeout: 60_000 });
+
+  const tidy = (t) => t.replace(/\s+/g, '');
+  const equirect = await page.evaluate(async () => {
+    const T = await import('three');
+    const m = /vec2 equirectUv[\s\S]*?\n}/.exec(T.ShaderChunk.common);
+    return m ? m[0] : '';
+  });
+  expect(equirect, 'three still has an equirectUv to agree with').not.toBe('');
+
+  /* RECIPROCAL_PI is 1/π, so these two say the same thing. What matters is
+     the sign: "asin(y)/π + 0.5" and "0.5 − asin(y)/π" differ only in which
+     end of the image is the sky's north, and that is the whole bug. */
+  expect(tidy(equirect)).toContain('floatv=asin(clamp(dir.y,-1.0,1.0))*RECIPROCAL_PI+0.5;');
+  expect(tidy(equirect)).toContain('floatu=atan(dir.z,dir.x)*RECIPROCAL_PI2+0.5;');
+
+  const src = readFileSync(new URL('../Source/js/orrery.js', import.meta.url), 'utf8');
+  const lens = /const HOLE_FRAG = \[[\s\S]*?\]\.join/.exec(src);
+  expect(lens, 'the lens shader is still called HOLE_FRAG').not.toBeNull();
+  expect(tidy(lens[0])).toContain('floatv=asin(clamp(dir.y,-1.0,1.0))/3.1415927+0.5;');
+  expect(tidy(lens[0])).toContain('floatu=atan(dir.z,dir.x)/6.2831853+0.5;');
+
+  // And the shader that writes the image inverts exactly that.
+  const paint = /const NEBULA_FRAG = \[[\s\S]*?\]\.join/.exec(src);
+  expect(tidy(paint[0])).toContain('floatlat=(vUv.y-0.5)*3.1415927;');
+  expect(tidy(paint[0])).toContain('floatlon=(vUv.x-0.5)*6.2831853;');
+});
+
+test('the lens and the backdrop are one image', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page, { ...HOLES, bodyCount: 2, bodies: HOLES.bodies.slice(0, 2) });
+  await page.addInitScript(() => {
+    try { localStorage.setItem('canonn.orrery.sky', 'galaxy'); } catch (e) {}
+  });
+  await page.goto('/orrery.html?system=Annihilator', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(2, { timeout: 60_000 });
+  await page.waitForTimeout(1200);
+
+  const one = await page.evaluate(() => window.Orrery.state());
+  expect(one.sky.isBackdrop, 'the image is the backdrop').toBe(true);
+  expect(one.holes[0].sameAsSky, 'and the lens is bending that image').toBe(true);
 });

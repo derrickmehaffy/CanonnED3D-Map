@@ -170,69 +170,112 @@ const RING_TINT = {
 };
 
 /* ── the sky ────────────────────────────────────────────────────────────────
-   Not a photograph pasted behind the scene: a galaxy sampled, then looked at
-   from where the system actually is.
+   Not a photograph pasted behind the scene, and no longer a scatter of dots
+   either: clouds and dust rendered into one equirectangular image, with a
+   star field of its own on top.
 
-   Points are drawn from a disc around Sagittarius A* — whose position is
-   already in this repo, in data/milkyway-ed.json, alongside every region name
-   the galaxy map labels — with an exponential falloff outward and a thin
-   vertical spread, then projected onto the sky from the system's own
-   coordinates. The band lands where it should and is densest toward the core,
-   and it genuinely differs between systems: Sol sits 25,900 light years out
-   and sees the galaxy edge-on and distant, Colonia is 22,000 ly nearer and
-   does not.
+   The image is the sky. It is what the scene is drawn against, and it is what
+   a black hole bends — the same pixels, so the lens can never show a sky the
+   reader is not looking at. It is made on the GPU because it has to be: four
+   octaves of noise over two million pixels is a third of a second of
+   JavaScript and a couple of milliseconds of shader.
 
+   Two skies come out of the same shader.
+
+   GALACTIC is the modelled one. Stars are drawn from a disc around
+   Sagittarius A* — whose position is already in this repo, in
+   data/milkyway-ed.json, alongside every region name the galaxy map labels —
+   with an exponential falloff outward and a thin vertical spread, then
+   projected onto the sky from the system's own coordinates. The dust follows
+   that same plane and the core glows where the core actually is, so the sky
+   genuinely differs between systems: Sol sits 25,900 light years out and sees
+   the galaxy edge-on and distant, Colonia is 22,000 ly nearer and does not.
    It is a model of a galaxy rather than a catalogue of its stars, and the
-   readout on the control says so. */
+   readout on the control says so.
+
+   DEEP SPACE is the generic one, and the default. No band, no core: an even
+   sky with clouds wherever the noise puts them. Still seeded from the
+   system's position, so it is stable for a given system and different between
+   them, but it claims nothing about where the system is. */
 
 const CORE = { x: 25, y: 0, z: 25900 };        // Sagittarius A*, from the map's own data
 
-function galacticSky(coords, count) {
-  const rnd = seeded('sky|' + coords.x + '|' + coords.y + '|' + coords.z);
+/* Real star colours, warm to cold, and how often each turns up in a sky.
+
+   Weighted by what is *visible*, not by what exists: M dwarfs are three
+   quarters of the galaxy's stars and almost none of its naked-eye ones, so a
+   sky weighted by population comes out uniformly red and wrong. */
+const STAR_HUES = [
+  [0.659, 0.753, 1.000, 0.07],   // B — blue-white
+  [0.847, 0.886, 1.000, 0.17],   // A — white
+  [0.973, 0.969, 1.000, 0.20],   // F
+  [1.000, 0.957, 0.918, 0.21],   // G — the Sun
+  [1.000, 0.867, 0.706, 0.24],   // K — orange
+  [1.000, 0.741, 0.435, 0.11]    // M — red
+];
+
+/**
+ * Where the stars are, how bright, and what colour.
+ *
+ * One generator for both skies: only the direction changes. Magnitudes run on
+ * a steep curve so that most stars are faint and a handful are not, which is
+ * what a real sky looks like and what a field of identical dots does not.
+ */
+function starField(coords, mode, count) {
+  const rnd = seeded(mode + '|' + coords.x + '|' + coords.y + '|' + coords.z);
   const pos = new Float32Array(count * 3);
   const col = new Float32Array(count * 3);
-  const c = new THREE.Color();
+  const mag = new Float32Array(count);
 
   for (let i = 0; i < count; i++) {
-    // A point in the disc: exponential in radius, near-gaussian in thickness.
-    const r = -Math.log(1 - rnd() * 0.985) * 8200;
-    const th = rnd() * Math.PI * 2;
-    const gx = CORE.x + Math.cos(th) * r;
-    const gz = CORE.z + Math.sin(th) * r;
-    const gy = CORE.y + (rnd() + rnd() + rnd() - 1.5) * 520;
+    let near = 1;
+    /* The galactic sky is the disc, plus what is standing in front of it.
 
-    // Where that lands on this system's sky. Scene z runs opposite the
-    // galaxy's, the same way it does everywhere else in this codebase.
-    const dx = gx - coords.x, dy = gy - coords.y, dz = -(gz - coords.z);
-    const d = Math.hypot(dx, dy, dz) || 1;
-    pos[i * 3] = dx / d; pos[i * 3 + 1] = dy / d; pos[i * 3 + 2] = dz / d;
+       The disc model alone leaves a system looking away from the band under
+       an almost empty sky, which is not what anyone has ever seen: the stars
+       you can pick out in any direction are the near ones, a few hundred
+       parsecs at most, and they are scattered evenly because at that range
+       the galaxy has no shape yet. So two fifths of this sky is local and the
+       rest is the band behind it. */
+    if (mode === 'galaxy' && i >= count * 0.4) {
+      // A point in the disc: exponential in radius, near-gaussian in thickness.
+      const r = -Math.log(1 - rnd() * 0.985) * 8200;
+      const th = rnd() * Math.PI * 2;
+      const gx = CORE.x + Math.cos(th) * r;
+      const gz = CORE.z + Math.sin(th) * r;
+      const gy = CORE.y + (rnd() + rnd() + rnd() - 1.5) * 520;
 
-    /* Nearer material reads brighter, which is what makes the core end of the
-       band glow instead of the whole ring looking uniform. */
-    const near = Math.min(1, 4200 / d);
-    c.setHSL(0.09 + rnd() * 0.08, 0.18 + rnd() * 0.3, 0.26 + near * 0.55);
-    col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
+      // Where that lands on this system's sky. Scene z runs opposite the
+      // galaxy's, the same way it does everywhere else in this codebase.
+      const dx = gx - coords.x, dy = gy - coords.y, dz = -(gz - coords.z);
+      const d = Math.hypot(dx, dy, dz) || 1;
+      pos[i * 3] = dx / d; pos[i * 3 + 1] = dy / d; pos[i * 3 + 2] = dz / d;
+      // Nearer material reads brighter, which is what makes the core end of
+      // the band glow instead of the whole ring looking uniform.
+      near = Math.min(1, 4200 / d);
+    } else {
+      // Evenly over the sphere; acos-free form, so the poles do not bunch.
+      const u = rnd() * 2 - 1, th = rnd() * Math.PI * 2, sr = Math.sqrt(1 - u * u);
+      pos[i * 3] = sr * Math.cos(th);
+      pos[i * 3 + 1] = u;
+      pos[i * 3 + 2] = sr * Math.sin(th);
+    }
+
+    /* Steep, and deliberately steeper than it first was: most of the sky
+       should be faint and a couple of dozen stars should carry it. At 2.7 a
+       third of the sky came out bright and the backdrop started competing
+       with the orbits drawn over it. */
+    const m = Math.pow(rnd(), 3.4) * (0.35 + near * 0.65);
+    mag[i] = 1.0 + m * 2.6;
+
+    let pick = rnd(), k = 0;
+    while (k < STAR_HUES.length - 1 && pick > STAR_HUES[k][3]) { pick -= STAR_HUES[k][3]; k++; }
+    const lum = 0.16 + m * 0.84;
+    col[i * 3] = STAR_HUES[k][0] * lum;
+    col[i * 3 + 1] = STAR_HUES[k][1] * lum;
+    col[i * 3 + 2] = STAR_HUES[k][2] * lum;
   }
-  return { pos, col };
-}
-
-/** No galaxy, just sky — an even scatter, still stable per system. */
-function plainSky(coords, count) {
-  const rnd = seeded('plain|' + coords.x + '|' + coords.y + '|' + coords.z);
-  const pos = new Float32Array(count * 3);
-  const col = new Float32Array(count * 3);
-  const c = new THREE.Color();
-  for (let i = 0; i < count; i++) {
-    // Evenly over the sphere; acos-free form, so the poles do not bunch.
-    const u = rnd() * 2 - 1, th = rnd() * Math.PI * 2, sr = Math.sqrt(1 - u * u);
-    pos[i * 3] = sr * Math.cos(th);
-    pos[i * 3 + 1] = u;
-    pos[i * 3 + 2] = sr * Math.sin(th);
-    const b = 0.3 + Math.pow(rnd(), 2.4) * 0.7;
-    c.setHSL(0.08 + rnd() * 0.12, 0.22 * rnd(), b * 0.66);
-    col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
-  }
-  return { pos, col };
+  return { pos, col, mag };
 }
 
 /** Where the galaxy's heart is from here — the fact the sky control states. */
@@ -244,6 +287,160 @@ function coreBearing(coords) {
     tilt: Math.atan2(-dy, Math.hypot(dx, dz)) * 180 / Math.PI
   };
 }
+
+/* Clouds and dust, over the whole sphere at once.
+
+   The noise is evaluated on the direction itself rather than on the image's
+   own coordinates, which is what keeps it seamless: longitude wraps and the
+   poles converge, and a pattern computed in three dimensions does not care.
+
+   Two cloud families, cold and warm, because one hue over a whole sky reads
+   as a filter rather than as a place. They are the page's own two colours —
+   the ion blue of the interface and the amber of its stars — kept dark
+   enough that this stays a background to read a data panel against. */
+const NEBULA_VERT = [
+  'varying vec2 vUv;',
+  'void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }'
+].join('\n');
+
+const NEBULA_FRAG = [
+  'uniform vec3 uSeed;',
+  'uniform vec3 uCore;',        // direction of the galactic core, scene space
+  'uniform float uBand;',       // 0 free-form, 1 pinned to the galactic plane
+  'uniform float uGlow;',       // how bright the core sits, 0 when there is no core
+  'varying vec2 vUv;',
+
+  'float hash(vec3 p) {',
+  '  return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453123);',
+  '}',
+  'float vnoise(vec3 p) {',
+  '  vec3 i = floor(p), f = fract(p);',
+  '  f = f * f * (3.0 - 2.0 * f);',
+  '  return mix(mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x),',
+  '                 mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),',
+  '             mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),',
+  '                 mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z);',
+  '}',
+  'float fbm(vec3 p) {',
+  '  float v = 0.0, a = 0.5;',
+  '  for (int i = 0; i < 5; i++) { v += a * vnoise(p); p *= 2.07; a *= 0.5; }',
+  '  return v;',
+  '}',
+
+  'void main() {',
+  /* The image's own axes back to a direction, in exactly the convention
+     three's equirectangular background reads it in — u around from +X
+     through +Z, v from the south pole up. Anything that samples this image
+     later, the black hole lens included, has to use the same two lines. */
+  '  float lat = (vUv.y - 0.5) * 3.1415927;',
+  '  float lon = (vUv.x - 0.5) * 6.2831853;',
+  '  vec3 dir = vec3(cos(lat) * cos(lon), sin(lat), cos(lat) * sin(lon));',
+
+  '  vec3 p = dir * 2.3 + uSeed;',
+  '  float cold = fbm(p);',
+  '  float warm = fbm(p * 1.7 + vec3(31.4, 7.2, 19.8));',
+  '  float fine = fbm(p * 4.3 - vec3(5.1, 2.7, 8.3));',
+  '  float dust = fbm(p * 6.7 + vec3(17.0, 41.0, 3.0));',
+
+  /* Pinned to the plane, or not. The galactic sky puts its material where the
+     disc is; the generic one lets the noise decide, which is the whole
+     difference between the two. */
+  '  float band = mix(1.0, exp(-dir.y * dir.y * 14.0), uBand);',
+
+  /* High thresholds and a power on top, because the point is a sky with
+     some nebulosity in it rather than a sky made of nebula. Below about a
+     quarter coverage it reads as a place; above that it reads as a filter
+     laid over the page. */
+  '  float c = pow(smoothstep(0.53, 0.84, cold) * band, 1.5);',
+  '  float wv = pow(smoothstep(0.60, 0.88, warm) * band, 1.7);',
+
+  /* Folded noise, which is what turns a cloud into a nebula. Plain fBm makes
+     soft blobs because its extremes are rare and its middle is everywhere;
+     folding it about its midpoint turns every crossing of that midpoint into
+     a bright edge, and a field of those reads as filaments. */
+  '  float ridge = 1.0 - abs(fine * 2.0 - 1.0);',
+  '  float wisp = 0.22 + pow(ridge, 2.6) * 2.1;',
+
+  /* Everything here is linear light and the render target encodes it, so
+     these numbers are far smaller than the ones they come out as. This is a
+     backdrop for reading a data panel against: the brightest cloud core lands
+     around a quarter of white, and most of the sky is nearly black. */
+  '  vec3 col = vec3(0.0012, 0.0016, 0.0030);',          // deep space is not black
+  '  col += vec3(0.006, 0.013, 0.030) * c * wisp;',
+  '  col += vec3(0.020, 0.008, 0.004) * wv * wisp;',
+  // Dust in front of the clouds, not mixed into them.
+  '  col *= mix(1.0, 0.25, smoothstep(0.48, 0.84, dust) * band);',
+  /* The bulge, where the bulge actually is — and kept tight. Great
+     Annihilator sits three thousand light years off the core, so a broad
+     falloff there covers most of the sky and turns the whole view brown. */
+  '  float toCore = max(dot(dir, uCore), 0.0);',
+  '  col += vec3(0.030, 0.022, 0.013) * uGlow * pow(toCore, 9.0);',
+  '  col += vec3(0.009, 0.007, 0.005) * uGlow * pow(toCore, 4.0) * band;',
+
+  '  gl_FragColor = vec4(col, 1.0);',
+  '}'
+].join('\n');
+
+/* The same stars, drawn twice.
+
+   On screen they are points at a constant pixel size, which is what keeps a
+   star a star at every zoom. Into the image they are drawn again, flattened
+   to longitude and latitude — because the lens has to have stars to bend, and
+   because a bright star seen through the backdrop as well as as a point picks
+   up the soft halo a bright star has. */
+const STARS_SCREEN_VERT = [
+  'attribute float mag;',
+  'attribute vec3 tint;',
+  'varying vec3 vTint;',
+  '#include <common>',
+  '#include <logdepthbuf_pars_vertex>',
+  'void main() {',
+  '  vTint = tint;',
+  '  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
+  '  gl_Position = projectionMatrix * mv;',
+  '  gl_PointSize = mag;',
+  '  #include <logdepthbuf_vertex>',
+  '}'
+].join('\n');
+
+const STARS_BAKE_VERT = [
+  'attribute float mag;',
+  'attribute vec3 tint;',
+  'uniform float uScale;',
+  'varying vec3 vTint;',
+  /* This pass has no depth buffer and no perspective, so it has no use for
+     logarithmic depth — but the renderer defines USE_LOGDEPTHBUF for every
+     material once it is switched on, and the fragment shader these two share
+     declares the varyings that go with it. A vertex shader that does not
+     declare them fails to link. */
+  '#include <common>',
+  '#include <logdepthbuf_pars_vertex>',
+  'void main() {',
+  '  vTint = tint;',
+  '  vec3 d = normalize(position);',
+  '  float u = atan(d.z, d.x) / 6.2831853 + 0.5;',
+  '  float v = asin(clamp(d.y, -1.0, 1.0)) / 3.1415927 + 0.5;',
+  '  gl_Position = vec4(u * 2.0 - 1.0, v * 2.0 - 1.0, 0.0, 1.0);',
+  '  gl_PointSize = mag * uScale;',
+  '  #include <logdepthbuf_vertex>',
+  '}'
+].join('\n');
+
+/* A round star rather than the square gl_PointSize actually hands you, with
+   the falloff a point spread function has: a small hard core and a wide faint
+   skirt, which is what makes a bright star look bright rather than large. */
+const STARS_FRAG = [
+  'varying vec3 vTint;',
+  '#include <common>',
+  '#include <logdepthbuf_pars_fragment>',
+  'void main() {',
+  '  float d = length(gl_PointCoord - 0.5) * 2.0;',
+  '  if (d > 1.0) discard;',
+  '  float a = pow(1.0 - d, 2.2);',
+  '  gl_FragColor = vec4(vTint * a, 1.0);',
+  '  #include <logdepthbuf_fragment>',
+  '}'
+].join('\n');
 
 /* ── black holes ────────────────────────────────────────────────────────────
    The one body in a system that is not a thing to draw but an absence to draw
@@ -295,8 +492,12 @@ function spectralTable() {
 function classColour(cls) {
   if (!SPECTRAL || !cls) return '';
   const c = String(cls).toUpperCase();
-  // "K3" is K, "DA" is D, "H5" is H. Two-letter keys get first refusal.
+  /* Longest key first. "K3" is K and "DA" is D, but "TTS6" is a T Tauri
+     star and emphatically not a T-class brown dwarf — matching it on its
+     first letter painted every young star in Great Annihilator the deep
+     magenta of a body four thousand degrees colder. */
   const key = SPECTRAL[c] ? c
+            : SPECTRAL[c.slice(0, 3)] ? c.slice(0, 3)
             : SPECTRAL[c.slice(0, 2)] ? c.slice(0, 2)
             : SPECTRAL[c.charAt(0)] ? c.charAt(0) : '';
   // Wolf-Rayet carries two colours; the first is the one to draw.
@@ -305,94 +506,6 @@ function classColour(cls) {
 
 /** Elite spells these "Black Hole" and "Supermassive Black Hole". */
 function isHole(sub) { return /black hole/i.test(sub || ''); }
-
-/* The sky again, as something a shader can read — and as radiance rather than
-   as points.
-
-   The drawn sky is nine thousand points on a unit sphere, which a fragment
-   shader cannot sample, so the same model is painted once into an
-   equirectangular image: longitude across, latitude down. But a lens bending
-   nine thousand points mostly finds the gaps between them, and the hole came
-   out as a dark disc cut into the starfield — the opposite of what a lens
-   does, which is to move light around without destroying any of it.
-
-   So this samples the same galaxy far more finely than the sky draws it. The
-   generator is seeded, so the first nine thousand draws are the very stars
-   the reader can see and they land exactly where they are on screen; the rest
-   are the galaxy those points were always standing in for, laid down faintly
-   and additively until the band between them glows the way it should. The
-   lens then has something continuous to bend, which is what makes an arc
-   instead of a scatter.
-
-   Built only for a system with a black hole in it, so nothing else pays. */
-function skyPanorama(coords, mode, drawn, w, h) {
-  const total = mode === 'galaxy' ? 60000 : 20000;
-  const d = mode === 'galaxy' ? galacticSky(coords, total) : plainSky(coords, total);
-
-  /* Straight into the pixels rather than through sixty thousand fillRects,
-     which took a tenth of a second and made changing the sky stutter. A
-     clamped array also adds the way light adds: overlapping samples pile up
-     and stop at white instead of wrapping round to black. */
-  const img = new Uint8ClampedArray(w * h * 4);
-  for (let i = 3; i < img.length; i += 4) img[i] = 255;
-
-  const col = new THREE.Color();
-  const paint = (from, to, alpha, size) => {
-    for (let i = from; i < to; i++) {
-      const x = d.pos[i * 3], y = d.pos[i * 3 + 1], z = d.pos[i * 3 + 2];
-      const u = (Math.atan2(z, x) / (2 * Math.PI) + 0.5) * w;
-      const v = (0.5 - Math.asin(Math.max(-1, Math.min(1, y))) / Math.PI) * h;
-      /* Equirectangular squeezes longitude toward the poles, so a dot the same
-         width everywhere becomes a smear at the top of the image. Widening it
-         by 1/cos(latitude) keeps it round on the sphere. */
-      const wide = size / Math.max(0.06, Math.sqrt(Math.max(0, 1 - y * y)));
-      // getHex converts out of the working space into sRGB, which is what the
-      // texture below declares, so the value round-trips.
-      const hex = col.fromArray(d.col, i * 3).getHex();
-      const cr = ((hex >> 16) & 255) * alpha;
-      const cg = ((hex >> 8) & 255) * alpha;
-      const cb = (hex & 255) * alpha;
-
-      const y0 = Math.max(0, Math.round(v - size));
-      const y1 = Math.min(h - 1, Math.round(v + size));
-      const x0 = Math.round(u - wide), x1 = Math.round(u + wide);
-      for (let py = y0; py <= y1; py++) {
-        for (let px = x0; px <= x1; px++) {
-          // Longitude wraps and the sampler reads across the join; latitude
-          // does not wrap, which is why only this one is taken modulo.
-          const k = (py * w + (((px % w) + w) % w)) * 4;
-          img[k] += cr; img[k + 1] += cg; img[k + 2] += cb;
-        }
-      }
-    }
-  };
-  /* The unresolved galaxy goes down first, wide and faint, so that where the
-     samples are dense they merge into a continuum rather than staying a
-     scatter of dots. That matters more than it sounds: a lens demagnifies —
-     it squeezes a wide piece of sky into a narrow one — and a point shrunk
-     below a pixel is a point the sampler misses, which showed up as a dark
-     annulus between the ring and the edge. A continuum survives being
-     squeezed; a scatter of points does not. */
-  paint(drawn, total, 0.13, 1.8);     // the galaxy between the stars
-  paint(0, drawn, 1, 0.9);            // the stars the reader can actually see
-
-  const c = document.createElement('canvas');
-  c.width = w; c.height = h;
-  c.getContext('2d').putImageData(new ImageData(img, w, h), 0, 0);
-
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.ClampToEdgeWrapping;
-  /* No mipmaps, deliberately. Longitude wraps at the seam, so the hardware's
-     own derivative of u jumps a whole texture there and picks the coarsest
-     mip: a grey arc drawn across the lens. The blur a stretched ray needs is
-     done in the shader instead, along the axis it is actually stretched on,
-     which is both seam-free and closer to the truth. */
-  tex.generateMipmaps = false;
-  tex.minFilter = tex.magFilter = THREE.LinearFilter;
-  return tex;
-}
 
 /* A quad that always faces the camera, centred on the hole. The offset is
    added in world space from the camera's own right and up, so the lens is a
@@ -450,7 +563,7 @@ const HOLE_FRAG = [
   'vec3 look(float beta, vec3 perp) {',
   '  vec3 dir = normalize(uFwd * cos(beta) + perp * sin(beta));',
   '  float u = atan(dir.z, dir.x) / 6.2831853 + 0.5;',
-  '  float v = 0.5 - asin(clamp(dir.y, -1.0, 1.0)) / 3.1415927;',
+  '  float v = asin(clamp(dir.y, -1.0, 1.0)) / 3.1415927 + 0.5;',
   '  return texture2D(uSky, vec2(u, v)).rgb;',
   '}',
 
@@ -1216,10 +1329,10 @@ const Orrery = (function () {
       '      </div>',
       '      <div class="orr-d-s">',
       '        <h4>Sky</h4>',
+      '        <button class="orr-opt on" id="orr-sky-stars"><span>Deep space</span><b></b></button>',
       '        <button class="orr-opt" id="orr-sky-galaxy"><span>Galactic</span><b></b></button>',
       '        <div class="orr-note" id="orr-corebear"></div>',
-      '        <button class="orr-opt" id="orr-sky-stars"><span>Star field</span><b></b></button>',
-      '        <button class="orr-opt on" id="orr-sky-none"><span>Empty</span><b></b></button>',
+      '        <button class="orr-opt" id="orr-sky-none"><span>Empty</span><b></b></button>',
       '      </div>',
       '      <div class="orr-d-s">',
       '        <h4>Light</h4>',
@@ -1282,7 +1395,7 @@ const Orrery = (function () {
     $('orr-labl').onclick = () => setLabels(!showLabels);
     $('orr-vopen').onclick = () => openDrawer(!panel.classList.contains('view-open'));
     $('orr-vclose').onclick = () => openDrawer(false);
-    ['galaxy', 'stars', 'none'].forEach((m) => {
+    ['stars', 'galaxy', 'none'].forEach((m) => {
       $('orr-sky-' + m).onclick = () => setSky(m);
     });
     $('orr-amb').addEventListener('input', (e) => setAmbient(+e.target.value));
@@ -1687,7 +1800,7 @@ const Orrery = (function () {
     const rs = n.drawR / SHADOW;             // drawR is the shadow, not the horizon
     return new THREE.ShaderMaterial({
       uniforms: {
-        uSky: { value: lensSky || noSky() },
+        uSky: { value: lensSky ? lensSky.texture : noSky() },
         uHasSky: { value: lensSky ? 1 : 0 },
         uCenter: { value: new THREE.Vector3() },
         uRight: { value: new THREE.Vector3(1, 0, 0) },
@@ -2006,7 +2119,7 @@ const Orrery = (function () {
     // These are a choice of one, and the Show rows above state their value in
     // words rather than in colour; the sky rows do the same so the drawer
     // reads consistently and does not lean on colour alone.
-    ['galaxy', 'stars', 'none'].forEach((m) => {
+    ['stars', 'galaxy', 'none'].forEach((m) => {
       const el = panel.querySelector('#orr-sky-' + m);
       el.classList.toggle('on', m === mode);
       el.querySelector('b').textContent = m === mode ? 'shown' : '';
@@ -2014,24 +2127,85 @@ const Orrery = (function () {
     buildSky();
   }
 
-  /* The sky the lens reads, kept in step with the sky the reader sees.
+  /* Hand the current sky to whatever is bending it.
 
-     Painted only for a system that has a black hole in it, so every other
-     system pays nothing; and cleared when the sky is switched off, because
-     with no sky behind it there is nothing for a hole to bend and black is
-     the honest answer. */
-  function buildLensSky(drawn) {
-    if (lensSky) { lensSky.dispose(); lensSky = null; }
-    if (drawn && model && model.all.some((n) => n.hole)) {
-      const coords = (model.sys && model.sys.coords) || { x: 0, y: 0, z: 0 };
-      lensSky = skyPanorama(coords, skyMode, drawn, 2048, 1024);
-    }
-    /* buildScene runs before the sky is chosen, so the lenses it made are
-       holding whatever was current then. Hand them the new one. */
+     buildScene runs before the sky is chosen, so the lenses it made are
+     holding whatever was current then; and with the sky switched off there is
+     nothing behind a hole to bend, which the lens is told rather than left to
+     guess at. */
+  function syncLenses() {
     lenses.forEach((m) => {
-      m.lens.material.uniforms.uSky.value = lensSky || noSky();
+      m.lens.material.uniforms.uSky.value = lensSky ? lensSky.texture : noSky();
       m.lens.material.uniforms.uHasSky.value = lensSky ? 1 : 0;
     });
+  }
+
+  /* The sky, rendered once into one image.
+
+     Clouds first, over the whole sphere from a shader that works on the
+     direction rather than on the image's own axes — which is what makes it
+     seamless at the wrap and at the poles. Then the stars into the same
+     image, flattened to longitude and latitude.
+
+     That image is then two things at once: the backdrop the scene is drawn
+     against, and the sky a black hole bends. One image, so the lens can never
+     show a sky the reader is not looking at. */
+  function bakeSky(coords, mode, geo) {
+    const rt = new THREE.WebGLRenderTarget(2048, 1024, { depthBuffer: false });
+    rt.texture.colorSpace = THREE.SRGBColorSpace;
+    rt.texture.mapping = THREE.EquirectangularReflectionMapping;
+    rt.texture.wrapS = THREE.RepeatWrapping;
+    rt.texture.wrapT = THREE.ClampToEdgeWrapping;
+    /* No mipmaps. Longitude wraps, so the hardware's own derivative of u
+       jumps a whole texture at the seam and picks the coarsest mip — a grey
+       arc drawn across the lens. The blur a stretched ray needs is done in
+       the lens shader instead, along the axis it is actually stretched on. */
+    rt.texture.generateMipmaps = false;
+    rt.texture.minFilter = rt.texture.magFilter = THREE.LinearFilter;
+
+    const core = new THREE.Vector3(
+      CORE.x - coords.x, CORE.y - coords.y, -(CORE.z - coords.z)).normalize();
+    const clouds = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
+      uniforms: {
+        // Seeded from where the system is, so a sky is stable for a system
+        // and different between systems, in both modes.
+        uSeed: { value: new THREE.Vector3(
+          (coords.x % 512) * 0.031, (coords.y % 512) * 0.037, (coords.z % 512) * 0.029) },
+        uCore: { value: core },
+        uBand: { value: mode === 'galaxy' ? 1 : 0 },
+        uGlow: { value: mode === 'galaxy' ? 1 : 0 }
+      },
+      vertexShader: NEBULA_VERT, fragmentShader: NEBULA_FRAG,
+      depthTest: false, depthWrite: false
+    }));
+    clouds.renderOrder = -1;
+    clouds.frustumCulled = false;
+
+    const stars = new THREE.Points(geo, new THREE.ShaderMaterial({
+      /* Small. The image is a fifth of the screen's resolution once it is
+         stretched over the view, so a star baked two pixels wide arrives as a
+         blob ten across. At this size it reads as the halo a bright star has,
+         under the crisp point drawn on top of it. */
+      uniforms: { uScale: { value: 1.15 } },
+      vertexShader: STARS_BAKE_VERT, fragmentShader: STARS_FRAG,
+      blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false
+    }));
+    stars.frustumCulled = false;
+
+    const bench = new THREE.Scene();
+    bench.add(clouds);
+    bench.add(stars);
+    const flat = new THREE.OrthographicCamera(-1, 1, 1, -1, -1, 1);
+
+    const was = renderer.getRenderTarget();
+    renderer.setRenderTarget(rt);
+    renderer.render(bench, flat);
+    renderer.setRenderTarget(was);
+
+    clouds.geometry.dispose();
+    clouds.material.dispose();
+    stars.material.dispose();      // the geometry belongs to the on-screen sky
+    return rt;
   }
 
   function buildSky() {
@@ -2041,19 +2215,23 @@ const Orrery = (function () {
       sky.material.dispose();
       sky = null;
     }
-    if (skyMode === 'none' || !model) { buildLensSky(0); return; }
+    if (lensSky) { lensSky.dispose(); lensSky = null; }
+    scene.background = null;
+
+    if (skyMode === 'none' || !model) { syncLenses(); return; }
     const coords = (model.sys && model.sys.coords) || { x: 0, y: 0, z: 0 };
-    const n = skyMode === 'galaxy' ? 9000 : 2600;
-    const d = skyMode === 'galaxy' ? galacticSky(coords, n) : plainSky(coords, n);
-    buildLensSky(n);
+    /* Six thousand is roughly what a person can see from a dark site, and the
+       generic sky is meant to read as a sky. The galactic one carries a band
+       and wants more to build it out of. */
+    const d = starField(coords, skyMode, skyMode === 'galaxy' ? 9000 : 6000);
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(d.pos, 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(d.col, 3));
-    sky = new THREE.Points(geo, new THREE.PointsMaterial({
-      size: skyMode === 'galaxy' ? 1.5 : 1.9,
-      sizeAttenuation: false, vertexColors: true,
-      transparent: true, opacity: 0.95, depthWrite: false
+    geo.setAttribute('tint', new THREE.BufferAttribute(d.col, 3));
+    geo.setAttribute('mag', new THREE.BufferAttribute(d.mag, 1));
+    sky = new THREE.Points(geo, new THREE.ShaderMaterial({
+      vertexShader: STARS_SCREEN_VERT, fragmentShader: STARS_FRAG,
+      blending: THREE.AdditiveBlending, depthWrite: false, transparent: true
     }));
     /* Directions, not places: the points sit on a unit sphere and the whole
        thing is scaled out and carried with the camera, so the sky never gets
@@ -2061,6 +2239,10 @@ const Orrery = (function () {
     sky.frustumCulled = false;
     sky.renderOrder = -1;
     scene.add(sky);
+
+    lensSky = bakeSky(coords, skyMode, geo);
+    scene.background = lensSky.texture;
+    syncLenses();
   }
 
   function setScale(isTrue) {
@@ -2748,7 +2930,7 @@ const Orrery = (function () {
     buildLabels();
     drawSpine();
     setOrbits(recallNum('orbits', 0));
-    setSky(recallStr('sky', 'galaxy'));
+    setSky(recallStr('sky', 'stars'));
     select(model.star);
     cancelAnimationFrame(loop);
     loop = requestAnimationFrame(animate);
@@ -2822,7 +3004,11 @@ const Orrery = (function () {
         mode: skyMode,
         points: sky ? sky.geometry.getAttribute('position').count : 0,
         scale: sky ? sky.scale.x : 0,
-        inScene: !!(sky && sky.parent)
+        inScene: !!(sky && sky.parent),
+        // The backdrop and the sky a black hole bends are meant to be the one
+        // image, and this is where that is either true or it is not.
+        baked: lensSky ? lensSky.width : 0,
+        isBackdrop: !!(lensSky && scene.background === lensSky.texture)
       },
       /* Every black hole, in the terms its shader works in: the horizon it
          was given, the shadow that horizon draws, how far out the lens runs,
@@ -2853,6 +3039,8 @@ const Orrery = (function () {
           lens: u.uSize.value,
           hasSky: u.uHasSky.value,
           skyWidth: img ? img.width : 0,
+          // Which only means anything if it is the sky on screen as well.
+          sameAsSky: !!(lensSky && u.uSky.value === lensSky.texture),
           toCamera: u.uD.value
         };
       }),
