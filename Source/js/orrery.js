@@ -1101,8 +1101,14 @@ function buildModel(sys) {
    from Io and 1.47 from Jupiter, and it orbits Jupiter — 377,000 km is two
    hundred Io radii and nowhere near Io, while 440,000 km is six Jupiter radii
    and exactly where a station sits. So the distance is measured in the body's
-   own radii, which is the scale a station orbit is actually set by. On Sol
-   that places all ten correctly, Galileo at Luna rather than Earth included.
+   own radii, which is the scale a station orbit is actually set by, and in
+   radii alone — a light-second cap sounds like a safety net and is really a
+   bias towards small bodies. Reed's Rest is 3.8 Ls off Merope 3, which is a
+   gas giant: seventeen of its radii, an ordinary orbit, and a three-light-
+   second guard threw it back onto the star. On Sol this places all ten
+   correctly, Galileo at Luna rather than Earth included; on Merope it puts
+   Reed's Rest at Merope 3 and leaves the megaship out at five thousand Ls
+   unattached, which is what a megaship is.
 
    It is still an inference, so it is marked as one and the reader is told. */
 const LS_KM = 299792.458;
@@ -1116,7 +1122,7 @@ function nearBody(st, nodes) {
     if (typeof d !== 'number' || !n.km || n.type === 'Star') return;
     const off = Math.abs(d - ls);
     const radii = (off * LS_KM) / n.km;
-    if (radii < score && radii < 250 && off < 3) { score = radii; best = n; }
+    if (radii < score && radii < 250) { score = radii; best = n; }
   });
   return best;
 }

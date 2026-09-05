@@ -1424,6 +1424,61 @@ test('the axis names what matters first, and says what it is holding back',
   expect(await page.locator('.orr-sp-de .lb').count()).toBeGreaterThan(named);
 });
 
+/* The dump's system-level list is the stations it does not attach to a body,
+   and it gives no body reference at all — so they all hung off the primary
+   star, which is not where stations are. A station and the body it orbits are
+   the same distance from the arrival star to within a light-second or two,
+   and that is the only join the data offers.
+
+   The numbers below are Sol's and Merope's, and they are the two cases that
+   decide how the match has to work. */
+test('a station the dump does not place is put where it orbits',
+  async ({ page }) => {
+  const sys = JSON.parse(JSON.stringify(SYSTEM));
+  // A gas giant and one of its moons, at Jupiter's and Io's real scale.
+  sys.bodies.push(
+    { bodyId: 5, type: 'Planet', name: 'Testholm 5', subType: 'Class I gas giant',
+      parents: [{ Star: 0 }], radius: 69911, semiMajorAxis: 5.2,
+      orbitalPeriod: 4331, distanceToArrival: 2618.5 },
+    { bodyId: 6, type: 'Planet', name: 'Testholm 5 a', subType: 'Rocky body',
+      parents: [{ Planet: 5 }, { Star: 0 }], radius: 1821, semiMajorAxis: 0.0028,
+      orbitalPeriod: 1.77, distanceToArrival: 2618.76 });
+  sys.stations = [
+    /* Columbus: 1.26 Ls from the moon and 1.47 from the giant, and it orbits
+       the giant. Nearest in light-seconds gets this wrong — 377,000 km is
+       two hundred moon-radii and nowhere near it, while 441,000 km is six
+       giant-radii and exactly where a station sits. */
+    { name: 'Columbus', type: 'Ocellus Starport', distanceToArrival: 2620.02 },
+    /* Reed's Rest: 3.8 Ls off a gas giant, which is seventeen of its radii
+       and an ordinary orbit. Any absolute light-second guard throws this one
+       back onto the star, which is why the test is in radii alone. */
+    { name: "Reed's Rest", type: 'Orbis Starport', distanceToArrival: 2622.3 },
+    // And a megaship far enough out that it belongs to nothing.
+    { name: 'Warden JO76', type: 'Mega ship', distanceToArrival: 4200 }
+  ];
+  await stubDataHosts(page);
+  await stubApi(page, sys);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(5, { timeout: 60_000 });
+
+  const at = async (station) => {
+    await page.locator('.orr-row.stn', { hasText: station }).click();
+    return (await page.locator('#orr-m-sub').textContent()).replace(/^.*· at /, '');
+  };
+  expect(await at('Columbus')).toBe('5');
+  await page.keyboard.press('Escape');
+  expect(await at("Reed's Rest")).toBe('5');
+  await page.keyboard.press('Escape');
+  // Nothing is close enough in its own radii, so it stays where the dump put it.
+  expect(await at('Warden JO76')).toBe('Testholm');
+  await page.keyboard.press('Escape');
+
+  /* It is worked out, not read, so it says so — the difference between a fact
+     and a guess wearing a fact's clothes. */
+  await expect(page.locator('.orr-row.stn', { hasText: 'Columbus' }))
+    .toHaveAttribute('title', /placed at 5 from its arrival distance/);
+});
+
 /* A link someone typed or pasted in caps is a link to the same system. The
    typeahead is a prefix search over canonical names, so the guard against a
    near-match has to compare letters rather than case. */
