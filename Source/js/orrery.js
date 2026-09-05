@@ -264,13 +264,19 @@ function starField(coords, mode, count) {
     /* Steep, and deliberately steeper than it first was: most of the sky
        should be faint and a couple of dozen stars should carry it. At 2.7 a
        third of the sky came out bright and the backdrop started competing
-       with the orbits drawn over it. */
-    const m = Math.pow(rnd(), 3.4) * (0.35 + near * 0.65);
+       with the orbits drawn over it.
+
+       Steeper again now the sky holds twice as many stars. Twice the stars at
+       the old curve is twice the light, and a backdrop that bright stops
+       being a backdrop; pushing the faint end down means the extra stars
+       arrive as the pinpricks between the bright ones, which is what having
+       more of them is for. */
+    const m = Math.pow(rnd(), 3.8) * (0.35 + near * 0.65);
     mag[i] = 1.0 + m * 2.6;
 
     let pick = rnd(), k = 0;
     while (k < STAR_HUES.length - 1 && pick > STAR_HUES[k][3]) { pick -= STAR_HUES[k][3]; k++; }
-    const lum = 0.16 + m * 0.84;
+    const lum = 0.08 + m * 0.92;
     col[i * 3] = STAR_HUES[k][0] * lum;
     col[i * 3 + 1] = STAR_HUES[k][1] * lum;
     col[i * 3 + 2] = STAR_HUES[k][2] * lum;
@@ -368,14 +374,22 @@ const NEBULA_FRAG = [
   '  vec3 col = vec3(0.0012, 0.0016, 0.0030);',          // deep space is not black
   '  col += vec3(0.006, 0.013, 0.030) * c * wisp;',
   '  col += vec3(0.020, 0.008, 0.004) * wv * wisp;',
-  // Dust in front of the clouds, not mixed into them.
-  '  col *= mix(1.0, 0.25, smoothstep(0.48, 0.84, dust) * band);',
+
   /* The bulge, where the bulge actually is — and kept tight. Great
      Annihilator sits three thousand light years off the core, so a broad
-     falloff there covers most of the sky and turns the whole view brown. */
+     falloff there covers most of the sky and turns the whole view brown.
+
+     Broken up by the same noise the clouds are made of, and added before the
+     dust rather than after it. A smooth gradient laid over the top is a
+     brown filter over the page; the same light with star clouds in it and
+     the dust lanes cut through it is the band everyone has looked up at. */
   '  float toCore = max(dot(dir, uCore), 0.0);',
-  '  col += vec3(0.030, 0.022, 0.013) * uGlow * pow(toCore, 9.0);',
-  '  col += vec3(0.009, 0.007, 0.005) * uGlow * pow(toCore, 4.0) * band;',
+  '  float clumps = 0.45 + 0.9 * fbm(dir * 5.2 - uSeed);',
+  '  col += vec3(0.030, 0.022, 0.013) * uGlow * pow(toCore, 9.0) * clumps;',
+  '  col += vec3(0.005, 0.0038, 0.0026) * uGlow * pow(toCore, 5.0) * band * clumps;',
+
+  // Dust in front of all of it, not mixed into any of it.
+  '  col *= mix(1.0, 0.25, smoothstep(0.48, 0.84, dust) * band);',
 
   '  gl_FragColor = vec4(col, 1.0);',
   '}'
@@ -391,6 +405,10 @@ const NEBULA_FRAG = [
 const STARS_SCREEN_VERT = [
   'attribute float mag;',
   'attribute vec3 tint;',
+  /* gl_PointSize is framebuffer pixels and the renderer draws at up to twice
+     the device's CSS scale, so a star sized in bare pixels came out half as
+     wide on every retina screen as it does here. */
+  'uniform float uPx;',
   'varying vec3 vTint;',
   '#include <common>',
   '#include <logdepthbuf_pars_vertex>',
@@ -398,7 +416,7 @@ const STARS_SCREEN_VERT = [
   '  vTint = tint;',
   '  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
   '  gl_Position = projectionMatrix * mv;',
-  '  gl_PointSize = mag;',
+  '  gl_PointSize = mag * uPx;',
   '  #include <logdepthbuf_vertex>',
   '}'
 ].join('\n');
@@ -2154,8 +2172,27 @@ const Orrery = (function () {
      That image is then two things at once: the backdrop the scene is drawn
      against, and the sky a black hole bends. One image, so the lens can never
      show a sky the reader is not looking at. */
+  /* How big that image is.
+
+     The nebula shader already carries detail down to about two degrees — its
+     ridged wisps are computed at nine times the base frequency — and at 2048
+     across a pixel was a fifth of a degree, so those wisps landed on ten
+     pixels each and arrived as mush. Doubling the image resolves detail that
+     was already being computed, and halves the width of a baked star into
+     the bargain. Past 4096 the picture stops improving as fast as the memory
+     grows: this is eight megapixels, about 33 MB of texture, which is a fair
+     price for the one image the entire view is drawn against.
+
+     Asked of the driver rather than assumed, so a device that cannot hold it
+     gets a smaller sky instead of no sky. */
+  function skySize() {
+    const w = Math.min(4096, renderer.capabilities.maxTextureSize || 2048);
+    return { w, h: Math.round(w / 2) };
+  }
+
   function bakeSky(coords, mode, geo) {
-    const rt = new THREE.WebGLRenderTarget(2048, 1024, { depthBuffer: false });
+    const size = skySize();
+    const rt = new THREE.WebGLRenderTarget(size.w, size.h, { depthBuffer: false });
     rt.texture.colorSpace = THREE.SRGBColorSpace;
     rt.texture.mapping = THREE.EquirectangularReflectionMapping;
     rt.texture.wrapS = THREE.RepeatWrapping;
@@ -2186,11 +2223,12 @@ const Orrery = (function () {
     clouds.frustumCulled = false;
 
     const stars = new THREE.Points(geo, new THREE.ShaderMaterial({
-      /* Small. The image is a fifth of the screen's resolution once it is
-         stretched over the view, so a star baked two pixels wide arrives as a
-         blob ten across. At this size it reads as the halo a bright star has,
-         under the crisp point drawn on top of it. */
-      uniforms: { uScale: { value: 1.15 } },
+      /* A couple of texels, and deliberately in texels rather than degrees:
+         holding the angle would have kept the same soft halo the smaller
+         image gave, which is the blur the bigger one exists to remove. The
+         star is still there under the crisp point drawn on top of it — it is
+         half as wide, which is what doubling the image buys. */
+      uniforms: { uScale: { value: 1.35 } },
       vertexShader: STARS_BAKE_VERT, fragmentShader: STARS_FRAG,
       blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false
     }));
@@ -2224,16 +2262,20 @@ const Orrery = (function () {
 
     if (skyMode === 'none' || !model) { syncLenses(); return; }
     const coords = (model.sys && model.sys.coords) || { x: 0, y: 0, z: 0 };
-    /* Six thousand is roughly what a person can see from a dark site, and the
-       generic sky is meant to read as a sky. The galactic one carries a band
-       and wants more to build it out of. */
-    const d = starField(coords, skyMode, skyMode === 'galaxy' ? 9000 : 6000);
+    /* Six thousand is what a person sees from a dark site with their own
+       eyes, which is the wrong target: nobody is standing in a field here,
+       they are looking through a canopy at a sky the game draws deep. Twice
+       that reads as the long exposure it is, and the magnitude curve above
+       keeps the extra ones faint. The galactic sky carries a band as well and
+       wants more again to build it out of. */
+    const d = starField(coords, skyMode, skyMode === 'galaxy' ? 18000 : 12000);
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(d.pos, 3));
     geo.setAttribute('tint', new THREE.BufferAttribute(d.col, 3));
     geo.setAttribute('mag', new THREE.BufferAttribute(d.mag, 1));
     sky = new THREE.Points(geo, new THREE.ShaderMaterial({
+      uniforms: { uPx: { value: renderer.getPixelRatio() } },
       vertexShader: STARS_SCREEN_VERT, fragmentShader: STARS_FRAG,
       blending: THREE.AdditiveBlending, depthWrite: false, transparent: true
     }));

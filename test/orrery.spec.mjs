@@ -1316,7 +1316,7 @@ test('with no sky behind it there is nothing for a hole to bend', async ({ page 
 
   await page.locator('#orr-sky-galaxy').click();
   await expect.poll(() => page.evaluate(() => window.Orrery.state().holes[0].hasSky)).toBe(1);
-  expect(await page.evaluate(() => window.Orrery.state().holes[0].skyWidth)).toBe(2048);
+  expect(await page.evaluate(() => window.Orrery.state().holes[0].skyWidth)).toBe(4096);
 
   await page.locator('#orr-sky-none').click();
   await expect.poll(() => page.evaluate(() => window.Orrery.state().holes[0].hasSky)).toBe(0);
@@ -1381,9 +1381,12 @@ test('deep space is what you get without asking', async ({ page }) => {
   await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
   const sky = await page.evaluate(() => window.Orrery.state().sky);
   expect(sky.mode).toBe('stars');
-  expect(sky.points).toBeGreaterThan(4000);
-  // A backdrop, not only a scatter of points: one image, and it is in use.
-  expect(sky.baked).toBe(2048);
+  expect(sky.points).toBeGreaterThan(10_000);
+  /* A backdrop, not only a scatter of points: one image, and it is in use.
+     Four thousand across wherever the driver will hold it, because the
+     nebula's finest structure is about two degrees and anything smaller
+     than this throws that away before it is ever drawn. */
+  expect(sky.baked).toBe(4096);
   expect(sky.isBackdrop).toBe(true);
 });
 
