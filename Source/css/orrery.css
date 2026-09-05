@@ -114,7 +114,11 @@ body.orrery-open .app{visibility:hidden}
   font-size:12px;font-weight:600;color:var(--dim,#93A3B1);
   background:none;cursor:pointer}
 .orr-back:hover{border-color:var(--amber,#FF9D00);color:var(--amber,#FF9D00)}
-.orr-title{flex:1;min-width:0;display:flex;align-items:baseline;gap:10px}
+/* The name of the system is what this page is about, so it is the last thing
+   in the header allowed to give way. It was flex:1 among five flex:none
+   buttons, which made it the only thing that could give: on a phone "Sol"
+   came out three pixels wide. */
+.orr-title{flex:1 1 auto;min-width:5.5em;display:flex;align-items:baseline;gap:10px}
 .orr-title b{font-family:var(--cond,sans-serif);font-size:16px;font-weight:600;
   color:#E4EBF1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .orr-title span{font-family:var(--mono,monospace);font-size:10.5px;
@@ -359,14 +363,15 @@ body.orr-dragging{user-select:none}
   border:1px solid var(--rule,#1B242E);box-shadow:0 14px 40px rgba(0,0,0,.7);
   max-height:70vh;overflow-y:auto}
 .menu-open .orr-menu{display:block}
-.orr-menu a{display:flex;align-items:baseline;justify-content:space-between;gap:14px;
-  padding:6px 11px;text-decoration:none}
-.orr-menu a span{font-family:var(--cond,sans-serif);font-size:12px;font-weight:600;
-  color:var(--dim,#93A3B1)}
-.orr-menu a em{font-style:normal;font-family:var(--mono,monospace);font-size:9px;
-  color:var(--dimmer,#6E7F8D);white-space:nowrap}
-.orr-menu a:hover{background:var(--panel-2,#111820)}
-.orr-menu a:hover span{color:var(--amber,#FF9D00)}
+.orr-menu a,.orr-menu button{display:flex;width:100%;align-items:baseline;
+  justify-content:space-between;gap:14px;padding:8px 11px;text-decoration:none;
+  background:none;border:0;text-align:left;cursor:pointer}
+.orr-menu a span,.orr-menu button span{font-family:var(--cond,sans-serif);font-size:12px;
+  font-weight:600;color:var(--dim,#93A3B1)}
+.orr-menu a em,.orr-menu button em{font-style:normal;font-family:var(--mono,monospace);
+  font-size:9px;color:var(--dimmer,#6E7F8D);white-space:nowrap}
+.orr-menu a:hover,.orr-menu button:hover{background:var(--panel-2,#111820)}
+.orr-menu a:hover span,.orr-menu button:hover span{color:var(--amber,#FF9D00)}
 .orr-menu-r{height:1px;margin:4px 0;background:var(--rule,#1B242E)}
 /* GitHub and Donate sit in the header while it has room for them, and in
    here when it does not — a narrow window must not be one with no way out. */
@@ -382,10 +387,12 @@ body.orr-dragging{user-select:none}
 /* What is in the system on the left, what you have picked on the right, and
    the model itself between them — so choosing a body and reading it are on
    opposite sides of the thing they are about, not stacked in one column. */
-.orr-side{width:290px;flex:none;display:flex;flex-direction:column;min-height:0;
-  background:var(--panel,#0C1116)}
+/* Dragged widths arrive as custom properties, not as inline styles, so the
+   media queries below can still say what a stacked layout does. */
+.orr-side{width:var(--left-w,290px);flex:none;display:flex;flex-direction:column;
+  min-height:0;background:var(--panel,#0C1116)}
 .orr-left{border-right:1px solid var(--rule,#1B242E)}
-.orr-right{width:276px;border-left:1px solid var(--rule,#1B242E)}
+.orr-right{width:var(--right-w,276px);border-left:1px solid var(--rule,#1B242E)}
 .orr-s-t{font-family:var(--cond,sans-serif);font-size:9.5px;
   letter-spacing:.16em;text-transform:uppercase;color:var(--dimmer,#6E7F8D)}
 .orr-s-h{display:flex;align-items:center;gap:8px;padding:10px 13px 8px}
@@ -624,8 +631,8 @@ body.orr-dragging{user-select:none}
   background:var(--dimmer,#6E7F8D)}
 
 @media (max-width:1100px){
-  .orr-side{width:206px}
-  .orr-right{width:214px}
+  .orr-side{width:var(--left-w,206px)}
+  .orr-right{width:var(--right-w,214px)}
 }
 /* Below this the header cannot hold the title and five ways out, so the two
    that are about Canonn rather than about this system fold into the menu
@@ -634,29 +641,102 @@ body.orr-dragging{user-select:none}
   .orr-tb.wide{display:none}
   .orr-menu .only-narrow{display:flex}
 }
+/* And below this even the two system links fold in, so the name keeps its
+   room. Everything they did is still one tap away in the menu. The default
+   goes above the query, not below it: two rules of equal weight, and the
+   later one wins whatever the width is. */
+.orr-menu .only-phone{display:none}
+@media (max-width:720px){
+  /* Matching .orrery.has-system .orr-tb.sys, which is what puts them there —
+     four classes, so three would quietly lose. */
+  .orrery.has-system .orr-tb.sys{display:none}
+  .orr-menu .only-phone{display:flex}
+}
 @media (max-width:960px){
   .orr-spine{display:none}
 }
+/* ── stacked ────────────────────────────────────────────────────────────────
+   No room for two rails beside a model worth looking at, so they take turns
+   under it behind a pair of tabs. The list used to be dropped outright, which
+   was defensible when it only held bodies and the panel repeated them — and
+   stopped being defensible the moment stations moved into it and nowhere
+   else. A phone had the whole station feature missing. */
+.orr-tabs{display:none}
 @media (max-width:820px){
-  /* No room for two rails beside a model worth looking at. The list is how
-     you find a body, so it goes; the detail moves under the view rather than
-     squeezing it to a strip, which is what it did before. */
-  .orr-left{display:none}
   .orr-mid{flex-direction:column}
-  .orr-stage{flex:1;min-height:0}
-  /* A definite height, not a cap: .orr-facts is flex:1 inside it, and inside
-     a parent sized by its own content that resolves to nothing — the panel
-     collapsed to 19px. */
-  .orr-right{width:auto;flex:none;height:42%;border-left:0;
+  .orr-stage{order:1;flex:1;min-height:0}
+  .orr-tabs{order:2;display:flex;flex:none;background:var(--panel,#0C1116);
     border-top:1px solid var(--rule,#1B242E)}
+  .orr-tabs button{flex:1;padding:9px 8px;background:none;border:0;
+    border-bottom:2px solid transparent;font-family:var(--cond,sans-serif);
+    font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--dimmer,#6E7F8D);cursor:pointer}
+  .orr-tabs button[aria-selected="true"]{color:var(--amber,#FF9D00);
+    border-bottom-color:var(--amber,#FF9D00)}
+
+  /* A definite height, not a cap: the scroller inside is flex:1, and inside a
+     parent sized by its own content that resolves to nothing — the panel
+     collapsed to 19px. */
+  .orr-side{order:3;width:auto;flex:none;height:42%;border:0;
+    border-top:1px solid var(--rule,#1B242E)}
+  .orr-left,.orr-right{display:none}
+  .sheet-list .orr-left{display:flex}
+  .sheet-facts .orr-right{display:flex}
+  /* Dragging a rail's edge means nothing when it is the width of the screen. */
+  .orr-grip-l,.orr-grip-r{display:none}
   .orr-legend{display:none}
 }
+
+/* A phone held sideways is short and wide, and stacking is the wrong answer
+   to that: it was leaving ninety pixels of model under a full-width sheet.
+   Wide is exactly what the desktop layout wants, so it comes back — both
+   rails, narrow, either side of the model — and the height is what gives. */
+@media (max-height:560px) and (orientation:landscape){
+  .orr-mid{flex-direction:row}
+  .orr-tabs{display:none}
+  /* Capped, not replaced: a width dragged on a desktop is still a preference,
+     but two of them at 290px leave 246px of model on an 812px screen. */
+  .orr-side{order:0;height:auto;width:min(var(--left-w,152px),22vw)}
+  .orr-left,.orr-right{display:flex}
+  .orr-left{border-right:1px solid var(--rule,#1B242E);border-top:0}
+  .orr-right{width:min(var(--right-w,168px),24vw);
+    border-left:1px solid var(--rule,#1B242E);border-top:0}
+  .orr-stage{order:0}
+  .orr-top{min-height:36px}
+  .orr-foot{min-height:32px}
+  .orr-find{max-width:180px}
+  .orr-hud{top:8px;left:8px;padding:2px 4px;gap:5px}
+  .orr-hud .orr-opt span,.orr-hud .orr-opt b,.orr-hud .orr-seg button,
+  .orr-hud .orr-tb{padding-top:3px;padding-bottom:3px}
+}
+/* The strip scrolls sideways when it will not fit, and the scrollbar is
+   hidden — which on a phone meant four hundred pixels of controls that looked
+   like they did not exist. Given a definite right edge it can wrap instead,
+   and everything on it stays visible. */
+@media (max-width:820px){
+  /* One row that scrolls, not three that wrap: wrapped, the strip stood a
+     hundred pixels tall over a stage only three-and-a-half hundred deep, and
+     the model is the reason anyone opened this. Scrolling was the original
+     behaviour and it was fine — what was missing is any sign that there is
+     more, so the right edge fades and the bar is left visible. */
+  .orr-hud{right:12px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;
+    scrollbar-color:var(--rule,#1B242E) transparent;
+    -webkit-overflow-scrolling:touch;
+    mask-image:linear-gradient(to right,#000 calc(100% - 26px),transparent)}
+  .orr-hud::-webkit-scrollbar{height:3px}
+  .orr-hud::-webkit-scrollbar-thumb{background:var(--rule,#1B242E)}
+  /* Room for a thumb to land on. */
+  .orr-hud .orr-opt span,.orr-hud .orr-opt b,.orr-hud .orr-seg button,
+  .orr-hud .orr-tb{padding-top:7px;padding-bottom:7px}
+}
+
 @media (max-width:560px){
   /* The header cannot hold a search box and everything else on one line at
      this width — it was down to a single letter. It gets its own row. */
   .orr-top{flex-wrap:wrap;gap:8px;padding:6px 8px}
   .orr-find{order:10;flex-basis:100%;max-width:none}
   .orr-home span,.orr-title span{display:none}
+  .orr-wip{display:none}
   .orr-foot{gap:10px;padding:0 8px}
   .orr-clock{flex:1;min-width:0}
   #orr-date{font-size:10.5px}

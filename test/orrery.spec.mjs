@@ -538,8 +538,16 @@ test('the layout holds at every width', async ({ page }) => {
     // The view gets the room, not the time bar.
     expect(Math.round(box.foot.height), `time bar stays a bar at ${at}`).toBeLessThan(70);
     expect(box.stage.height, `the view has real height at ${at}`).toBeGreaterThan(200);
-    // And the detail panel is readable rather than a sliver.
+    /* And the detail panel is readable rather than a sliver — in both
+       directions. Under the model it is supposed to be the full width of the
+       screen, and it was not: resizing writes a width, and a width beats a
+       media query, so a rail dragged narrow on a desktop stayed narrow on a
+       phone with dead space beside it. */
     expect(box.facts.height, `detail panel is usable at ${at}`).toBeGreaterThan(120);
+    if (w <= 820 && h > 560) {
+      expect(Math.round(box.facts.width), `detail panel is full width at ${at}`)
+        .toBeGreaterThan(w - 4);
+    }
     // Everything lands inside the window.
     expect(Math.round(box.foot.bottom), `nothing below the fold at ${at}`).toBeLessThanOrEqual(h);
   }
@@ -1511,6 +1519,83 @@ test('a station the dump does not place is put where it orbits',
      and a guess wearing a fact's clothes. */
   await expect(page.locator('.orr-row.stn', { hasText: 'Columbus' }))
     .toHaveAttribute('title', /placed at 5 from its arrival distance/);
+});
+
+/* Everything above is checked at a desk. This is the phone, where the answers
+   are different and where five separate things were broken for months without
+   a single test noticing — because every one of them was a matter of where an
+   element ended up rather than whether a class had been set. */
+test('a phone gets a whole orrery', async ({ page }) => {
+  await stubDataHosts(page);
+  const withPorts = JSON.parse(JSON.stringify(SYSTEM));
+  withPorts.bodies[1].stations = [{ name: 'Nearer Dock', type: 'Outpost',
+    distanceToArrival: 505, landingPads: { medium: 2 } }];
+  await stubApi(page, withPorts);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-facts .orr-f-h')).toBeVisible({ timeout: 60_000 });
+
+  /* The name of the system is what the page is about. It was flex:1 among
+     five flex:none buttons — the only thing that could give — and gave until
+     it was three pixels wide. */
+  const name = await page.locator('#orr-name').boundingBox();
+  expect(name.width).toBeGreaterThan(20);
+  await expect(page.locator('#orr-name')).toHaveText('Testholm');
+
+  /* The strip is one row that scrolls, not three that wrap over the model,
+     and not a row with half of itself past the edge and no way to know. */
+  const hud = await page.locator('#orr-hud').boundingBox();
+  expect(hud.height).toBeLessThan(52);
+  const reach = await page.locator('#orr-hud').evaluate((e) => ({
+    scroll: e.scrollWidth, client: e.clientWidth,
+    scrollable: getComputedStyle(e).overflowX
+  }));
+  if (reach.scroll > reach.client) expect(reach.scrollable).toBe('auto');
+
+  /* The list is where stations live and nowhere else, so a phone without it
+     is a phone with the whole station feature missing. */
+  await expect(page.locator('#orr-tabs')).toBeVisible();
+  await expect(page.locator('#orr-left')).toBeHidden();
+  await page.locator('#orr-tab-list').click();
+  await expect(page.locator('#orr-left')).toBeVisible();
+  await expect(page.locator('.orr-row.stn', { hasText: 'Nearer Dock' })).toBeVisible();
+  const list = await page.locator('#orr-left').boundingBox();
+  expect(list.width).toBeGreaterThan(370);
+
+  // Choosing a body means you want to read about it, so the sheet follows.
+  await page.locator('.orr-row[data-id="1"]').click();
+  await expect(page.locator('#orr-right')).toBeVisible();
+  await expect(page.locator('#orr-left')).toBeHidden();
+  await expect(page.locator('.orr-facts')).toContainText('Testholm 1');
+
+  /* The two links about the system fold into the menu rather than crowding
+     the name out of the header. */
+  await expect(page.locator('#orr-signals')).toBeHidden();
+  await page.locator('#orr-tools').click();
+  await expect(page.locator('#orr-menu a[href*="signals.canonn.tech/?system="]'))
+    .toBeVisible();
+  await expect(page.locator('#orr-menu [data-act="copy"]')).toBeVisible();
+});
+
+/* Held sideways a phone is short and wide. Stacking is the wrong answer to
+   wide — it was leaving ninety pixels of model under a full-width sheet — so
+   the side-by-side layout comes back and the height is what gives. */
+test('a phone held sideways still has a model in it', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.setViewportSize({ width: 812, height: 375 });
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-facts .orr-f-h')).toBeVisible({ timeout: 60_000 });
+
+  const stage = await page.locator('.orr-stage').boundingBox();
+  expect(stage.height).toBeGreaterThan(200);
+  expect(stage.width).toBeGreaterThan(380);
+  // Both rails, either side, and no tabs to switch between them.
+  await expect(page.locator('#orr-left')).toBeVisible();
+  await expect(page.locator('#orr-right')).toBeVisible();
+  await expect(page.locator('#orr-tabs')).toBeHidden();
+  // Neither of them eating the room a dragged desktop width would have taken.
+  expect((await page.locator('#orr-left').boundingBox()).width).toBeLessThan(200);
 });
 
 /* A link someone typed or pasted in caps is a link to the same system. The

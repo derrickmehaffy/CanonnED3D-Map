@@ -1428,6 +1428,14 @@ const Orrery = (function () {
       '  </div>',
       '    <div class="orr-grip orr-grip-l" id="orr-grip-l" role="separator"',
       '         aria-label="Resize the body list" tabindex="0"></div>',
+
+      /* Stacked under the model there is only room for one rail at a time, so
+         they take turns. Without this the list — and with it every station in
+         the system — was simply not on a phone at all. */
+      '  <div class="orr-tabs" id="orr-tabs" role="tablist" aria-label="Panels">',
+      '    <button role="tab" id="orr-tab-list" aria-controls="orr-left" aria-selected="false">System</button>',
+      '    <button role="tab" id="orr-tab-facts" aria-controls="orr-right" aria-selected="true">Detail</button>',
+      '  </div>',
       '  <aside class="orr-side orr-right" id="orr-right">',
       '    <div class="orr-grip orr-grip-r" id="orr-grip-r" role="separator"',
       '         aria-label="Resize the detail panel" tabindex="0"></div>',
@@ -1517,6 +1525,9 @@ const Orrery = (function () {
       if (e.target === $('orr-modal')) closeStation();
     });
     $('orr-tools').onclick = (e) => { e.stopPropagation(); showMenu(!menuOpen()); };
+    $('orr-menu').addEventListener('click', (e) => {
+      if (e.target.closest('[data-act="copy"]')) { copyLink(); showMenu(false); }
+    });
     $('orr-light').onclick = (e) => { e.stopPropagation(); showLight(!lightOpen()); };
     document.addEventListener('click', (e) => {
       if (menuOpen() && !$('orr-menu').contains(e.target)) showMenu(false);
@@ -1524,6 +1535,8 @@ const Orrery = (function () {
     });
     $('orr-filter').addEventListener('input', () => renderList());
     $('orr-stations').onclick = () => setStations(!showPorts);
+    $('orr-tab-list').onclick = () => setSheet('list');
+    $('orr-tab-facts').onclick = () => setSheet('facts');
     $('orr-empty').addEventListener('click', (e) => {
       const b = e.target.closest('[data-sys]');
       if (b) go(b.dataset.sys);
@@ -1664,7 +1677,19 @@ const Orrery = (function () {
       /* The two site links live in the header when there is room for them and
          in here when there is not, so the menu carries them either way — a
          narrow window must not be a window with no way to the source. */
-      panel.querySelector('#orr-menu').innerHTML =
+      /* On a phone the header keeps only the system's name and this button, so
+         the two things that are about the system on screen fold in here —
+         first, because that is what they are for. */
+      const here = model && stacked() ? [
+        '<a role="menuitem" class="only-phone" target="_blank" rel="noopener" href="' +
+          esc('https://signals.canonn.tech/?system=' + encodeURIComponent(model.name)) +
+          '"><span>Open in Signals</span><em>every body</em></a>',
+        '<button role="menuitem" class="only-phone" data-act="copy">' +
+          '<span>Copy link to ' + esc(model.name) + '</span><em>this system</em></button>',
+        '<div class="orr-menu-r only-phone"></div>'
+      ].join('') : '';
+
+      panel.querySelector('#orr-menu').innerHTML = here +
         (TOOLS || []).map(([name, host, url]) =>
           '<a role="menuitem" href="' + esc(url) + '" target="_blank" rel="noopener">' +
           '<span>' + esc(name) + '</span><em>' + esc(host) + '</em></a>').join('') +
@@ -1691,10 +1716,18 @@ const Orrery = (function () {
     return Math.round(Math.max(160, Math.min(max, px)));
   }
 
+  /* The width goes into a custom property rather than onto the element.
+
+     An inline width beats every media query there is, so a rail dragged to
+     180px on a desktop stayed 180px on a phone — where the stylesheet says it
+     should be the full width of the screen — and the panel sat in the corner
+     with dead space beside it. As a property the stylesheet can still have
+     the last word about layouts where a dragged width means nothing. */
+  const stacked = () => window.matchMedia('(max-width: 820px)').matches;
+
   function setSide(which, px) {
-    const el = panel.querySelector('#orr-' + which);
     const w = clampSide(px, which);
-    el.style.width = w + 'px';
+    panel.style.setProperty('--' + which + '-w', w + 'px');
     keep(which + 'Width', w);
     resize();
     return w;
@@ -1759,6 +1792,10 @@ const Orrery = (function () {
     setSide('right', recallNum('rightWidth', 276));
     setSpine(recallNum('spineHeight', COMPACT));
     window.addEventListener('resize', () => {
+      /* Only where a dragged width is still what the rail is wearing. Stacked
+         under the model they are full-width by stylesheet, and reading that
+         back would record the whole screen as the reader's chosen size. */
+      if (stacked()) return resize();
       setSide('left', left.getBoundingClientRect().width);
       setSide('right', right.getBoundingClientRect().width);
     });
@@ -2477,6 +2514,17 @@ const Orrery = (function () {
     b.querySelector('b').textContent = on ? 'on' : 'off';
   }
 
+  /* Which rail the phone is showing. Meaningless on a wide screen, where both
+     are up at once and the tabs are not drawn. */
+  function setSheet(which) {
+    panel.classList.toggle('sheet-list', which === 'list');
+    panel.classList.toggle('sheet-facts', which !== 'list');
+    panel.querySelector('#orr-tab-list').setAttribute('aria-selected', which === 'list');
+    panel.querySelector('#orr-tab-facts').setAttribute('aria-selected', which !== 'list');
+    keep('sheet', which);
+    resize();
+  }
+
   function setStations(on) {
     showPorts = on;
     keep('stations', on ? '1' : '0');
@@ -2871,6 +2919,9 @@ const Orrery = (function () {
 
   function select(node, retarget) {
     selected = node;
+    /* On a phone the two rails take turns, and choosing a body from the list
+       means you want to read about it — so the sheet follows you over. */
+    if (stacked() && panel.classList.contains('sheet-list')) setSheet('facts');
     if (retarget !== false) focusOn(node);
     panel.querySelectorAll('.orr-row').forEach((el) => {
       el.classList.toggle('on', +el.dataset.id === node.id);
@@ -3635,6 +3686,7 @@ const Orrery = (function () {
     buildLabels();
     drawSpine();
     setStations(recallStr('stations', '1') === '1');
+    setSheet(recallStr('sheet', 'facts'));
     setOrbits(recallNum('orbits', 0));
     setSky(recallStr('sky', 'stars'));
     select(model.star);
