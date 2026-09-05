@@ -36,6 +36,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { surfaceSpec, bakeSurface, surfaceCanvas } from './orrery-surface.js';
+import { NEBULA_GLSL, SkyBackdrop } from './orrery-sky.js';
 
 /* ── constants ──────────────────────────────────────────────────────────── */
 
@@ -326,24 +327,11 @@ const NEBULA_FRAG = [
   'uniform float uBand;',       // 0 free-form, 1 pinned to the galactic plane
   'uniform float uGlow;',       // how bright the core sits, 0 when there is no core
   'varying vec2 vUv;',
-
-  'float hash(vec3 p) {',
-  '  return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453123);',
-  '}',
-  'float vnoise(vec3 p) {',
-  '  vec3 i = floor(p), f = fract(p);',
-  '  f = f * f * (3.0 - 2.0 * f);',
-  '  return mix(mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x),',
-  '                 mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),',
-  '             mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),',
-  '                 mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z);',
-  '}',
-  'float fbm(vec3 p) {',
-  '  float v = 0.0, a = 0.5;',
-  '  for (int i = 0; i < 5; i++) { v += a * vnoise(p); p *= 2.07; a *= 0.5; }',
-  '  return v;',
-  '}',
-
+  /* The nebula itself lives in orrery-sky.js and is the same source the live
+     backdrop compiles, which is the whole point: this image is what the
+     black-hole lens bends and what the 2D view stands against, and it has to
+     be the same sky the 3D view is drawing. */
+  NEBULA_GLSL,
   'void main() {',
   /* The image's own axes back to a direction, in exactly the convention
      three's equirectangular background reads it in — u around from +X
@@ -352,57 +340,7 @@ const NEBULA_FRAG = [
   '  float lat = (vUv.y - 0.5) * 3.1415927;',
   '  float lon = (vUv.x - 0.5) * 6.2831853;',
   '  vec3 dir = vec3(cos(lat) * cos(lon), sin(lat), cos(lat) * sin(lon));',
-
-  '  vec3 p = dir * 2.3 + uSeed;',
-  '  float cold = fbm(p);',
-  '  float warm = fbm(p * 1.7 + vec3(31.4, 7.2, 19.8));',
-  '  float fine = fbm(p * 4.3 - vec3(5.1, 2.7, 8.3));',
-  '  float dust = fbm(p * 6.7 + vec3(17.0, 41.0, 3.0));',
-
-  /* Pinned to the plane, or not. The galactic sky puts its material where the
-     disc is; the generic one lets the noise decide, which is the whole
-     difference between the two. */
-  '  float band = mix(1.0, exp(-dir.y * dir.y * 14.0), uBand);',
-
-  /* High thresholds and a power on top, because the point is a sky with
-     some nebulosity in it rather than a sky made of nebula. Below about a
-     quarter coverage it reads as a place; above that it reads as a filter
-     laid over the page. */
-  '  float c = pow(smoothstep(0.53, 0.84, cold) * band, 1.5);',
-  '  float wv = pow(smoothstep(0.60, 0.88, warm) * band, 1.7);',
-
-  /* Folded noise, which is what turns a cloud into a nebula. Plain fBm makes
-     soft blobs because its extremes are rare and its middle is everywhere;
-     folding it about its midpoint turns every crossing of that midpoint into
-     a bright edge, and a field of those reads as filaments. */
-  '  float ridge = 1.0 - abs(fine * 2.0 - 1.0);',
-  '  float wisp = 0.22 + pow(ridge, 2.6) * 2.1;',
-
-  /* Everything here is linear light and the render target encodes it, so
-     these numbers are far smaller than the ones they come out as. This is a
-     backdrop for reading a data panel against: the brightest cloud core lands
-     around a quarter of white, and most of the sky is nearly black. */
-  '  vec3 col = vec3(0.0012, 0.0016, 0.0030);',          // deep space is not black
-  '  col += vec3(0.006, 0.013, 0.030) * c * wisp;',
-  '  col += vec3(0.020, 0.008, 0.004) * wv * wisp;',
-
-  /* The bulge, where the bulge actually is — and kept tight. Great
-     Annihilator sits three thousand light years off the core, so a broad
-     falloff there covers most of the sky and turns the whole view brown.
-
-     Broken up by the same noise the clouds are made of, and added before the
-     dust rather than after it. A smooth gradient laid over the top is a
-     brown filter over the page; the same light with star clouds in it and
-     the dust lanes cut through it is the band everyone has looked up at. */
-  '  float toCore = max(dot(dir, uCore), 0.0);',
-  '  float clumps = 0.45 + 0.9 * fbm(dir * 5.2 - uSeed);',
-  '  col += vec3(0.030, 0.022, 0.013) * uGlow * pow(toCore, 9.0) * clumps;',
-  '  col += vec3(0.005, 0.0038, 0.0026) * uGlow * pow(toCore, 5.0) * band * clumps;',
-
-  // Dust in front of all of it, not mixed into any of it.
-  '  col *= mix(1.0, 0.25, smoothstep(0.48, 0.84, dust) * band);',
-
-  '  gl_FragColor = vec4(col, 1.0);',
+  '  gl_FragColor = vec4(nebula(dir, uSeed, uCore, uBand, uGlow), 1.0);',
   '}'
 ].join('\n');
 
@@ -644,6 +582,27 @@ const STARS_SCREEN_VERT = [
   '  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
   '  gl_Position = projectionMatrix * mv;',
   '  gl_PointSize = mag * uPx;',
+  '  #include <logdepthbuf_vertex>',
+  '}'
+].join('\n');
+
+/* The bright few, drawn again wide and faint: the soft halo a bright star
+   has in any photograph, and the thing that separates Sirius from a pixel.
+   Everything under the threshold is discarded in the vertex stage by being
+   given no size at all. */
+const STARS_HALO_VERT = [
+  'attribute float mag;',
+  'attribute vec3 tint;',
+  'uniform float uPx;',
+  'varying vec3 vTint;',
+  '#include <common>',
+  '#include <logdepthbuf_pars_vertex>',
+  'void main() {',
+  '  float bright = smoothstep(2.9, 3.6, mag);',
+  '  vTint = tint * bright * 0.16;',
+  '  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
+  '  gl_Position = projectionMatrix * mv;',
+  '  gl_PointSize = bright > 0.0 ? mag * uPx * 7.0 : 0.0;',
   '  #include <logdepthbuf_vertex>',
   '}'
 ].join('\n');
@@ -1375,6 +1334,19 @@ const Orrery = (function () {
   let skyMode = 'none', sky = null;                        // none | galaxy | stars
   // The same sky as a picture, for any black hole in the system to bend.
   let lensSky = null, lenses = [];
+  let backdrop = null, halo = null;
+  let skySlow = 0;
+
+  /* A machine that cannot evaluate the sky in the time a frame has falls back
+     to the baked picture rather than dragging at seven frames a second. Ten
+     slow passes in a row is a verdict; one is a stall. */
+  function skyCost(ms) {
+    skySlow = ms > 40 ? skySlow + 1 : 0;
+    if (skySlow < 10 || !backdrop) return;
+    scene.remove(backdrop.mesh); backdrop.dispose(); backdrop = null;
+    SURF.low = true;
+    skyForMode();
+  }
   let composer = null, bloomPass = null, bloomPct = 18;
   let ambient = null, ambientPct = 30, glowPct = 60;
 
@@ -2918,6 +2890,7 @@ const Orrery = (function () {
     cam2.left = -half * aspect; cam2.right = half * aspect;
     cam2.top = half; cam2.bottom = -half;
     cam2.updateProjectionMatrix();
+    if (backdrop) backdrop.resize(w, h);
     if (composer) {
       composer.setSize(w, h);
       composer.setPixelRatio(renderer.getPixelRatio());
@@ -2999,11 +2972,15 @@ const Orrery = (function () {
      flat across the whole frame, which is the honest sky for a view that has
      no direction. The point stars are directions and stay with 3D. */
   function skyForMode() {
+    const live = !!(backdrop && mode3d);
     if (lensSky) {
       lensSky.texture.mapping = mode3d
         ? THREE.EquirectangularReflectionMapping : THREE.UVMapping;
+      scene.background = live ? null : lensSky.texture;
     }
+    if (backdrop) backdrop.mesh.visible = live;
     if (sky) sky.visible = mode3d;
+    if (halo) halo.visible = mode3d;
     invalidate();
   }
 
@@ -3224,6 +3201,8 @@ const Orrery = (function () {
       sky = null;
     }
     if (lensSky) { lensSky.dispose(); lensSky = null; }
+    if (halo) { scene.remove(halo); halo.material.dispose(); halo = null; }
+    if (backdrop) { scene.remove(backdrop.mesh); backdrop.dispose(); backdrop = null; }
     scene.background = null;
 
     if (skyMode === 'none' || !model) { syncLenses(); return; }
@@ -3252,8 +3231,32 @@ const Orrery = (function () {
     sky.renderOrder = -1;
     scene.add(sky);
 
+    /* The bright few again, wide and faint, over the crisp points. */
+    halo = new THREE.Points(geo, new THREE.ShaderMaterial({
+      uniforms: { uPx: { value: renderer.getPixelRatio() } },
+      vertexShader: STARS_HALO_VERT, fragmentShader: STARS_FRAG,
+      blending: THREE.AdditiveBlending, depthWrite: false, transparent: true
+    }));
+    halo.frustumCulled = false;
+    halo.renderOrder = -1;
+    scene.add(halo);
+
     lensSky = bakeSky(coords, skyMode, geo);
-    scene.background = lensSky.texture;
+
+    /* Where the device can carry it, the backdrop is drawn live — every
+       screen pixel evaluating the nebula for its own direction, with no
+       texel in between — and the baked image is kept for the lens and for
+       the 2D view. Where it cannot, the baked image is the backdrop. */
+    if (!SURF.low) {
+      backdrop = new SkyBackdrop();
+      backdrop.resize(canvas.clientWidth, canvas.clientHeight);
+      const core = new THREE.Vector3(
+        CORE.x - coords.x, CORE.y - coords.y, -(CORE.z - coords.z)).normalize();
+      backdrop.set(new THREE.Vector3(
+        (coords.x % 512) * 0.031, (coords.y % 512) * 0.037, (coords.z % 512) * 0.029),
+        core, skyMode === 'galaxy' ? 1 : 0, skyMode === 'galaxy' ? 1 : 0);
+      scene.add(backdrop.mesh);
+    }
     syncLenses();
     skyForMode();
   }
@@ -3424,6 +3427,12 @@ const Orrery = (function () {
       const cam = mode3d ? cam3 : cam2;
       sky.position.copy(cam.position);
       sky.scale.setScalar(Math.max(cam3.far * 0.35, ORBIT_OUT * 4));
+      if (halo) { halo.position.copy(sky.position); halo.scale.copy(sky.scale); }
+    }
+    if (backdrop && backdrop.mesh.visible) {
+      cam3.updateMatrixWorld();
+      const t0 = performance.now();
+      if (backdrop.update(renderer, cam3)) skyCost(performance.now() - t0);
     }
 
     controls.update();
@@ -3476,12 +3485,12 @@ const Orrery = (function () {
      Every body gets a base bake it can be looked at from across the system;
      the one filling the view gets a sharp one. A phone, or anything that
      says it is short of memory, gets half each way. */
-  const SURF = { baseW: 512, baseH: 256, hiW: 2048, hiH: 1024 };
+  const SURF = { baseW: 512, baseH: 256, hiW: 2048, hiH: 1024, low: false };
   function surfaceTier() {
     const low = window.matchMedia('(hover: none)').matches
       || (navigator.deviceMemory && navigator.deviceMemory < 4)
       || renderer.capabilities.maxTextureSize < 4096;
-    if (low) Object.assign(SURF, { baseW: 256, baseH: 128, hiW: 1024, hiH: 512 });
+    if (low) Object.assign(SURF, { baseW: 256, baseH: 128, hiW: 1024, hiH: 512, low: true });
   }
 
   /* The sharp surface follows whichever body is largest on screen.
@@ -3491,7 +3500,7 @@ const Orrery = (function () {
      and a few milliseconds. Decided four times a second rather than every
      frame, and only handed on when another body is clearly bigger, so
      zooming past two moons does not bake them both twice. */
-  let sharpAt = 0, sharpOn = null;
+  let sharpAt = 0, sharpOn = null, bakes = 0;
 
   function screenRadius(m, cam) {
     if (!cam.isPerspectiveCamera) {
@@ -3520,8 +3529,13 @@ const Orrery = (function () {
        texels, and a body merely zoomed past is worth painting. */
     let want = chosen && chosenPx > 10 ? chosen : (bestPx > 40 ? best : null);
     if (want === sharpOn) return;
-    // Hand the largest-disc case on only when the newcomer is clearly bigger.
+    /* Hysteresis, both ways. Hand the largest-disc case on only when the
+       newcomer is clearly bigger; and keep a holder that has merely drifted a
+       little under the threshold. Without this a body sitting at forty pixels
+       baked two thousand across, dropped it, and baked it again four times a
+       second — a stall the whole frame waited on, at seven frames a second. */
     if (want !== chosen && sharpOn && holderPx > 28 && bestPx < holderPx * 1.25) return;
+    if (want === null && sharpOn && holderPx > 25) return;
     if (sharpOn) {
       sharpOn.mat.map = sharpOn.surface.base.albedo;
       sharpOn.mat.normalMap = sharpOn.surface.base.normal;
@@ -3531,6 +3545,7 @@ const Orrery = (function () {
     }
     if (want) {
       want.surface.hi = bakeSurface(renderer, want.surface.spec, SURF.hiW, SURF.hiH);
+      bakes++;
       want.mat.map = want.surface.hi.albedo;
       want.mat.normalMap = want.surface.hi.normal;
       want.mat.needsUpdate = true;
@@ -4759,7 +4774,13 @@ const Orrery = (function () {
         isBackdrop: !!(lensSky && scene.background === lensSky.texture),
         // Laid flat for the 2D view, or wrapped round the 3D one.
         flat: !!(lensSky && lensSky.texture.mapping === THREE.UVMapping),
-        visible: !!(sky && sky.visible)
+        visible: !!(sky && sky.visible),
+        // Drawn live per pixel, or standing against the baked picture.
+        live: !!(backdrop && backdrop.mesh.visible),
+        // How many times the live sky has actually been evaluated: a still
+        // camera watching the orbits run should not move this at all.
+        passes: backdrop ? backdrop.passes : 0,
+        halos: !!(halo && halo.visible)
       },
       /* Every black hole, in the terms its shader works in: the horizon it
          was given, the shadow that horizon draws, how far out the lens runs,
@@ -4800,6 +4821,8 @@ const Orrery = (function () {
       /* Which body wears the sharp surface, and what every body's surface
          measures — the two facts the level-of-detail is made of. */
       sharp: sharpOn ? sharpOn.node.name : null,
+      // How many hi-res bakes have happened: a still view should not move this.
+      bakes,
       surfaces: meshes.filter((m) => m.surface).map((m) => ({
         name: m.node.name, base: m.surface.base.width, px: Math.round(m.px || 0),
         hi: m.surface.hi ? m.surface.hi.width : 0,
@@ -4936,7 +4959,35 @@ const Orrery = (function () {
     });
   }
 
-  return { open, close, isOpen, page, state, faces, pixels, air, shade };
+  /* The live backdrop and the baked image, at the same directions.
+
+     The rule is that the lens can never show a sky the reader is not looking
+     at, and with two renderers of one function the only way to know it holds
+     is to look: several screen points, the direction each one looks in, the
+     baked texel that direction lands on, and the pixel the live sky drew
+     there. Points in the corners, away from the bodies. */
+  function skyAgreement() {
+    if (!lensSky || !backdrop || !mode3d) return null;
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    const spots = [[0.06, 0.08], [0.94, 0.08], [0.06, 0.92], [0.94, 0.92], [0.5, 0.06]];
+    const bakedBuf = new Uint8Array(4);
+    const out = [];
+    cam3.updateMatrixWorld();
+    spots.forEach(([fx, fy]) => {
+      const x = Math.round(fx * w), y = Math.round(fy * h);
+      const live = pixels(x, y, 1, 1).data;
+      const dir = new THREE.Vector3(fx * 2 - 1, 1 - fy * 2, 1).unproject(cam3)
+        .sub(cam3.position).normalize();
+      const u = Math.atan2(dir.z, dir.x) / (2 * Math.PI) + 0.5;
+      const v = Math.asin(Math.max(-1, Math.min(1, dir.y))) / Math.PI + 0.5;
+      renderer.readRenderTargetPixels(lensSky,
+        Math.floor(u * lensSky.width) % lensSky.width, Math.floor(v * lensSky.height), 1, 1, bakedBuf);
+      out.push({ live: [live[0], live[1], live[2]], baked: [bakedBuf[0], bakedBuf[1], bakedBuf[2]] });
+    });
+    return out;
+  }
+
+  return { open, close, isOpen, page, state, faces, pixels, air, shade, skyAgreement };
 })();
 
 window.Orrery = Orrery;

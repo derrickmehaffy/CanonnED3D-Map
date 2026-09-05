@@ -2776,7 +2776,9 @@ test('deep space is what you get without asking', async ({ page }) => {
      nebula's finest structure is about two degrees and anything smaller
      than this throws that away before it is ever drawn. */
   expect(sky.baked).toBe(4096);
-  expect(sky.isBackdrop).toBe(true);
+  // In use — as the backdrop itself, or behind a live sky drawn from the
+  // same function, which the "one image" test checks by looking.
+  expect(sky.isBackdrop || sky.live).toBe(true);
 });
 
 /* Clouds are the difference between a sky and a handful of dots. They are
@@ -2876,6 +2878,22 @@ test('the lens and the backdrop are one image', async ({ page }) => {
   await page.waitForTimeout(1200);
 
   const one = await page.evaluate(() => window.Orrery.state());
-  expect(one.sky.isBackdrop, 'the image is the backdrop').toBe(true);
-  expect(one.holes[0].sameAsSky, 'and the lens is bending that image').toBe(true);
+  expect(one.holes[0].sameAsSky, 'the lens is bending the baked image').toBe(true);
+
+  /* The backdrop is either that same image, or — on a machine that can carry
+     it — the same function drawn live for every pixel. Either way the rule
+     holds: the lens never shows a sky the reader is not looking at. For the
+     live case that is a claim about two renderers of one function, and the
+     only way to know it is to look: five screen points in the corners, the
+     direction each looks in, the baked texel there, and the live pixel. A
+     point star can land on a probe, so four of five agreeing is agreement. */
+  if (one.sky.live) {
+    const probes = await page.evaluate(() => window.Orrery.skyAgreement());
+    const diffs = probes.map((p) => Math.max(
+      Math.abs(p.live[0] - p.baked[0]), Math.abs(p.live[1] - p.baked[1]), Math.abs(p.live[2] - p.baked[2])))
+      .sort((a, b) => a - b);
+    expect(diffs[3], 'live sky and baked sky agree — ' + JSON.stringify(probes)).toBeLessThanOrEqual(6);
+  } else {
+    expect(one.sky.isBackdrop, 'the image is the backdrop').toBe(true);
+  }
 });
