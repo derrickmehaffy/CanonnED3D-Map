@@ -333,18 +333,21 @@
       { n: "T-Type Anomaly", u: "codex.html?hud_category=Anomaly&sub_class=T-Type Anomaly" }
     ]}
   ];
-  var TOOLS = [
-    ['Signals', 'signals.canonn.tech', 'https://signals.canonn.tech/'],
-    ['Bioforge', 'bioforge.canonn.tech', 'https://bioforge.canonn.tech/'],
-    ['Bifrost — Guardian ruins', 'ruins.canonn.tech', 'https://ruins.canonn.tech/'],
-    ['Thargoid Link Decoder', 'tools.canonn.tech', 'https://tools.canonn.tech/linkdecoder/'],
-    ['Thargoid Glyph Tool', 'tools.canonn.tech', 'https://tools.canonn.tech/thargoid_glyphs/'],
-    ['Codex Regions', 'canonn-science.github.io', 'https://canonn-science.github.io/Codex-Regions/'],
-    ['Undiscovered Codex', 'canonn-science.github.io', 'https://canonn-science.github.io/undiscovered-codex/'],
-    ['Abandoned Settlements', 'canonn-science.github.io', 'https://canonn-science.github.io/abandonned/'],
-    ['Neutron Star Plots', 'canonn-science.github.io', 'https://canonn-science.github.io/Canonn-Plots/neutron_stars_plots.html'],
-    ['EDMC-Canonn plugin', 'github.com', 'https://github.com/canonn-science/EDMC-Canonn/releases/latest']
-  ];
+  /* The tools this map links out to, from data/canonn-tools.json — the same
+     file the orrery's Tools menu reads, so a tool added there is added in
+     both places rather than in one and forgotten in the other.
+
+     Fetched rather than inlined, which means the palette can open before the
+     list arrives; renderPal() is idempotent, so the answer is to draw it
+     again when it does. The list is a few hundred bytes and cached. */
+  var TOOLS = [];
+  fetch('data/canonn-tools.json')
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (j) {
+      TOOLS = (j && j.tools) || [];
+      if (TOOLS.length && $('scrim') && $('scrim').classList.contains('open')) renderPal();
+    })
+    .catch(function () { TOOLS = []; });
 
   /* Per-map configuration. `panel` is what makes each map's layer rail its own
      thing — the point of the exercise. */

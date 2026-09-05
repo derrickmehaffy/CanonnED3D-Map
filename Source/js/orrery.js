@@ -1233,6 +1233,7 @@ const Orrery = (function () {
   let rateLo = 0, rateHi = LADDER.length - 1;
   const ORBIT_LABEL = ['all', 'planets only', 'none'];
   let standalone = false;
+  let coreNote = '';
   let galaxyWasVisible = null;
   const cache = new Map();
   const tmp = new THREE.Vector3();
@@ -1302,9 +1303,27 @@ const Orrery = (function () {
       '    <div class="orr-res" id="orr-res" role="listbox"></div>',
       '  </div>',
       '  <div class="orr-title"><b id="orr-name"></b><span id="orr-sub"></span></div>',
-      '  <button class="orr-tb" id="orr-link" title="Copy a link straight to this system">Copy link</button>',
+
+      /* The same three ways out the map's own header carries, because a
+         reader who came here from the map should not lose them by arriving,
+         and one who came straight to the page never had them. In front of
+         them, the two that are about the system on screen rather than about
+         Canonn. */
+      '  <a class="orr-tb sys" id="orr-signals" target="_blank" rel="noopener"',
+      '     title="This system in Signals, which knows every body Canonn has a record of">Signals <span>&#8599;</span></a>',
+      '  <button class="orr-tb sys" id="orr-link" title="Copy a link straight to this system">Copy link</button>',
+      '  <div class="orr-rail">',
+      '    <button class="orr-tb" id="orr-tools" aria-haspopup="true" aria-expanded="false"',
+      '            title="Canonn tools">&#8862; Tools</button>',
+      '    <a class="orr-tb wide" href="https://github.com/canonn-science/CanonnED3D-Map"',
+      '       target="_blank" rel="noopener" title="Source on GitHub">GitHub</a>',
+      '    <a class="orr-tb wide donate" href="https://canonn.science/donate/"',
+      '       target="_blank" rel="noopener" title="Support Canonn">Donate</a>',
+      '  </div>',
       '  <button class="orr-x" id="orr-close" aria-label="Close">&times;</button>',
+      '  <div class="orr-menu" id="orr-menu" role="menu" aria-labelledby="orr-tools"></div>',
       '</div>',
+
 
       // The spine: every body on a log axis of its distance from where you
       // drop in. The orbit view shows AU from each parent, which is a
@@ -1324,47 +1343,48 @@ const Orrery = (function () {
       '  </aside>',
       '  <div class="orr-stage"><canvas id="orr-canvas"></canvas>',
       '    <div class="orr-labels" id="orr-labels"></div>',
-      '    <div class="orr-msg" id="orr-msg">Reading the system dump&#8230;</div>',
-      '    <button class="orr-vbtn" id="orr-vopen" aria-expanded="false"',
-      '            aria-controls="orr-drawer">View</button>',
-      '    <div class="orr-drawer" id="orr-drawer" role="group" aria-label="View">',
-      '      <div class="orr-d-h">View<button id="orr-vclose" aria-label="Close">&times;</button></div>',
-      '      <div class="orr-d-s">',
-      '        <h4>Projection</h4>',
-      '        <div class="orr-seg">',
-      '          <button id="orr-3d" class="on" aria-pressed="true">3D</button>',
-      '          <button id="orr-2d" aria-pressed="false">2D</button>',
+      /* ── how it is drawn ──────────────────────────────────────────────────
+         On the map, over the thing they change. These lived behind a View
+         button in a panel that floated here, which meant remembering the
+         button existed, opening it, changing one thing and closing it again.
+         They are a strip now: no opening, and everything they do is
+         happening directly underneath them. */
+      '    <div class="orr-hud" id="orr-hud">',
+      '      <div class="orr-seg" role="group" aria-label="Projection">',
+      '        <button id="orr-3d" class="on" aria-pressed="true">3D</button>',
+      '        <button id="orr-2d" aria-pressed="false">2D</button>',
+      '      </div>',
+      '      <div class="orr-seg" role="group" aria-label="Scale">',
+      '        <button id="orr-spread" class="on" aria-pressed="true"',
+      '                title="Orbits spread on a log scale, so the whole system is legible at once">Spread</button>',
+      '        <button id="orr-true" aria-pressed="false"',
+      '                title="Orbits and bodies both to scale. Pick a body to fly to it — at this scale nothing is visible from across the system">True scale</button>',
+      '      </div>',
+      '      <span class="orr-hud-r"></span>',
+      '      <button class="orr-opt" id="orr-orbits"><span>Orbits</span><b>all</b></button>',
+      '      <button class="orr-opt on" id="orr-labl"><span>Names</span><b>on</b></button>',
+      '      <button class="orr-opt on" id="orr-follow"><span>Follow</span><b>on</b></button>',
+      '      <button class="orr-opt" id="orr-sky"><span>Sky</span><b></b></button>',
+      '      <span class="orr-hud-r"></span>',
+
+      /* Not everything belongs on the bar. How bright the ambient light is
+         and how far a star's glow reaches are set once, to taste, and then
+         left alone for the rest of the session — they are settings, not
+         controls, and putting them in the same row as the six things a reader
+         changes while reading makes all eight harder to find. So these two
+         keep a box of their own. */
+      '      <div class="orr-pop-w">',
+      '        <button class="orr-tb" id="orr-light" aria-haspopup="true" aria-expanded="false">Light</button>',
+      '        <div class="orr-pop" id="orr-light-p" role="group" aria-label="Light">',
+      '          <label class="orr-sl"><span>Ambient</span>',
+      '            <input id="orr-amb" type="range" min="0" max="100" value="30"></label>',
+      '          <label class="orr-sl"><span>Star glow</span>',
+      '            <input id="orr-glow" type="range" min="0" max="100" value="60"></label>',
       '        </div>',
       '      </div>',
-      '      <div class="orr-d-s">',
-      '        <h4>Scale</h4>',
-      '        <div class="orr-seg">',
-      '          <button id="orr-spread" class="on" title="Orbits spread on a log scale, so the whole system is legible at once">Spread</button>',
-      '          <button id="orr-true" title="Orbits and bodies both to scale. Pick a body to fly to it — at this scale nothing is visible from across the system">True scale</button>',
-      '        </div>',
-      '      </div>',
-      '      <div class="orr-d-s">',
-      '        <h4>Show</h4>',
-      '        <button class="orr-opt" id="orr-orbits"><span>Orbit paths</span><b>all</b></button>',
-      '        <button class="orr-opt on" id="orr-labl"><span>Names</span><b>on</b></button>',
-      '        <button class="orr-opt on" id="orr-follow"><span>Follow selection</span><b>on</b></button>',
-      '      </div>',
-      '      <div class="orr-d-s">',
-      '        <h4>Sky</h4>',
-      '        <button class="orr-opt on" id="orr-sky-stars"><span>Deep space</span><b></b></button>',
-      '        <button class="orr-opt" id="orr-sky-galaxy"><span>Galactic</span><b></b></button>',
-      '        <div class="orr-note" id="orr-corebear"></div>',
-      '        <button class="orr-opt" id="orr-sky-none"><span>Empty</span><b></b></button>',
-      '      </div>',
-      '      <div class="orr-d-s">',
-      '        <h4>Light</h4>',
-      '        <label class="orr-sl"><span>Ambient</span>',
-      '          <input id="orr-amb" type="range" min="0" max="100" value="30"></label>',
-      '        <label class="orr-sl"><span>Star glow</span>',
-      '          <input id="orr-glow" type="range" min="0" max="100" value="60"></label>',
-      '      </div>',
-      '      <button class="orr-d-reset" id="orr-reset">Frame the whole system</button>',
+      '      <button class="orr-tb" id="orr-reset">Frame the system</button>',
       '    </div>',
+      '    <div class="orr-msg" id="orr-msg">Reading the system dump&#8230;</div>',
       '    <div class="orr-legend" id="orr-legend"></div>',
       '  </div>',
       '    <div class="orr-grip orr-grip-l" id="orr-grip-l" role="separator"',
@@ -1415,17 +1435,21 @@ const Orrery = (function () {
     $('orr-spread').onclick = () => setScale(false);
     $('orr-true').onclick = () => setScale(true);
     $('orr-labl').onclick = () => setLabels(!showLabels);
-    $('orr-vopen').onclick = () => openDrawer(!panel.classList.contains('view-open'));
-    $('orr-vclose').onclick = () => openDrawer(false);
-    ['stars', 'galaxy', 'none'].forEach((m) => {
-      $('orr-sky-' + m).onclick = () => setSky(m);
-    });
+    // Three states, so it says which one it is in and steps to the next.
+    $('orr-sky').onclick = () =>
+      setSky(SKIES[(SKIES.findIndex((k) => k[0] === skyMode) + 1) % SKIES.length][0]);
     $('orr-amb').addEventListener('input', (e) => setAmbient(+e.target.value));
     $('orr-glow').addEventListener('input', (e) => setGlow(+e.target.value));
     $('orr-follow').onclick = () => setFollow(!following);
     $('orr-reset').onclick = () => { if (model) { frame(); select(model.star, false); } };
     $('orr-orbits').onclick = () => setOrbits((orbitMode + 1) % 3);
     $('orr-link').onclick = copyLink;
+    $('orr-tools').onclick = (e) => { e.stopPropagation(); showMenu(!menuOpen()); };
+    $('orr-light').onclick = (e) => { e.stopPropagation(); showLight(!lightOpen()); };
+    document.addEventListener('click', (e) => {
+      if (menuOpen() && !$('orr-menu').contains(e.target)) showMenu(false);
+      if (lightOpen() && !$('orr-light-p').contains(e.target)) showLight(false);
+    });
     $('orr-filter').addEventListener('input', () => renderList());
     $('orr-empty').addEventListener('click', (e) => {
       const b = e.target.closest('[data-sys]');
@@ -1438,6 +1462,56 @@ const Orrery = (function () {
     window.addEventListener('resize', () => { resize(); drawSpine(); });
     canvas.addEventListener('pointerdown', onPick);
     initGL();
+  }
+
+  /* ── the tools menu ───────────────────────────────────────────────────────
+     Canonn is a dozen tools and the map links out to a handful of them; the
+     orrery linked to none, so arriving here was a way of leaving the rest of
+     Canonn behind. The list is data/canonn-tools.json, which the console's
+     command palette reads as well — one list, so a tool added anywhere is
+     added everywhere. Fetched on the first open rather than on load: a reader
+     who never opens the menu never pays for it. */
+
+  let TOOLS = null, toolsAsked = null;
+
+  function toolList() {
+    if (!toolsAsked) {
+      toolsAsked = fetch('data/canonn-tools.json')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => { TOOLS = (j && j.tools) || []; })
+        .catch(() => { TOOLS = []; });
+    }
+    return toolsAsked;
+  }
+
+  const menuOpen = () => !!(panel && panel.classList.contains('menu-open'));
+  const lightOpen = () => !!(panel && panel.classList.contains('light-open'));
+
+  function showLight(on) {
+    panel.classList.toggle('light-open', !!on);
+    panel.querySelector('#orr-light').setAttribute('aria-expanded', on ? 'true' : 'false');
+  }
+
+  function showMenu(on) {
+    panel.classList.toggle('menu-open', !!on);
+    panel.querySelector('#orr-tools').setAttribute('aria-expanded', on ? 'true' : 'false');
+    if (!on) return;
+    toolList().then(() => {
+      if (!menuOpen()) return;
+      /* The two site links live in the header when there is room for them and
+         in here when there is not, so the menu carries them either way — a
+         narrow window must not be a window with no way to the source. */
+      panel.querySelector('#orr-menu').innerHTML =
+        (TOOLS || []).map(([name, host, url]) =>
+          '<a role="menuitem" href="' + esc(url) + '" target="_blank" rel="noopener">' +
+          '<span>' + esc(name) + '</span><em>' + esc(host) + '</em></a>').join('') +
+        '<div class="orr-menu-r"></div>' +
+        '<a role="menuitem" class="only-narrow" href="https://github.com/canonn-science/CanonnED3D-Map"' +
+        ' target="_blank" rel="noopener"><span>GitHub</span><em>the source</em></a>' +
+        '<a role="menuitem" class="only-narrow" href="https://canonn.science/donate/"' +
+        ' target="_blank" rel="noopener"><span>Donate</span><em>support Canonn</em></a>' +
+        '<a role="menuitem" href="index.html"><span>All Canonn maps</span><em>this site</em></a>';
+    });
   }
 
   /* ── resizing ─────────────────────────────────────────────────────────────
@@ -1695,12 +1769,11 @@ const Orrery = (function () {
     if (!isOpen()) return;
     if (e.key === 'Escape') {
       e.preventDefault();
-      if (panel.classList.contains('view-open')) openDrawer(false); else close();
+      if (menuOpen()) showMenu(false);
+      else if (lightOpen()) showLight(false);
+      else close();
     }
     else if (e.key === ' ') { e.preventDefault(); setPlaying(!playing); }
-    else if (e.key === 'v' || e.key === 'V') {
-      openDrawer(!panel.classList.contains('view-open'));
-    }
     else if (e.key === ',') setRate(rateIx - 1);
     else if (e.key === '.') setRate(rateIx + 1);
   }
@@ -2109,11 +2182,6 @@ const Orrery = (function () {
     });
   }
 
-  function openDrawer(on) {
-    panel.classList.toggle('view-open', on);
-    panel.querySelector('#orr-vopen').setAttribute('aria-expanded', String(on));
-    panel.querySelector('#orr-vopen').classList.toggle('on', on);
-  }
 
   function setAmbient(pct) {
     ambientPct = pct;
@@ -2135,17 +2203,27 @@ const Orrery = (function () {
     });
   }
 
+  /* Three skies, in the order the button steps through them. Deep space is
+     first because it is the default and the one most systems are read
+     against. */
+  const SKIES = [
+    ['stars', 'Deep space'],
+    ['galaxy', 'Galactic'],
+    ['none', 'Empty']
+  ];
+
   function setSky(mode) {
+    if (!SKIES.some((k) => k[0] === mode)) mode = 'stars';
     skyMode = mode;
     keep('sky', mode);
-    // These are a choice of one, and the Show rows above state their value in
-    // words rather than in colour; the sky rows do the same so the drawer
-    // reads consistently and does not lean on colour alone.
-    ['stars', 'galaxy', 'none'].forEach((m) => {
-      const el = panel.querySelector('#orr-sky-' + m);
-      el.classList.toggle('on', m === mode);
-      el.querySelector('b').textContent = m === mode ? 'shown' : '';
-    });
+    const el = panel.querySelector('#orr-sky');
+    el.classList.toggle('on', mode !== 'none');
+    el.querySelector('b').textContent = SKIES.filter((k) => k[0] === mode)[0][1];
+    /* The one fact this control can tell a reader that nothing else here
+       does: where the galaxy's heart is from this system. It was a line of
+       prose in the drawer; on a bar it is what the button says when you rest
+       on it, which is also where a reader looks for the other two options. */
+    el.title = 'Deep space, Galactic or Empty' + (coreNote ? ' — ' + coreNote : '');
     buildSky();
   }
 
@@ -2706,8 +2784,8 @@ const Orrery = (function () {
      the strongest reason there is. */
   function finds(title, rows, kind) {
     if (!rows.length) return '';
-    return '<div class="orr-finds"><h4>' + title + '</h4>' + rows.map((r) =>
-      '<div class="orr-find' + (r.dim ? ' dim' : '') + '">' +
+    return '<div class="orr-sigs"><h4>' + title + '</h4>' + rows.map((r) =>
+      '<div class="orr-sig' + (r.dim ? ' dim' : '') + '">' +
       '<i class="' + kind + '"></i><span>' + esc(r.name) + '</span>' +
       (r.note ? '<em>' + esc(r.note) + '</em>' : '') + '</div>').join('') + '</div>';
   }
@@ -3051,14 +3129,19 @@ const Orrery = (function () {
 
     limitRates();
 
-    /* What the reader last chose, and the one fact the sky control can tell
-       them that nothing else here does: how far the galaxy's heart is from
-       this system, and how far off its plane they are sitting. */
+    /* How far the galaxy's heart is from this system, and how far off its
+       plane it sits. The sky control carries it, because that is the control
+       the fact is about. */
     const bear = coreBearing((model.sys && model.sys.coords) || { x: 0, y: 0, z: 0 });
-    panel.querySelector('#orr-corebear').textContent =
-      'Sagittarius A* is ' + bear.ly.toLocaleString() + ' ly away, ' +
-      Math.abs(bear.tilt).toFixed(1) + '° ' + (bear.tilt >= 0 ? 'below' : 'above') +
-      ' the plane. Modelled, not catalogued.';
+    coreNote = bear.ly < 1
+      ? 'this is the galactic core'
+      : 'Sagittarius A* is ' + bear.ly.toLocaleString() + ' ly away, ' +
+        Math.abs(bear.tilt).toFixed(1) + '° ' + (bear.tilt >= 0 ? 'below' : 'above') +
+        ' the plane (modelled, not catalogued)';
+
+    // Everything out of here goes to the system, so it needs the system.
+    panel.querySelector('#orr-signals').href =
+      'https://signals.canonn.tech/?system=' + encodeURIComponent(model.name);
 
     setAmbient(recallNum('ambient', 30));
     setGlow(recallNum('glow', 60));

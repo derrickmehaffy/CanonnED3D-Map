@@ -1,0 +1,15 @@
+{
+  "_comment": "The Canonn tools the maps link out to. One list, read by both js/console.js (the command palette's Canonn tools group) and js/orrery.js (the Tools menu in the orrery's header), so adding a tool here adds it in both places. Each row is [name, host, url] — the host is shown beside the name, because knowing where a link goes before following it is worth a column.",
+  "tools": [
+    ["Signals", "signals.canonn.tech", "https://signals.canonn.tech/"],
+    ["Bioforge", "bioforge.canonn.tech", "https://bioforge.canonn.tech/"],
+    ["Bifrost — Guardian ruins", "ruins.canonn.tech", "https://ruins.canonn.tech/"],
+    ["Thargoid Link Decoder", "tools.canonn.tech", "https://tools.canonn.tech/linkdecoder/"],
+    ["Thargoid Glyph Tool", "tools.canonn.tech", "https://tools.canonn.tech/thargoid_glyphs/"],
+    ["Codex Regions", "canonn-science.github.io", "https://canonn-science.github.io/Codex-Regions/"],
+    ["Undiscovered Codex", "canonn-science.github.io", "https://canonn-science.github.io/undiscovered-codex/"],
+    ["Abandoned Settlements", "canonn-science.github.io", "https://canonn-science.github.io/abandonned/"],
+    ["Neutron Star Plots", "canonn-science.github.io", "https://canonn-science.github.io/Canonn-Plots/neutron_stars_plots.html"],
+    ["EDMC-Canonn plugin", "github.com", "https://github.com/canonn-science/EDMC-Canonn/releases/latest"]
+  ]
+}

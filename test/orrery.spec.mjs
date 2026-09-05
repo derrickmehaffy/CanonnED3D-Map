@@ -10,12 +10,22 @@ import { stubDataHosts } from './helpers.mjs';
 
 const API = '**/us-central1-canonn-api-236217.cloudfunctions.net/**';
 
-/** Everything about how the scene is drawn lives behind one button. */
-async function openView(page) {
-  if (!(await page.locator('.orrery.view-open').count())) {
-    await page.locator('#orr-vopen').click();
+/** The light settings are the only two still behind a button. */
+async function openLight(page) {
+  if (!(await page.locator('.orrery.light-open').count())) {
+    await page.locator('#orr-light').click();
   }
-  await expect(page.locator('#orr-drawer')).toBeVisible();
+  await expect(page.locator('#orr-light-p')).toBeVisible();
+}
+
+/** Step the sky control until it is showing the mode wanted. */
+async function setSky(page, want) {
+  const btn = page.locator('#orr-sky');
+  for (let i = 0; i < 4; i++) {
+    if (await page.evaluate(() => window.Orrery.state().sky.mode) === want) return;
+    await btn.click();
+  }
+  throw new Error('the sky control never reached ' + want);
 }
 
 /* A star, a planet on a one-year circle, and a moon of that planet. Small
@@ -459,8 +469,6 @@ test('what gets drawn is under the reader\'s control', async ({ page }) => {
   await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
 
-  await openView(page);
-
   // Three states, because a forty-body system draws forty ellipses and the
   // planets disappear into their own moons. Each row states its own value in
   // words, so the drawer reads without relying on colour.
@@ -648,10 +656,8 @@ test('you can get right up to a body at true scale', async ({ page }) => {
   await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
 
-  await openView(page);
   await page.locator('#orr-true').click();
   await expect(page.locator('#orr-true')).toHaveClass(/on/);
-  await page.locator('#orr-vclose').click();
   await page.locator('.orr-row[data-id="1"]').click();
   await page.waitForTimeout(600);
 
@@ -708,7 +714,6 @@ test('a body rides on its own orbit line, at either scale', async ({ page }) => 
   // being something you can see.
   expect(await miss(), 'spread').toBeLessThan(1);
 
-  await openView(page);
   await page.locator('#orr-true').click();
   await expect(page.locator('#orr-true')).toHaveClass(/on/);
   await page.waitForTimeout(500);
@@ -912,8 +917,9 @@ test('a body keeps the same face between visits', async ({ page }) => {
 /* An orrery answers three questions — which system, when, and how it is drawn
    — and its controls belong where the answers do. The third group had no
    home: projection sat in the header, scale in the time bar, and orbits,
-   names and follow floated over the render. All of it is in one drawer now,
-   and the header and time bar hold only what they are about. */
+   names and follow floated over the render as a row of chips. All of it is on
+   one strip now, over the model it changes, and the header and the time bar
+   hold only what they are about. */
 test('how the scene is drawn lives in one place', async ({ page }) => {
   await stubDataHosts(page);
   await stubApi(page);
@@ -923,19 +929,37 @@ test('how the scene is drawn lives in one place', async ({ page }) => {
   // Nothing about drawing is loose in the header or the time bar.
   await expect(page.locator('.orr-top #orr-3d')).toHaveCount(0);
   await expect(page.locator('.orr-foot #orr-true')).toHaveCount(0);
-  await expect(page.locator('#orr-drawer')).toBeHidden();
 
-  await openView(page);
+  /* On the strip, over the render, and visible without being asked for. A
+     control a reader has to remember is behind a button is one they never
+     use — and it belongs on the thing it changes, not a screen-height away
+     at the top of the window. */
   for (const id of ['orr-3d', 'orr-2d', 'orr-spread', 'orr-true',
-                    'orr-orbits', 'orr-labl', 'orr-follow',
-                    'orr-sky-galaxy', 'orr-sky-stars', 'orr-sky-none',
-                    'orr-amb', 'orr-glow', 'orr-reset']) {
-    await expect(page.locator('#orr-drawer #' + id), id).toHaveCount(1);
+                    'orr-orbits', 'orr-labl', 'orr-follow', 'orr-sky',
+                    'orr-reset']) {
+    await expect(page.locator('.orr-stage #orr-hud #' + id), id).toBeVisible();
   }
 
-  // Escape closes the drawer before it closes the orrery.
+  /* One row. A wrapping flex container shrink-to-fits to its widest single
+     item rather than the sum of them, which stacked this four deep over the
+     model however much room it had — and a class name already taken by the
+     composition bars in the panel had it laid out as a three-column grid. */
+  const hud = await page.locator('#orr-hud').boundingBox();
+  expect(hud.height).toBeLessThan(40);
+  expect(hud.width).toBeGreaterThan(500);
+
+  /* The two exceptions, and the reason they are exceptions: ambient light and
+     star glow are set once to taste and then left alone for the session. They
+     are settings rather than controls, and putting them in the same row as
+     the eight above would have made all ten harder to find. */
+  await expect(page.locator('#orr-light-p')).toBeHidden();
+  await openLight(page);
+  await expect(page.locator('#orr-light-p #orr-amb')).toBeVisible();
+  await expect(page.locator('#orr-light-p #orr-glow')).toBeVisible();
+
+  // Escape closes that box before it closes the orrery.
   await page.keyboard.press('Escape');
-  await expect(page.locator('#orr-drawer')).toBeHidden();
+  await expect(page.locator('#orr-light-p')).toBeHidden();
   await expect(page.locator('.orrery.open')).toHaveCount(1);
 });
 
@@ -948,12 +972,10 @@ test('the sky is built from the system\'s position', async ({ page }) => {
   await stubApi(page, { ...SYSTEM, coords: { x: 0, y: 0, z: 0 } });
   await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
-  await openView(page);
-
   // It states the one fact nothing else here tells you: where the core is.
-  await expect(page.locator('#orr-corebear')).toContainText('25,900 ly');
+  await expect(page.locator('#orr-sky')).toHaveAttribute('title', /25,900 ly/);
 
-  await page.locator('#orr-sky-galaxy').click();
+  await setSky(page, 'galaxy');
   await expect.poll(() => page.evaluate(() => window.Orrery.state().sky.mode))
     .toBe('galaxy');
   const galaxy = await page.evaluate(() => window.Orrery.state().sky);
@@ -961,7 +983,7 @@ test('the sky is built from the system\'s position', async ({ page }) => {
   // Direction only, carried out to sit beyond everything else in the scene.
   expect(galaxy.scale).toBeGreaterThan(400);
 
-  await page.locator('#orr-sky-none').click();
+  await setSky(page, 'none');
   await expect.poll(() => page.evaluate(() => window.Orrery.state().sky.points)).toBe(0);
 
   // And the choice is remembered, because it is a preference not a mode.
@@ -975,7 +997,7 @@ test('the light controls do something, and are remembered', async ({ page }) => 
   await stubApi(page);
   await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
-  await openView(page);
+  await openLight(page);
 
   await page.locator('#orr-amb').fill('80');
   await page.locator('#orr-amb').dispatchEvent('input');
@@ -1078,7 +1100,7 @@ test('a mapped signal says what is down there, not just how many', async ({ page
 
   await page.locator('.orr-row[data-id="1"]').click();
   const guard = page.locator('.orr-sec', { hasText: 'Mapped signals' });
-  await expect(guard.locator('.orr-find span')).toHaveText(
+  await expect(guard.locator('.orr-sig span')).toHaveText(
     ['Guardian Codex', 'Guardian Relic Tower']);
   // Guardian sites are Bifrost's subject, so that is where the way out goes.
   await expect(guard.locator('a[href*="ruins.canonn.tech"]')).toHaveCount(1);
@@ -1087,9 +1109,9 @@ test('a mapped signal says what is down there, not just how many', async ({ page
   const bio = page.locator('.orr-sec', { hasText: 'Mapped signals' });
   // The genus token is read out as the codex prints it, and the species that
   // nobody has landed on and named says so rather than being left out.
-  await expect(bio.locator('.orr-find span')).toHaveText(
+  await expect(bio.locator('.orr-sig span')).toHaveText(
     ['Electricae Radialem — Magenta', 'Bacterium']);
-  await expect(bio.locator('.orr-find.dim em')).toHaveText('not identified');
+  await expect(bio.locator('.orr-sig.dim em')).toHaveText('not identified');
   await expect(bio).toContainText('Lit by Testholm');
   await expect(bio).not.toContainText('$Codex_Ent');
 });
@@ -1113,6 +1135,66 @@ test('the list marks the bodies worth clicking', async ({ page }) => {
   // The marks have to be visible to be marks.
   const box = await page.locator('.orr-row[data-id="1"] .sg.gua').boundingBox();
   expect(box.width).toBeGreaterThan(2);
+});
+
+/* Canonn is a dozen tools and the orrery linked out to none of them, so
+   arriving here was a way of leaving the rest of Canonn behind. The list is
+   one file, read by the console's command palette as well, so a tool added
+   in one place is not missing from the other. */
+test('the way out to the rest of Canonn is in both rooms', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+
+  const shared = JSON.parse(readFileSync('Source/data/canonn-tools.json', 'utf8')).tools;
+  expect(shared.length).toBeGreaterThan(5);
+  // The one file, verbatim, in the console that has never read it before.
+  const consoleJs = readFileSync('Source/js/console.js', 'utf8');
+  expect(consoleJs).toContain('data/canonn-tools.json');
+  expect(consoleJs).not.toContain("['Bioforge', 'bioforge.canonn.tech'");
+
+  await page.locator('#orr-tools').click();
+  const menu = page.locator('#orr-menu');
+  await expect(menu).toBeVisible();
+  for (const [name, , url] of shared) {
+    await expect(menu.locator('a[href="' + url + '"]'), name).toHaveCount(1);
+  }
+  // Every one of them leaves this tab where it is.
+  expect(await menu.locator('a[target="_blank"]').count()).toBeGreaterThanOrEqual(shared.length);
+
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  // Escape closed the menu, not the orrery.
+  await expect(page.locator('.orrery.open')).toHaveCount(1);
+});
+
+/* Whatever the header grows, both rooms get: a reader who came from the map
+   should not lose the tools by arriving, and one who came straight to the
+   page never had them. What differs is only what is genuinely different —
+   the way back to the map, and the search that is the page's whole reason. */
+test('the header carries the same links in the map and on the page', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+  for (const id of ['orr-signals', 'orr-link', 'orr-tools']) {
+    await expect(page.locator('.orr-top #' + id), id).toBeVisible();
+  }
+  await expect(page.locator('#orr-find')).toBeVisible();
+  await expect(page.locator('#orr-back')).toBeHidden();
+  await expect(page.locator('#orr-signals'))
+    .toHaveAttribute('href', 'https://signals.canonn.tech/?system=Testholm');
+
+  // The same header, opened over a map instead.
+  await openOrrery(page);
+  for (const id of ['orr-signals', 'orr-link', 'orr-tools']) {
+    await expect(page.locator('.orr-top #' + id), id).toBeVisible();
+  }
+  // And the two that are genuinely different swap over.
+  await expect(page.locator('#orr-back')).toBeVisible();
+  await expect(page.locator('#orr-find')).toBeHidden();
 });
 
 /* A link someone typed or pasted in caps is a link to the same system. The
@@ -1312,13 +1394,12 @@ test('with no sky behind it there is nothing for a hole to bend', async ({ page 
   await stubApi(page, HOLES);
   await page.goto('/orrery.html?system=Annihilator', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
-  await openView(page);
 
-  await page.locator('#orr-sky-galaxy').click();
+  await setSky(page, 'galaxy');
   await expect.poll(() => page.evaluate(() => window.Orrery.state().holes[0].hasSky)).toBe(1);
   expect(await page.evaluate(() => window.Orrery.state().holes[0].skyWidth)).toBe(4096);
 
-  await page.locator('#orr-sky-none').click();
+  await setSky(page, 'none');
   await expect.poll(() => page.evaluate(() => window.Orrery.state().holes[0].hasSky)).toBe(0);
 });
 
@@ -1415,8 +1496,7 @@ test('the sky has weather in it', async ({ page }) => {
   });
 
   const withSky = await patch();
-  await openView(page);
-  await page.locator('#orr-sky-none').click();
+  await setSky(page, 'none');
   await expect.poll(() => page.evaluate(() => window.Orrery.state().sky.points)).toBe(0);
   await page.waitForTimeout(400);
   const empty = await patch();
