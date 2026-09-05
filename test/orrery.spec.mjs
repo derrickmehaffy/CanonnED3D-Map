@@ -2383,6 +2383,45 @@ test('a moving body leaves a trail', async ({ page }) => {
     .find((t) => t.name === 'Testholm 1 a').points).toBeLessThan(3);
 });
 
+/* Sol's Asteroid Belt has real inner and outer radii in the dump and was a
+   line of text in the panel and nothing in the model — the one thing in the
+   system with a width, drawn with none. */
+test('a belt is drawn where it is, between the planets either side of it', async ({ page }) => {
+  const sys = JSON.parse(JSON.stringify(SYSTEM));
+  // A second planet, so there is a "between", and Sol's real belt in metres.
+  sys.bodies.push({ bodyId: 5, type: 'Planet', name: 'Testholm 5', subType: 'Class I gas giant',
+    parents: [{ Star: 0 }], radius: 69911, semiMajorAxis: 5.2, orbitalPeriod: 4331,
+    distanceToArrival: 2600 });
+  sys.bodies[0].belts = [{ name: 'Main Belt', type: 'Rocky',
+    innerRadius: 3.0817e11, outerRadius: 4.8919e11 }];
+  await stubDataHosts(page);
+  await stubApi(page, sys);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(4, { timeout: 60_000 });
+
+  const read = () => page.evaluate(() => {
+    const s = window.Orrery.state();
+    return { belt: s.belts[0], one: s.orbits.find((o) => o.name === 'Testholm 1').a,
+             five: s.orbits.find((o) => o.name === 'Testholm 5').a, mode: s.trueScale };
+  });
+
+  // In Spread, through the same log the planets were placed by: inside the
+  // giant's orbit and outside the inner planet's, as it is.
+  let r = await read();
+  expect(r.belt.name).toBe('Main Belt');
+  expect(r.belt.inner).toBeGreaterThan(r.one);
+  expect(r.belt.outer).toBeLessThan(r.five);
+  expect(r.belt.outer).toBeGreaterThan(r.belt.inner);
+
+  // At true scale it is simply 2.06 to 3.27 AU on the planets' own scale.
+  await page.locator('#orr-true').click();
+  await page.waitForTimeout(400);
+  r = await read();
+  expect(r.mode).toBe(true);
+  expect(r.belt.inner / r.one).toBeCloseTo(2.06, 1);
+  expect(r.belt.outer / r.one).toBeCloseTo(3.27, 1);
+});
+
 /* A link someone typed or pasted in caps is a link to the same system. The
    typeahead is a prefix search over canonical names, so the guard against a
    near-match has to compare letters rather than case. */

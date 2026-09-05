@@ -1341,6 +1341,7 @@ function buildModel(sys) {
 
    It is still an inference, so it is marked as one and the reader is told. */
 const LS_KM = 299792.458;
+const AU_M = 1.495978707e11;                   // the dump gives belt radii in metres
 
 function nearBody(st, nodes) {
   const ls = st.distanceToArrival;
@@ -1452,6 +1453,23 @@ function layout(model, trueDistance) {
   // Orbits first, then sizes, because a moon system is laid out against the
   // planet's drawn radius and that radius is about to be cut down to fit.
   spread(model.star.children, ORBIT_IN, ORBIT_OUT);
+
+  /* The same mapping the star's children were placed by, kept for anything
+     else that has a distance from the star and is not a body — a belt is a
+     region of the star's orbit space, and has to land where the planets
+     either side of it landed. Mirrors spread() exactly, including the log. */
+  const orbiting = model.star.children.filter((k) => k.aAu > 0);
+  if (trueDistance) {
+    model.toDraw = (au) => au * perAu;
+  } else if (orbiting.length) {
+    const key = (au) => Math.log10(Math.max(au, 1e-6));
+    const lo = Math.min(...orbiting.map((k) => key(k.aAu)));
+    const hi = Math.max(...orbiting.map((k) => key(k.aAu)));
+    model.toDraw = (au) => hi === lo ? ORBIT_OUT
+      : ORBIT_IN + (ORBIT_OUT - ORBIT_IN) * ((key(au) - lo) / (hi - lo));
+  } else {
+    model.toDraw = null;
+  }
   model.all.forEach((n) => {
     if (!n.children.length || n === model.star) return;
     if (trueDistance) { spread(n.children); return; }
@@ -2615,6 +2633,10 @@ const Orrery = (function () {
       if (m.lens) { scene.remove(m.lens); m.lens.geometry.dispose(); m.lens.material.dispose(); }
       if (m.line) { scene.remove(m.line); m.line.geometry.dispose(); m.line.material.dispose(); }
       if (m.trail) { scene.remove(m.trail); m.trail.geometry.dispose(); m.trail.material.dispose(); }
+      if (m.belts) {
+        scene.remove(m.belts);
+        m.belts.children.forEach((d) => { d.geometry.dispose(); d.material.dispose(); });
+      }
       if (m.rings) {
         scene.remove(m.rings);
         m.rings.children.forEach((d) => { d.geometry.dispose(); d.material.dispose(); });
@@ -2743,6 +2765,33 @@ const Orrery = (function () {
           entry.glow = glow;
           entry.mesh.add(glow);
         }
+      }
+
+      /* A belt, drawn as the region it is.
+
+         Sol's Asteroid Belt has real inner and outer radii in the dump and
+         was a line of text in the panel and nothing in the model — the one
+         thing in the system with a width, drawn with none. A faint annulus
+         at those radii, through the same mapping the planets were placed by,
+         so it sits between Mars and Jupiter in Spread and at 2.1 to 3.3 AU at
+         true scale. The star's belts only: a belt round a planet would need
+         that planet's own mapping, and the dump has none on any planet. */
+      if (n === model.star && model.toDraw && (n.raw.belts || []).length) {
+        entry.belts = new THREE.Object3D();
+        n.raw.belts.forEach((r) => {
+          const ri = model.toDraw(r.innerRadius / AU_M), ro = model.toDraw(r.outerRadius / AU_M);
+          if (!(ro > ri) || !(ri > 0)) return;
+          const disc = new THREE.Mesh(new THREE.RingGeometry(ri, ro, 160, 1),
+            new THREE.MeshBasicMaterial({
+              color: RING_TINT[r.type] || 0x9A8F7E, transparent: true, opacity: 0.075,
+              side: THREE.DoubleSide, depthWrite: false
+            }));
+          disc.rotation.x = Math.PI / 2;
+          disc.raycast = () => {};
+          disc.userData.belt = r.name;
+          entry.belts.add(disc);
+        });
+        if (entry.belts.children.length) scene.add(entry.belts); else entry.belts = null;
       }
 
       /* A trail: where the body has just been, fading behind it.
@@ -4777,6 +4826,17 @@ const Orrery = (function () {
       }),
       ambient: ambientPct,
       glow: glowPct,
+      // The star's belts as drawn, in drawn units, beside the planets' orbits.
+      belts: (() => {
+        const m = model && meshes.filter((x) => x.node === model.star)[0];
+        return m && m.belts ? m.belts.children.map((d) => ({
+          name: d.userData.belt,
+          inner: d.geometry.parameters.innerRadius,
+          outer: d.geometry.parameters.outerRadius
+        })) : [];
+      })(),
+      orbits: model ? model.star.children.filter((k) => k.a > 0)
+        .map((k) => ({ name: k.name, a: k.a })) : [],
       // Where each body has just been: how many points its trail is drawing.
       trails: meshes.filter((m) => m.trail).map((m) =>
         ({ name: m.node.name, points: m.trail.geometry.drawRange.count })),
