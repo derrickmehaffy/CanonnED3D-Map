@@ -1400,6 +1400,11 @@ const Orrery = (function () {
          they are things in the system — but a reader looking for a body
          should be able to put them away for a moment. */
       '      <button class="orr-s-tog on" id="orr-stations" aria-pressed="true">Stations</button>',
+      /* Five signal colours, two kinds of station square and a smaller pip for
+         a moon — all of it invented here, and all of it previously learnable
+         only by hovering things one at a time. */
+      '      <button class="orr-s-key" id="orr-key" aria-haspopup="true"',
+      '              aria-expanded="false" aria-label="What the marks mean">?</button>',
       '      <input id="orr-filter" class="orr-filter" type="text" autocomplete="off"',
       '             spellcheck="false" placeholder="Filter" aria-label="Filter bodies">',
       '    </div>',
@@ -1495,6 +1500,22 @@ const Orrery = (function () {
          the strip has all three concerns and a backdrop blur, which made it
          the containing block and threw the box hundreds of pixels down the
          page. Its overflow clipped it out of existence for good measure. */
+      '<div class="orr-pop orr-key-p" id="orr-key-p" role="group" aria-label="What the marks mean">',
+      '  <h4>On a body</h4>',
+      '  <div class="orr-key-r"><i class="sg bio"></i><span>Biological signals</span></div>',
+      '  <div class="orr-key-r"><i class="sg geo"></i><span>Geological signals</span></div>',
+      '  <div class="orr-key-r"><i class="sg gua"></i><span>Guardian signals</span></div>',
+      '  <div class="orr-key-r"><i class="sg thg"></i><span>Thargoid signals</span></div>',
+      '  <div class="orr-key-r"><i class="sg hum"></i><span>Human signals</span></div>',
+      '  <h4>Stations</h4>',
+      '  <div class="orr-key-r"><i class="stn"></i><span>In orbit</span></div>',
+      '  <div class="orr-key-r"><i class="stn hollow"></i><span>On the ground</span></div>',
+      '  <div class="orr-key-r"><i class="pad">L</i><span>Largest landing pad</span></div>',
+      '  <h4>Numbers</h4>',
+      '  <div class="orr-key-r"><i class="none"></i><span>A body: its orbit, in AU</span></div>',
+      '  <div class="orr-key-r"><i class="none"></i><span>A station: how far from arrival, in Ls</span></div>',
+      '</div>',
+
       '<div class="orr-pop" id="orr-light-p" role="group" aria-label="Light">',
       '  <label class="orr-sl"><span>Ambient</span>',
       '    <input id="orr-amb" type="range" min="0" max="100" value="30"></label>',
@@ -1547,9 +1568,11 @@ const Orrery = (function () {
       if (e.target.closest('[data-act="copy"]')) { copyLink(); showMenu(false); }
     });
     $('orr-light').onclick = (e) => { e.stopPropagation(); showLight(!lightOpen()); };
+    $('orr-key').onclick = (e) => { e.stopPropagation(); showKey(!keyOpen()); };
     document.addEventListener('click', (e) => {
       if (menuOpen() && !$('orr-menu').contains(e.target)) showMenu(false);
       if (lightOpen() && !$('orr-light-p').contains(e.target)) showLight(false);
+      if (keyOpen() && !$('orr-key-p').contains(e.target)) showKey(false);
     });
     $('orr-filter').addEventListener('input', () => renderList());
     $('orr-stations').onclick = () => setStations(!showPorts);
@@ -1677,6 +1700,19 @@ const Orrery = (function () {
 
   const menuOpen = () => !!(panel && panel.classList.contains('menu-open'));
   const lightOpen = () => !!(panel && panel.classList.contains('light-open'));
+  const keyOpen = () => !!(panel && panel.classList.contains('key-open'));
+
+  function showKey(on) {
+    panel.classList.toggle('key-open', !!on);
+    const btn = panel.querySelector('#orr-key');
+    btn.setAttribute('aria-expanded', on ? 'true' : 'false');
+    if (!on) return;
+    const r = btn.getBoundingClientRect();
+    const pop = panel.querySelector('#orr-key-p');
+    pop.style.top = Math.round(Math.min(r.bottom + 5, window.innerHeight - 300)) + 'px';
+    pop.style.left = Math.round(Math.max(8, Math.min(
+      window.innerWidth - 230, r.left - 40))) + 'px';
+  }
 
   function showLight(on) {
     panel.classList.toggle('light-open', !!on);
@@ -2178,6 +2214,7 @@ const Orrery = (function () {
       e.preventDefault();
       if (stationOpen()) closeStation();
       else if (menuOpen()) showMenu(false);
+      else if (keyOpen()) showKey(false);
       else if (lightOpen()) showLight(false);
       else close();
     }
@@ -3492,6 +3529,97 @@ const Orrery = (function () {
 
   const KM = (m) => Math.round(m / 1000).toLocaleString() + ' km';
 
+  /* ── the system ────────────────────────────────────────────────────────────
+     Every dump carries a block about the system itself — who lives there, who
+     runs it, which power holds it and how hard, what the minor factions are
+     doing, how much of it anybody has actually scanned — and none of it was
+     ever shown. Selecting the star showed you the star. There was no view of
+     the system anywhere in a program called an orrery.
+
+     None of this costs a request. It arrived with the bodies. */
+
+  const HUMANS = (v) => v >= 1e9 ? num(v / 1e9, 2) + ' bn'
+    : v >= 1e6 ? num(v / 1e6, 2) + ' m'
+    : v >= 1e3 ? num(v / 1e3, 1) + ' k' : String(v);
+
+  /** "2026-09-05 02:43:00+00" as a date a person would write. */
+  function when(raw) {
+    if (!raw) return '';
+    const d = parseEpoch(raw);
+    return isNaN(d) ? '' : d.toISOString().slice(0, 10);
+  }
+
+  function systemSection() {
+    const sys = model.sys || {};
+    let h = '';
+
+    h += measures([
+      ['Population', sys.population ? HUMANS(sys.population) : '', ''],
+      ['Security', sys.security, ''],
+      ['Allegiance', sys.allegiance, ''],
+      ['Government', sys.government, '']
+    ]);
+
+    /* How much of it anybody has been to. bodyCount is the game's own count
+       and does not include barycentres, so neither does this — a barycentre
+       is a place two things orbit, not a place. */
+    const scanned = model.all.filter((n) => n.km > 0).length;
+    const known = sys.bodyCount;
+    h += sect('System', table([
+      ['Region', sys.region && sys.region.name],
+      ['Economy', [sys.primaryEconomy, sys.secondaryEconomy]
+        .filter((x) => x && x !== 'None').join(' · ')],
+      /* "3 of 2" is what happens when the two counts disagree, and they do:
+         the dump's own array and the game's bodyCount are not counting the
+         same things. Whichever is larger is the honest denominator. */
+      ['Bodies scanned', !known || scanned >= known
+        ? scanned + ' — all of them'
+        : scanned + ' of ' + known],
+      ['Data from', when(sys.date)]
+    ]));
+
+    /* Powerplay. The power holding it, how firmly, and — the number people
+       actually argue about — how the week is going. */
+    if (sys.controllingPower || (sys.powers || []).length) {
+      const pct = typeof sys.powerStateControlProgress === 'number'
+        ? Math.round(sys.powerStateControlProgress * 100) + '%' : '';
+      const rein = sys.powerStateReinforcement, und = sys.powerStateUndermining;
+      let body = table([
+        ['Power', sys.controllingPower],
+        ['State', sys.powerState],
+        ['Control', pct]
+      ]);
+      if (typeof rein === 'number' && typeof und === 'number' && (rein || und)) {
+        body += '<div class="orr-tug" title="Reinforcement against undermining">' +
+          '<i style="flex:' + Math.max(rein, 1) + '"><b>' + rein.toLocaleString() + '</b></i>' +
+          '<u style="flex:' + Math.max(und, 1) + '"><b>' + und.toLocaleString() + '</b></u>' +
+          '</div>' +
+          '<div class="orr-note-i">Reinforcing against undermining, this cycle.</div>';
+      }
+      const rest = (sys.powers || []).filter((p) => p !== sys.controllingPower);
+      if (rest.length) {
+        body += '<div class="orr-note-i">Also contesting: ' + esc(rest.join(', ')) + '</div>';
+      }
+      h += sect('Powerplay', body);
+    }
+
+    /* The minor factions, which is what a system's politics actually is.
+       Influence comes through as a fraction; a reader thinks in percent. */
+    const facs = (sys.factions || []).filter((f) => f && f.name);
+    if (facs.length) {
+      const ctrl = sys.controllingFaction || {};
+      const states = (ctrl.activeStates || []).map((x) => x.state)
+        .filter(Boolean).join(', ') || ctrl.state;
+      const share = {};
+      facs.slice().sort((a, b) => (b.influence || 0) - (a.influence || 0))
+        .forEach((f) => { share[f.name] = (f.influence || 0) * 100; });
+      h += sect(facs.length + ' factions',
+        table([['Controlling', ctrl.name], ['State', states && states !== 'None' ? states : '']]) +
+        bars(share, '#6FBF73'));
+    }
+    return h;
+  }
+
   function updateFacts() {
     const n = selected, b = n.raw;
     const isStar = n.type === 'Star';
@@ -3516,6 +3644,11 @@ const Orrery = (function () {
 
     h += '<div class="orr-f-h">' + disc + '<div class="orr-f-n"><b>' +
          esc(n.name) + '</b><span>' + esc(n.sub || n.type) + '</span></div></div>';
+
+    /* The arrival star is the system as far as a reader is concerned — it is
+       what they land at and what the name on the header means — so the
+       system's own facts are read off it, before the star's. */
+    if (n === model.star) h += systemSection();
 
     const flags =
       chip(b.isLandable, 'Landable', 'good') +
@@ -3568,6 +3701,10 @@ const Orrery = (function () {
       ['Volcanism', b.volcanismType],
       ['Axial tilt', b.axialTilt ? num(Math.abs(b.axialTilt) * 180 / Math.PI, 1) + '°' : '']
     ]));
+
+    if (b.updateTime) {
+      h += '<div class="orr-note-i">Last updated ' + esc(when(b.updateTime)) + '</div>';
+    }
 
     h += sect('Orbit', table([
       ['Orbits', n.parent && n.parent.name],

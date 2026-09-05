@@ -348,7 +348,33 @@ body.orr-dragging{user-select:none}
 .orr-pop{position:fixed;z-index:65;width:212px;
   display:none;padding:8px 10px;background:var(--panel,#0C1116);
   border:1px solid var(--rule,#1B242E);box-shadow:0 14px 40px rgba(0,0,0,.7)}
-.light-open .orr-pop{display:block}
+.light-open #orr-light-p{display:block}
+.key-open #orr-key-p{display:block}
+/* What the marks mean. All of them are invented here, and until now the only
+   way to learn one was to rest on it and wait for a tooltip. */
+.orr-key{}
+.orr-s-key{flex:none;width:22px;height:22px;padding:0;background:none;
+  border:1px solid var(--rule,#1B242E);color:var(--dimmer,#6E7F8D);
+  font-family:var(--cond,sans-serif);font-size:11px;font-weight:700;cursor:pointer}
+.orr-s-key:hover,.key-open .orr-s-key{border-color:var(--amber,#FF9D00);
+  color:var(--amber,#FF9D00)}
+.orr-key-p{width:226px}
+.orr-key-p h4{margin:8px 0 4px;font-family:var(--cond,sans-serif);font-size:9px;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--dimmer,#6E7F8D);font-weight:600}
+.orr-key-p h4:first-child{margin-top:0}
+.orr-key-r{display:flex;align-items:center;gap:9px;padding:2px 0}
+.orr-key-r span{font-family:var(--mono,monospace);font-size:10px;color:var(--dim,#93A3B1)}
+.orr-key-r i{flex:none;width:12px;display:flex;justify-content:center;font-style:normal}
+.orr-key-r i.sg{height:5px;border-radius:1px}
+.orr-key-r i.sg.bio{background:var(--bio)}
+.orr-key-r i.sg.geo{background:var(--geo)}
+.orr-key-r i.sg.gua{background:var(--gua)}
+.orr-key-r i.sg.thg{background:var(--thg)}
+.orr-key-r i.sg.hum{background:var(--hum);opacity:.6}
+.orr-key-r i.stn{width:6px;height:6px;background:var(--ion,#4DE3E1);margin:0 3px}
+.orr-key-r i.stn.hollow{background:none;box-shadow:inset 0 0 0 1.5px var(--ion,#4DE3E1)}
+.orr-key-r i.pad{font-family:var(--mono,monospace);font-size:8.5px;
+  color:var(--dimmer,#6E7F8D);border:1px solid var(--rule,#1B242E);padding:0 3px;width:auto}
 .light-open #orr-light{border-color:var(--amber,#FF9D00);color:var(--amber,#FF9D00)}
 .orr-sl{display:flex;align-items:center;gap:10px;padding:3px 0;cursor:pointer}
 .orr-sl span{flex:none;width:64px;font-family:var(--cond,sans-serif);font-size:11px;
@@ -536,6 +562,19 @@ body.orr-dragging{user-select:none}
 .orr-sig.dim span{color:var(--dimmer,#6E7F8D)}
 .orr-note-i{margin-top:7px;font-family:var(--mono,monospace);font-size:9.5px;
   line-height:1.6;color:var(--dimmer,#6E7F8D)}
+
+/* Reinforcement against undermining, as the tug of war it is. Two numbers in
+   a table are a comparison the reader has to do; this is one they can see. */
+.orr-tug{display:flex;height:20px;margin-top:6px;background:var(--panel-2,#111820);
+  border:1px solid var(--rule,#1B242E)}
+.orr-tug i,.orr-tug u{display:flex;align-items:center;min-width:0;padding:0 6px;
+  font-style:normal;text-decoration:none;overflow:hidden}
+.orr-tug i{background:rgba(111,191,115,.18);justify-content:flex-start}
+.orr-tug u{background:rgba(229,72,77,.18);justify-content:flex-end}
+.orr-tug b{font-family:var(--mono,monospace);font-size:9.5px;font-weight:500;
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.orr-tug i b{color:var(--bio)}
+.orr-tug u b{color:#E5484D}
 
 .orr-item{padding:5px 8px;border:1px solid var(--rule,#1B242E);margin-bottom:3px}
 .orr-item b{display:block;font-family:var(--cond,sans-serif);font-size:11.5px;

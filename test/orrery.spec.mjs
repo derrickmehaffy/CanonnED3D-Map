@@ -1862,6 +1862,94 @@ test('the station dialog keeps the keyboard inside it', async ({ page }) => {
     document.activeElement.textContent.includes('Walz Depot'))).toBe(true);
 });
 
+/* Every dump carries a block about the system itself — who lives there, who
+   runs it, which power holds it and how hard, what the minor factions are
+   doing, how much of it anybody has scanned — and none of it was shown
+   anywhere. Selecting the star showed you the star; there was no view of the
+   system in a program called an orrery. The numbers below are Sol's. */
+test('the star is where you read the system', async ({ page }) => {
+  const sys = JSON.parse(JSON.stringify(SYSTEM));
+  Object.assign(sys, {
+    population: 18320926115, security: 'High', allegiance: 'Federation',
+    government: 'Democracy', primaryEconomy: 'Refinery', secondaryEconomy: 'Service',
+    region: { region: 18, name: 'Inner Orion Spur' },
+    bodyCount: 5, date: '2026-09-05 02:43:00+00',
+    controllingPower: 'Jerome Archer', powerState: 'Stronghold',
+    powerStateControlProgress: 0.542413,
+    powerStateReinforcement: 19898, powerStateUndermining: 92285,
+    powers: ['Aisling Duval', 'Jerome Archer', 'Zemina Torval'],
+    controllingFaction: { name: 'Mother Gaia', activeStates: [{ state: 'Expansion' }] },
+    factions: [
+      { name: 'Mother Gaia', influence: 0.42 },
+      { name: 'Sol Workers\u2019 Party', influence: 0.31 },
+      { name: 'Aegis Core', influence: 0.27 }
+    ]
+  });
+  await stubDataHosts(page);
+  await stubApi(page, sys);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+
+  const facts = page.locator('.orr-facts');
+  await expect(facts).toContainText('18.32 bn');
+  await expect(facts).toContainText('Inner Orion Spur');
+  await expect(facts).toContainText('Refinery · Service');
+
+  /* How much of it anybody has been to. bodyCount is the game's own count and
+     leaves out barycentres, so this does too — a barycentre is a place two
+     things orbit, not a place. */
+  await expect(facts.locator('.orr-sec', { hasText: 'System' }))
+    .toContainText('3 of 5');
+
+  const pp = facts.locator('.orr-sec', { hasText: 'Powerplay' });
+  await expect(pp.locator('dd')).toHaveText(['Jerome Archer', 'Stronghold', '54%']);
+  // The number people argue about, drawn as the tug of war it is.
+  await expect(pp.locator('.orr-tug i b')).toHaveText('19,898');
+  await expect(pp.locator('.orr-tug u b')).toHaveText('92,285');
+  await expect(pp).toContainText('Also contesting: Aisling Duval, Zemina Torval');
+
+  const fac = facts.locator('.orr-sec', { hasText: '3 factions' });
+  await expect(fac).toContainText('Mother Gaia');
+  await expect(fac).toContainText('Expansion');
+  // Influence arrives as a fraction; a reader thinks in percent, biggest first.
+  await expect(fac.locator('.orr-bar .k')).toHaveText(
+    ['Mother Gaia', 'Sol Workers\u2019 Party', 'Aegis Core']);
+  await expect(fac.locator('.orr-bar .v').first()).toHaveText('42%');
+
+  // And none of it turns up on a body that is not the star.
+  await page.locator('.orr-row[data-id="1"]').click();
+  await expect(page.locator('.orr-facts')).not.toContainText('Powerplay');
+  await expect(page.locator('.orr-facts')).not.toContainText('18.32 bn');
+});
+
+/* Five signal colours, two kinds of station square and a smaller pip for a
+   moon — all invented here, and until now learnable only by resting on things
+   one at a time and waiting for a tooltip. */
+test('the marks in the list have a key', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+
+  await expect(page.locator('#orr-key-p')).toBeHidden();
+  await page.locator('#orr-key').click();
+  const key = page.locator('#orr-key-p');
+  await expect(key).toBeVisible();
+  for (const kind of ['bio', 'geo', 'gua', 'thg', 'hum']) {
+    await expect(key.locator('.orr-key-r i.sg.' + kind), kind).toBeVisible();
+  }
+  await expect(key).toContainText('Guardian signals');
+  await expect(key).toContainText('On the ground');
+
+  // It opens against its button, rather than wherever the stylesheet lands it.
+  const btn = await page.locator('#orr-key').boundingBox();
+  const box = await key.boundingBox();
+  expect(Math.abs(box.y - (btn.y + btn.height))).toBeLessThan(20);
+
+  await page.keyboard.press('Escape');
+  await expect(key).toBeHidden();
+});
+
 /* A link someone typed or pasted in caps is a link to the same system. The
    typeahead is a prefix search over canonical names, so the guard against a
    near-match has to compare letters rather than case. */
