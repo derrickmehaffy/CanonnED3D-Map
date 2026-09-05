@@ -35,6 +35,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { surfaceSpec, bakeSurface, surfaceCanvas } from './orrery-surface.js';
 
 /* ── constants ──────────────────────────────────────────────────────────── */
 
@@ -561,8 +562,17 @@ function shadeUniforms() {
 /* A body's material, with the shadows and the wrap folded into three's own
    Lambert. One program for every body — the flags are uniforms — so nothing
    is compiled twice. */
-function shadedBody(map, wrap) {
-  const mat = new THREE.MeshLambertMaterial({ map });
+function shadedBody(surface, wrap) {
+  /* Phong rather than Lambert now that there is a normal map to light and a
+     surface that can be shiny in places: the ocean catches the star and the
+     land does not, and that is carried in the albedo's alpha so it costs no
+     extra texture. Everything the Lambert version injected is injected here
+     — the same hooks exist in Phong's chunks, line for line. */
+  const mat = new THREE.MeshPhongMaterial({
+    map: surface.albedo, normalMap: surface.normal,
+    normalScale: new THREE.Vector2(1, 1),
+    specular: new THREE.Color(0x6a6a6a), shininess: 26
+  });
   const u = shadeUniforms();
   u.uWrap.value = wrap;
   mat.userData.shade = u;
@@ -574,18 +584,18 @@ function shadedBody(map, wrap) {
         '#include <project_vertex>\nvOrrW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', '#include <common>\nuniform float uWrap;\n' + SHADE_PARS)
-      /* The wrap: Lambert cuts the light off at ninety degrees exactly, and a
-         world with air does not. Lifting the floor a little turns the
-         terminator into a band the width of a dusk. */
-      .replace('#include <lights_lambert_pars_fragment>',
-        THREE.ShaderChunk.lights_lambert_pars_fragment.replace(
+      .replace('#include <lights_phong_pars_fragment>',
+        THREE.ShaderChunk.lights_phong_pars_fragment.replace(
           'float dotNL = saturate( dot( geometryNormal, directLight.direction ) );',
           'float dotNL = saturate( ( dot( geometryNormal, directLight.direction ) + uWrap ) / ( 1.0 + uWrap ) );'))
-      // Only the light from the star is shadowed. The ambient is the sky.
+      /* How shiny, from the albedo's alpha — which is where the painter put
+         it — and then the alpha set back to opaque so it means nothing else. */
+      .replace('#include <specularmap_fragment>',
+        '#include <specularmap_fragment>\nspecularStrength = diffuseColor.a;\ndiffuseColor.a = 1.0;')
       .replace('#include <lights_fragment_end>',
-        '#include <lights_fragment_end>\nreflectedLight.directDiffuse *= orrShadow();');
+        '#include <lights_fragment_end>\nreflectedLight.directDiffuse *= orrShadow();\nreflectedLight.directSpecular *= orrShadow();');
   };
-  mat.customProgramCacheKey = () => 'orr-body';
+  mat.customProgramCacheKey = () => 'orr-body-phong';
   return mat;
 }
 
@@ -994,55 +1004,8 @@ function baseHsl(hex) {
   return { h: o.h * 360, s: o.s * 100, l: o.l * 100 };
 }
 
-/** Latitude bands, jittered — how every gas giant reads at a glance. */
-function paintBands(ctx, w, h, rnd, b, count) {
-  for (let i = 0; i < count; i++) {
-    const y = rnd() * h;
-    const thick = h * (0.02 + rnd() * 0.13);
-    const dl = (rnd() - 0.5) * 52;
-    ctx.fillStyle = hsl(b.h + (rnd() - 0.5) * 20, b.s * (0.6 + rnd() * 0.8),
-                        Math.max(6, Math.min(92, b.l + dl)), 0.8);
-    // Drawn as a run of short segments so the edges waver instead of ruling.
-    const steps = 60;
-    for (let sx = 0; sx < steps; sx++) {
-      const wob = Math.sin(sx / steps * Math.PI * 2 * (1 + rnd())) * thick * 0.35;
-      ctx.fillRect((sx / steps) * w, y + wob, w / steps + 1, thick);
-    }
-  }
-}
 
-/** Soft patches — continents, ice fields, mare, whatever the class calls it. */
-function paintBlobs(ctx, w, h, rnd, b, count, size, dl, alpha) {
-  for (let i = 0; i < count; i++) {
-    const x = rnd() * w, y = rnd() * h;
-    const r = size * (0.4 + rnd() * 1.6);
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    const col = hsl(b.h + (rnd() - 0.5) * 22, b.s * (0.6 + rnd() * 0.7),
-                    Math.max(4, Math.min(95, b.l + dl * (0.4 + rnd()))), alpha);
-    g.addColorStop(0, col);
-    g.addColorStop(1, hsl(b.h, b.s, b.l, 0));
-    ctx.fillStyle = g;
-    ctx.fillRect(x - r, y - r, r * 2, r * 2);
-    // Wrap, so nothing has a seam down the back.
-    if (x < r) ctx.fillRect(x - r + w, y - r, r * 2, r * 2);
-    if (x > w - r) ctx.fillRect(x - r - w, y - r, r * 2, r * 2);
-  }
-}
 
-/** Craters, for anything with no atmosphere to weather them away. */
-function paintCraters(ctx, w, h, rnd, b, count) {
-  for (let i = 0; i < count; i++) {
-    const x = rnd() * w, y = rnd() * h, r = 1 + rnd() * (h * 0.035);
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fillStyle = hsl(b.h, b.s * 0.8, Math.max(3, b.l - 10 - rnd() * 12), 0.5);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(x - r * 0.18, y - r * 0.18, r * 0.82, 0, Math.PI * 2);
-    ctx.fillStyle = hsl(b.h, b.s * 0.7, Math.min(96, b.l + 6 + rnd() * 10), 0.28);
-    ctx.fill();
-  }
-}
 
 /* Faces and ring bands, kept so a body looks the same every time you come
    back to it and so rebuilding the scene costs nothing.
@@ -1056,115 +1019,24 @@ const TEX_CACHE = new Map();
 function dropTextures() {
   TEX_CACHE.forEach((t) => t.dispose());
   TEX_CACHE.clear();
+  SURFACES.forEach((x) => { x.base.dispose(); if (x.hi) x.hi.dispose(); });
+  SURFACES.clear();
 }
 
-function bodyTexture(n) {
+/* A body's surface, painted on the GPU: see orrery-surface.js. Kept per body
+   so it looks the same each time and costs nothing to rebuild the scene; the
+   hi-res version lives here too while a body has one. */
+const SURFACES = new Map();
+
+function surfaceFor(renderer, n, w, h) {
   const key = n.raw.id64 || n.name;
-  if (TEX_CACHE.has(key)) return TEX_CACHE.get(key);
-
-  const rnd = seeded(key);
-  const b = baseHsl(tintOf(n.sub));
-  const sub = String(n.sub || '').toLowerCase();
-  const w = 256, h = 128;
-  const c = document.createElement('canvas');
-  c.width = w; c.height = h;
-  const ctx = c.getContext('2d');
-
-  ctx.fillStyle = hsl(b.h, b.s, b.l);
-  ctx.fillRect(0, 0, w, h);
-
-  if (sub.includes('gas giant') || sub.includes('water giant')) {
-    // Bands, and a storm or two. The count varies per body so two Class I
-    // giants in the same system are not the same picture.
-    paintBands(ctx, w, h, rnd, b, 16 + Math.floor(rnd() * 14));
-    const storms = Math.floor(rnd() * 3);
-    for (let i = 0; i < storms; i++) {
-      const x = rnd() * w, y = h * (0.25 + rnd() * 0.5), r = h * (0.05 + rnd() * 0.07);
-      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-      g.addColorStop(0, hsl(b.h + 18, Math.min(100, b.s * 1.4), b.l + 14, 0.8));
-      g.addColorStop(1, hsl(b.h, b.s, b.l, 0));
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.ellipse(x, y, r * 1.8, r, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  } else if (sub.includes('earth-like') || sub.includes('water world')) {
-    /* Ocean first, then land on top of it. Painting an ocean world out of a
-       single green produced a green ball with nothing on it — water and land
-       are different colours, and that difference is the whole reason the
-       class is recognisable at a glance. */
-    const ocean = { h: 204, s: 52, l: 26 };
-    ctx.fillStyle = hsl(ocean.h, ocean.s, ocean.l);
-    ctx.fillRect(0, 0, w, h);
-    paintBlobs(ctx, w, h, rnd, ocean, 12, h * 0.22, 10, 0.5);
-
-    // How much land there is varies per world; a water world keeps less.
-    const land = { h: 96 + rnd() * 30, s: 30 + rnd() * 22, l: 30 + rnd() * 10 };
-    const count = sub.includes('water world')
-      ? 4 + Math.floor(rnd() * 5) : 12 + Math.floor(rnd() * 12);
-    paintBlobs(ctx, w, h, rnd, land, count, h * 0.15, 6, 0.95);
-    paintBlobs(ctx, w, h, rnd, { h: land.h - 40, s: 26, l: 42 },
-               Math.floor(count / 2), h * 0.08, 8, 0.55);   // arid ground
-
-    // Ice at both poles.
-    ['top', 'bottom'].forEach((edge) => {
-      const g = ctx.createLinearGradient(0, edge === 'top' ? 0 : h,
-                                         0, edge === 'top' ? h * 0.2 : h * 0.8);
-      g.addColorStop(0, hsl(198, 14, 94, 0.9));
-      g.addColorStop(1, hsl(198, 14, 94, 0));
-      ctx.fillStyle = g;
-      ctx.fillRect(0, edge === 'top' ? 0 : h * 0.8, w, h * 0.2);
-    });
-  } else if (sub.includes('ammonia')) {
-    paintBands(ctx, w, h, rnd, b, 8 + Math.floor(rnd() * 8));
-    paintBlobs(ctx, w, h, rnd, b, 10, h * 0.12, -14, 0.4);
-  } else if (sub.includes('ice') || sub.includes('icy')) {
-    paintBlobs(ctx, w, h, rnd, b, 16, h * 0.15, 14, 0.4);
-    paintCraters(ctx, w, h, rnd, b, 30 + Math.floor(rnd() * 50));
-  } else {
-    // Rock, metal and everything else the dump has no better word for.
-    paintBlobs(ctx, w, h, rnd, b, 14, h * 0.18, -12, 0.45);
-    paintCraters(ctx, w, h, rnd, b, 40 + Math.floor(rnd() * 70));
-  }
-
-  /* What the dump knows, showing on the surface. A body with a real
-     atmosphere gets weather over it; one with active volcanism gets its
-     hotspots. Both come from fields, not from taste. */
-  const atmo = n.raw.atmosphereComposition;
-  if (atmo && Object.keys(atmo).length && n.raw.surfacePressure > 0.02) {
-    const decks = 14 + Math.floor(rnd() * 14);
-    for (let i = 0; i < decks; i++) {
-      const x = rnd() * w, y = rnd() * h;
-      const rx = w * (0.05 + rnd() * 0.14), ry = h * (0.02 + rnd() * 0.04);
-      const g = ctx.createRadialGradient(x, y, 0, x, y, rx);
-      g.addColorStop(0, hsl(0, 0, 99, 0.34 + rnd() * 0.3));
-      g.addColorStop(1, hsl(0, 0, 99, 0));
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.scale(1, ry / rx);
-      ctx.translate(-x, -y);
-      ctx.fillStyle = g;
-      ctx.fillRect(x - rx, y - rx, rx * 2, rx * 2);
-      ctx.restore();
-    }
-  }
-  if (/major|magma|lava/i.test(n.raw.volcanismType || '')) {
-    for (let i = 0; i < 8; i++) {
-      const x = rnd() * w, y = rnd() * h, r = h * (0.02 + rnd() * 0.05);
-      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-      g.addColorStop(0, hsl(18, 90, 58, 0.75));
-      g.addColorStop(1, hsl(18, 90, 40, 0));
-      ctx.fillStyle = g;
-      ctx.fillRect(x - r, y - r, r * 2, r * 2);
-    }
-  }
-
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.wrapS = THREE.RepeatWrapping;
-  TEX_CACHE.set(key, tex);
-  return tex;
+  if (SURFACES.has(key)) return SURFACES.get(key);
+  const spec = surfaceSpec(n, tintOf(n.sub), seeded(key));
+  const entry = { spec, base: bakeSurface(renderer, spec, w, h), hi: null, disc: null };
+  SURFACES.set(key, entry);
+  return entry;
 }
+
 
 /* How solid a ring is drawn.
 
@@ -2559,6 +2431,7 @@ const Orrery = (function () {
       canvas, antialias: true, alpha: false, logarithmicDepthBuffer: true
     });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    surfaceTier();
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x05070A);
 
@@ -2628,7 +2501,14 @@ const Orrery = (function () {
   function clearScene() {
     if (pips) { scene.remove(pips); pips.geometry.dispose(); pips.material.dispose(); pips = null; }
     meshes.forEach((m) => {
-      if (m.mesh) { scene.remove(m.mesh); m.mesh.geometry.dispose(); m.mesh.material.dispose(); }
+      if (m.mesh) {
+        scene.remove(m.mesh);
+        if (m.mesh.isLOD) m.mesh.levels.forEach((l) => l.object.geometry.dispose());
+        else m.mesh.geometry.dispose();
+        m.mat.dispose();
+        // A hi-res surface belongs to the view, not to the body's cache.
+        if (m.surface && m.surface.hi) { m.surface.hi.dispose(); m.surface.hi = null; }
+      }
       if (m.air) { m.air.geometry.dispose(); m.air.material.dispose(); }
       if (m.lens) { scene.remove(m.lens); m.lens.geometry.dispose(); m.lens.material.dispose(); }
       if (m.line) { scene.remove(m.line); m.line.geometry.dispose(); m.line.material.dispose(); }
@@ -2644,6 +2524,7 @@ const Orrery = (function () {
     });
     meshes = [];
     lenses = [];
+    sharpOn = null;
   }
 
   /* The primary's colour by default, and any star's when asked.
@@ -2703,7 +2584,7 @@ const Orrery = (function () {
 
       if (n.drawR > 0) {
         const isStar = n.type === 'Star';
-        const geo = new THREE.SphereGeometry(n.drawR, isStar ? 32 : 20, isStar ? 24 : 14);
+        const geo = new THREE.SphereGeometry(n.drawR, isStar ? 64 : 96, isStar ? 48 : 64);
         const mat = n.hole
           // Nothing leaves it, so nothing is painted on it. This sphere is the
           // shadow: it occludes what is behind it, and it takes the click.
@@ -2712,9 +2593,27 @@ const Orrery = (function () {
           // A star is its own light source, so it is not lit by one — it makes
           // its own, and churns while it does it.
           ? starMaterial(n, starColour(n))
-          : shadedBody(bodyTexture(n), airOf(n.raw) ? 0.28 : 0.07);
-        entry.mesh = new THREE.Mesh(geo, mat);
-        entry.mesh.userData.node = n;
+          : shadedBody(surfaceFor(renderer, n, SURF.baseW, SURF.baseH).base, airOf(n.raw) ? 0.28 : 0.07);
+        entry.mat = mat;
+        if (n.hole || isStar) {
+          entry.mesh = new THREE.Mesh(geo, mat);
+          entry.mesh.userData.node = n;
+        } else {
+          /* Three spheres, and the renderer picks by distance. Twenty segments
+             was a visible polygon on any body filling the view, and ninety-six
+             on every one of Sol's forty bodies is a quarter of a million
+             triangles for dots. The far level is the dot. */
+          entry.surface = SURFACES.get(n.raw.id64 || n.name);
+          const lod = new THREE.LOD();
+          [[geo, 0], [new THREE.SphereGeometry(n.drawR, 40, 28), n.drawR * 26],
+           [new THREE.SphereGeometry(n.drawR, 16, 12), n.drawR * 180]].forEach(([g, d]) => {
+            const level = new THREE.Mesh(g, mat);
+            level.userData.node = n;
+            lod.addLevel(level, d);
+          });
+          lod.userData.node = n;
+          entry.mesh = lod;
+        }
         scene.add(entry.mesh);
 
         /* A moon can pass behind its planet, so it carries the planet's
@@ -2783,7 +2682,7 @@ const Orrery = (function () {
           if (!(ro > ri) || !(ri > 0)) return;
           const disc = new THREE.Mesh(new THREE.RingGeometry(ri, ro, 160, 1),
             new THREE.MeshBasicMaterial({
-              color: RING_TINT[r.type] || 0x9A8F7E, transparent: true, opacity: 0.075,
+              color: RING_TINT[r.type] || 0x9A8F7E, transparent: true, opacity: 0.045,
               side: THREE.DoubleSide, depthWrite: false
             }));
           disc.rotation.x = Math.PI / 2;
@@ -2910,7 +2809,7 @@ const Orrery = (function () {
              dense they are, which is how dark the band across it is. The
              normal is the group's own up, which the tilt has already turned. */
           entry.rings.updateMatrixWorld();
-          const shade = entry.mesh.material.userData.shade;
+          const shade = entry.mat.userData.shade;
           const discs = entry.rings.children;
           if (shade) {
           shade.uHasRing.value = 1;
@@ -3486,16 +3385,16 @@ const Orrery = (function () {
       if (m.line) m.line.position.copy(n.parent ? n.parent._pos : ORIGIN);
       if (m.rings) {
         m.rings.position.copy(n._pos);
-        const own = m.mesh.material.userData.shade;
+        const own = m.mat.userData.shade;
         if (own) own.uRingC.value.copy(n._pos);
         m.rings.children.forEach((d) => d.material.userData.shade.uEclC.value.copy(n._pos));
       }
-      if (m.eclipsedBy) m.mesh.material.userData.shade.uEclC.value.copy(m.eclipsedBy._pos);
+      if (m.eclipsedBy) m.mat.userData.shade.uEclC.value.copy(m.eclipsedBy._pos);
       if (m.trail) trailStep(m, n);
       // Real seconds, not simulated ones: a star's surface should not strobe
       // because the orbits were asked to run at a year a second.
-      if (m.mesh && m.mesh.material.uniforms && m.mesh.material.uniforms.uTime) {
-        m.mesh.material.uniforms.uTime.value = wallClock;
+      if (m.mat && m.mat.uniforms && m.mat.uniforms.uTime) {
+        m.mat.uniforms.uTime.value = wallClock;
       }
     });
     movePips();
@@ -3559,6 +3458,7 @@ const Orrery = (function () {
       });
     }
 
+    sharpen();
     adaptClip();
     if (composer) {
       composer.passes[0].camera = mode3d ? cam3 : cam2;
@@ -3570,6 +3470,74 @@ const Orrery = (function () {
 
   const ORIGIN = new THREE.Vector3();
   const step = new THREE.Vector3();
+
+  /* Sizes for the surfaces, by what the device can carry.
+
+     Every body gets a base bake it can be looked at from across the system;
+     the one filling the view gets a sharp one. A phone, or anything that
+     says it is short of memory, gets half each way. */
+  const SURF = { baseW: 512, baseH: 256, hiW: 2048, hiH: 1024 };
+  function surfaceTier() {
+    const low = window.matchMedia('(hover: none)').matches
+      || (navigator.deviceMemory && navigator.deviceMemory < 4)
+      || renderer.capabilities.maxTextureSize < 4096;
+    if (low) Object.assign(SURF, { baseW: 256, baseH: 128, hiW: 1024, hiH: 512 });
+  }
+
+  /* The sharp surface follows whichever body is largest on screen.
+
+     Baking two thousand pixels across for every body would be a hundred
+     megabytes of texture; baking it for the one being looked at is sixteen
+     and a few milliseconds. Decided four times a second rather than every
+     frame, and only handed on when another body is clearly bigger, so
+     zooming past two moons does not bake them both twice. */
+  let sharpAt = 0, sharpOn = null;
+
+  function screenRadius(m, cam) {
+    if (!cam.isPerspectiveCamera) {
+      return m.node.drawR * cam.zoom * (canvas.clientHeight / (cam.top - cam.bottom));
+    }
+    const d = m.mesh.position.distanceTo(cam.position) || 1e-6;
+    return (m.node.drawR / d) * (canvas.clientHeight / 2) / Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2);
+  }
+
+  function sharpen() {
+    if (wallClock - sharpAt < 0.25) return;
+    sharpAt = wallClock;
+    const cam = mode3d ? cam3 : cam2;
+    let best = null, bestPx = 0, holderPx = 0, chosen = null, chosenPx = 0;
+    meshes.forEach((m) => {
+      if (!m.surface) return;
+      const px = m.px = screenRadius(m, cam);
+      if (m === sharpOn) holderPx = px;
+      if (m.node === selected) { chosen = m; chosenPx = px; }
+      if (px > bestPx) { bestPx = px; best = m; }
+    });
+    /* The body the reader chose is the one being looked at, whatever else is
+       in the frame — a planet framed to show its moons is small beside them
+       and is still the subject. Failing a choice, the largest disc, once it
+       is forty pixels of radius: where a 512-wide surface starts to show its
+       texels, and a body merely zoomed past is worth painting. */
+    let want = chosen && chosenPx > 10 ? chosen : (bestPx > 40 ? best : null);
+    if (want === sharpOn) return;
+    // Hand the largest-disc case on only when the newcomer is clearly bigger.
+    if (want !== chosen && sharpOn && holderPx > 28 && bestPx < holderPx * 1.25) return;
+    if (sharpOn) {
+      sharpOn.mat.map = sharpOn.surface.base.albedo;
+      sharpOn.mat.normalMap = sharpOn.surface.base.normal;
+      sharpOn.mat.needsUpdate = true;
+      if (sharpOn.surface.hi) { sharpOn.surface.hi.dispose(); sharpOn.surface.hi = null; }
+      sharpOn = null;
+    }
+    if (want) {
+      want.surface.hi = bakeSurface(renderer, want.surface.spec, SURF.hiW, SURF.hiH);
+      want.mat.map = want.surface.hi.albedo;
+      want.mat.normalMap = want.surface.hi.normal;
+      want.mat.needsUpdate = true;
+      sharpOn = want;
+    }
+    invalidate();
+  }
   const TRAIL_N = 40;
 
   /* One sample every 1/240th of the body's orbit, so forty of them is a sixth
@@ -4241,11 +4209,14 @@ const Orrery = (function () {
        already, so showing it costs nothing and makes the thing you clicked and
        the panel about it visibly the same object. */
     const m = meshes.filter((x) => x.node === n)[0];
-    const face = m && m.mesh && m.mesh.material.map && m.mesh.material.map.image;
     let disc = '';
-    if (face && face.toDataURL) {
-      disc = '<span class="orr-face" style="background-image:url(' +
-        face.toDataURL() + ')"></span>';
+    if (m && m.surface) {
+      /* Read back off the GPU once, small, and kept: the disc is the very
+         surface the sphere is wearing, at a size a panel can hold. */
+      if (!m.surface.disc) {
+        m.surface.disc = surfaceCanvas(renderer, m.surface.base, 96, 48).toDataURL();
+      }
+      disc = '<span class="orr-face" style="background-image:url(' + m.surface.disc + ')"></span>';
     } else if (n.hole) {
       disc = '<span class="orr-face hole"></span>';
     } else if (isStar) {
@@ -4826,6 +4797,15 @@ const Orrery = (function () {
       }),
       ambient: ambientPct,
       glow: glowPct,
+      /* Which body wears the sharp surface, and what every body's surface
+         measures — the two facts the level-of-detail is made of. */
+      sharp: sharpOn ? sharpOn.node.name : null,
+      surfaces: meshes.filter((m) => m.surface).map((m) => ({
+        name: m.node.name, base: m.surface.base.width, px: Math.round(m.px || 0),
+        hi: m.surface.hi ? m.surface.hi.width : 0,
+        levels: m.mesh.isLOD ? m.mesh.levels.length : 1,
+        normalMap: !!m.mat.normalMap
+      })),
       // The star's belts as drawn, in drawn units, beside the planets' orbits.
       belts: (() => {
         const m = model && meshes.filter((x) => x.node === model.star)[0];
@@ -4844,7 +4824,7 @@ const Orrery = (function () {
       // clock, so its surface does not strobe when time is run fast.
       starTime: (() => {
         const m = model && meshes.filter((x) => x.node === model.star)[0];
-        const u = m && m.mesh && m.mesh.material.uniforms;
+        const u = m && m.mat && m.mat.uniforms;
         return u && u.uTime ? u.uTime.value : null;
       })(),
       /* The selected body's ring system, in that body's own radii — the units
@@ -4886,15 +4866,15 @@ const Orrery = (function () {
      back off the GPU-bound image, which is far too expensive to sit in a
      function the tests poll. */
   function faces() {
-    return meshes.filter((m) => m.mesh && m.mesh.material.map).map((m) => {
-      const img = m.mesh.material.map.image;
-      const d = img.getContext('2d', { willReadFrequently: true })
-        .getImageData(0, 0, img.width, img.height).data;
+    return meshes.filter((m) => m.surface).map((m) => {
+      const img = surfaceCanvas(renderer, m.surface.base, 64, 32);
+      const d = img.getContext('2d').getImageData(0, 0, img.width, img.height).data;
       let h = 2166136261;
-      for (let i = 0; i < d.length; i += 997) { h ^= d[i]; h = Math.imul(h, 16777619); }
+      for (let i = 0; i < d.length; i += 97) { h ^= d[i]; h = Math.imul(h, 16777619); }
       return m.node.name + ':' + (h >>> 0);
     });
   }
+
 
   /* One frame, read back as pixels.
 
@@ -4942,8 +4922,8 @@ const Orrery = (function () {
   /* What each body is shadowed by, for the suite: the ring band across it, if
      any, in its own draw radii, and the planet it can pass behind. */
   function shade() {
-    return meshes.filter((m) => m.mesh && m.mesh.material.userData.shade).map((m) => {
-      const u = m.mesh.material.userData.shade;
+    return meshes.filter((m) => m.mat && m.mat.userData.shade).map((m) => {
+      const u = m.mat.userData.shade;
       return {
         name: m.node.name,
         wrap: u.uWrap.value,

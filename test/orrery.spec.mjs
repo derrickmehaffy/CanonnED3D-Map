@@ -2427,6 +2427,51 @@ test('a belt is drawn where it is, between the planets either side of it', async
   expect(r.belt.outer / r.one).toBeCloseTo(3.27, 1);
 });
 
+/* Every body used to be a 256-pixel canvas of gradients and blobs, and at the
+   size a selected body fills the view it was a blurred coloured ball. They are
+   painted on the GPU now — terrain, coastlines, craters with rims, a normal
+   map from the height field — at a size for looking at from across the system,
+   and the one body filling the view is re-painted four times as wide. */
+test('a body is painted properly, and the one you look at is painted sharp', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+  await page.waitForTimeout(800);
+
+  const read = () => page.evaluate(() => {
+    const s = window.Orrery.state();
+    return { sharp: s.sharp, surfaces: s.surfaces };
+  });
+  let r = await read();
+  // Both planets wear a surface with a normal map, on three levels of sphere.
+  expect(r.surfaces.map((x) => x.name).sort()).toEqual(['Testholm 1', 'Testholm 1 a']);
+  for (const x of r.surfaces) {
+    expect(x.base, x.name + ' base size').toBeGreaterThanOrEqual(256);
+    expect(x.levels, x.name + ' levels of detail').toBe(3);
+    expect(x.normalMap, x.name + ' has a normal map').toBe(true);
+  }
+
+  // Choosing a body puts it in the view, and the sharp surface follows.
+  await page.locator('.orr-row[data-id="1"]').click();
+  await expect.poll(async () => (await read()).sharp, { timeout: 15_000 }).toBe('Testholm 1');
+  r = await read();
+  const one = r.surfaces.find((x) => x.name === 'Testholm 1');
+  expect(one.hi).toBeGreaterThanOrEqual(one.base * 4);
+  // And only one body is sharp at a time — the other's hi-res is not held.
+  expect(r.surfaces.filter((x) => x.hi > 0).length).toBe(1);
+
+  // Choose the moon; the sharp surface moves and the planet's is let go.
+  await page.locator('.orr-row[data-id="2"]').click();
+  await expect.poll(async () => (await read()).sharp, { timeout: 15_000 }).toBe('Testholm 1 a');
+  r = await read();
+  expect(r.surfaces.find((x) => x.name === 'Testholm 1').hi).toBe(0);
+  expect(r.surfaces.find((x) => x.name === 'Testholm 1 a').hi).toBeGreaterThan(0);
+
+  // The face in the panel is read off the very surface the sphere wears.
+  await expect(page.locator('.orr-facts .orr-face')).toHaveAttribute('style', /data:image\/png/);
+});
+
 /* A link someone typed or pasted in caps is a link to the same system. The
    typeahead is a prefix search over canonical names, so the guard against a
    near-match has to compare letters rather than case. */
