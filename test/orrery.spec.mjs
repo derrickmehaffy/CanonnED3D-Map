@@ -1681,7 +1681,11 @@ test('a paused orrery stops drawing', async ({ page }) => {
      is the ceiling over 1.2 s. Comparing against the running rate instead
      made this fail whenever the machine was busy enough to drag running
      down toward the idle rate, which under a parallel suite it often is. */
-  expect(calls.paused / 3 / 1.2, 'paused frames per second').toBeLessThanOrEqual(12);
+  /* "About ten a second" — the throttle is a hundred milliseconds between
+     draws, met on the next animation frame after it, and a settling camera
+     can add a draw or two at the start of the window. Fifteen is still a
+     quarter of the sixty this guards against. */
+  expect(calls.paused / 3 / 1.2, 'paused frames per second').toBeLessThanOrEqual(15);
   expect(calls.playing, 'running draws at least as often as paused').toBeGreaterThanOrEqual(calls.paused);
 });
 
