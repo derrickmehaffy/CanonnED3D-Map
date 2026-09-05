@@ -1641,6 +1641,16 @@ test('a paused orrery stops drawing', async ({ page }) => {
   await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
   await page.waitForTimeout(700);
 
+  /* Without the bloom pipeline, which is about what the frame is made of and
+     not about how often one is made — and which under software rendering is
+     slow enough to drag the running case down to the idle rate and hide the
+     very difference being measured. */
+  await page.locator('#orr-light').click();
+  await page.locator('#orr-bloom').fill('0');
+  await page.locator('#orr-bloom').dispatchEvent('input');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
+
   const calls = await page.evaluate(async () => {
     const c = document.querySelector('#orr-canvas');
     const gl = c.getContext('webgl2') || c.getContext('webgl');
@@ -1792,10 +1802,20 @@ test('back and forward walk the systems you looked at', async ({ page }) => {
   await page.locator('.orr-res .orr-r').first().click();
   await expect(page.locator('#orr-name')).toHaveText('Otherholm', { timeout: 30_000 });
 
+  /* Straight back, without waiting for anything to settle. A dump takes a
+     moment to arrive and until it does the model still holds the last system,
+     so a guard that asks the model "are we already here?" gets the wrong
+     answer and decides nothing needs doing — leaving the header naming a
+     system the view is not showing. */
   await page.goBack();
   await expect(page.locator('#orr-name')).toHaveText('Testholm', { timeout: 30_000 });
+  await expect.poll(() => page.evaluate(() => window.Orrery.state().system),
+    { timeout: 30_000 }).toBe('Testholm');
+
   await page.goForward();
   await expect(page.locator('#orr-name')).toHaveText('Otherholm', { timeout: 30_000 });
+  await expect.poll(() => page.evaluate(() => window.Orrery.state().system),
+    { timeout: 30_000 }).toBe('Otherholm');
 });
 
 /* A link to a system was the only link there was, so "look at Europa" was a

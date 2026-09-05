@@ -31,6 +31,10 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 /* ── constants ──────────────────────────────────────────────────────────── */
 
@@ -1274,6 +1278,7 @@ const Orrery = (function () {
   let skyMode = 'none', sky = null;                        // none | galaxy | stars
   // The same sky as a picture, for any black hole in the system to bend.
   let lensSky = null, lenses = [];
+  let composer = null, bloomPass = null, bloomPct = 18;
   let ambient = null, ambientPct = 30, glowPct = 60;
 
   /* Preferences live in localStorage, guarded: a private window can make even
@@ -1521,6 +1526,8 @@ const Orrery = (function () {
       '    <input id="orr-amb" type="range" min="0" max="100" value="30"></label>',
       '  <label class="orr-sl"><span>Star glow</span>',
       '    <input id="orr-glow" type="range" min="0" max="100" value="60"></label>',
+      '  <label class="orr-sl"><span>Bloom</span>',
+      '    <input id="orr-bloom" type="range" min="0" max="100" value="18"></label>',
       '</div>',
 
       '<div class="orr-empty" id="orr-empty">',
@@ -1555,6 +1562,7 @@ const Orrery = (function () {
       setSky(SKIES[(SKIES.findIndex((k) => k[0] === skyMode) + 1) % SKIES.length][0]);
     $('orr-amb').addEventListener('input', (e) => setAmbient(+e.target.value));
     $('orr-glow').addEventListener('input', (e) => setGlow(+e.target.value));
+    $('orr-bloom').addEventListener('input', (e) => setBloom(+e.target.value));
     $('orr-follow').onclick = () => setFollow(!following);
     $('orr-reset').onclick = () => { if (model) { frame(); select(model.star, false); } };
     $('orr-orbits').onclick = () => setOrbits((orbitMode + 1) % 3);
@@ -2585,6 +2593,11 @@ const Orrery = (function () {
     cam2.left = -half * aspect; cam2.right = half * aspect;
     cam2.top = half; cam2.bottom = -half;
     cam2.updateProjectionMatrix();
+    if (composer) {
+      composer.setSize(w, h);
+      composer.setPixelRatio(renderer.getPixelRatio());
+      if (bloomPass) bloomPass.resolution.set(w, h);
+    }
   }
 
   /* ── the clock ────────────────────────────────────────────────────────── */
@@ -2891,6 +2904,68 @@ const Orrery = (function () {
     syncLenses();
   }
 
+  /* ── glow ──────────────────────────────────────────────────────────────────
+     A star drawn straight into an eight-bit buffer clips at white and stops
+     being bright — every star in the field arrives the same flat disc, which
+     is most of why this read as a diagram beside the galaxy map, which has had
+     an HDR pipeline since it was rebuilt.
+
+     So the scene renders into a half-float target where the bright parts can
+     go past 1.0, bloom has real headroom to threshold against, and OutputPass
+     converts on the way out. Tone mapping is deliberately left alone: the sky,
+     the star colours and the black-hole lens were all calibrated against the
+     current output path, and imposing a curve on top would shift every one of
+     them. This adds light around bright things; it does not regrade the view.
+
+     Built the first time it is wanted and torn down when it is turned off, so
+     a reader who does not want it pays neither the target nor the blur. */
+  function buildComposer() {
+    const size = renderer.getSize(new THREE.Vector2());
+    const target = new THREE.WebGLRenderTarget(
+      Math.max(1, size.x * renderer.getPixelRatio()),
+      Math.max(1, size.y * renderer.getPixelRatio()),
+      { type: THREE.HalfFloatType, samples: 4 }
+    );
+    target.texture.colorSpace = THREE.LinearSRGBColorSpace;
+    composer = new EffectComposer(renderer, target);
+    composer.addPass(new RenderPass(scene, mode3d ? cam3 : cam2));
+    /* A tight radius and a threshold above the sky: the point is a halo on the
+       stars and the lit limb of a planet, not a soft focus over the orbits.
+       Modest by default, too — at half again this much the whole frame goes
+       milky and the orbit lines stop reading against it. */
+    bloomPass = new UnrealBloomPass(size, 0, 0.35, 0.85);
+    composer.addPass(bloomPass);
+    composer.addPass(new OutputPass());
+    syncBloom();
+    resize();
+  }
+
+  function dropComposer() {
+    if (!composer) return;
+    composer.renderTarget1.dispose();
+    composer.renderTarget2.dispose();
+    if (bloomPass.dispose) bloomPass.dispose();
+    composer = null;
+    bloomPass = null;
+  }
+
+  function syncBloom() {
+    if (!bloomPass) return;
+    bloomPass.strength = (bloomPct / 100) * 1.5;
+    bloomPass.enabled = bloomPct > 0;
+  }
+
+  function setBloom(pct) {
+    bloomPct = pct;
+    keep('bloom', pct);
+    const el = panel.querySelector('#orr-bloom');
+    if (el && +el.value !== pct) el.value = pct;
+    if (pct > 0 && !composer) buildComposer();
+    else if (pct <= 0) dropComposer();
+    syncBloom();
+    invalidate();
+  }
+
   function setScale(isTrue) {
     if (trueDistance === isTrue) return;
     trueDistance = isTrue;
@@ -3023,7 +3098,12 @@ const Orrery = (function () {
     }
 
     adaptClip();
-    renderer.render(scene, mode3d ? cam3 : cam2);
+    if (composer) {
+      composer.passes[0].camera = mode3d ? cam3 : cam2;
+      composer.render();
+    } else {
+      renderer.render(scene, mode3d ? cam3 : cam2);
+    }
   }
 
   const ORIGIN = new THREE.Vector3();
@@ -3942,7 +4022,17 @@ const Orrery = (function () {
 
   function isOpen() { return panel && panel.classList.contains('open'); }
 
+  /* The system being opened, which is not the same as the system modelled.
+
+     A dump takes a moment to arrive, and until it does `model` still holds the
+     last system — so anything that asks "are we already here?" while a fetch
+     is in flight gets the wrong answer. Going back immediately after choosing
+     a system did exactly that: the guard saw the old model, decided nothing
+     had changed, and left the header naming a system the view was not showing. */
+  let showing = null;
+
   async function open(name, id64) {
+    showing = name;
     if (!panel) build();
     panel.classList.add('open');
     document.body.classList.add('orrery-open');
@@ -3976,6 +4066,8 @@ const Orrery = (function () {
       return;
     }
     if (!isOpen()) return;                    // closed while we were fetching
+    // Or moved on to another system while this one was still arriving.
+    if (showing !== name) return;
 
     // Another system means none of the last one's faces are wanted again.
     if (model && model.name !== sys.name) dropTextures();
@@ -4007,6 +4099,7 @@ const Orrery = (function () {
     panel.querySelector('#orr-signals').href =
       'https://signals.canonn.tech/?system=' + encodeURIComponent(model.name);
 
+    setBloom(recallNum('bloom', 18));
     setAmbient(recallNum('ambient', 30));
     setGlow(recallNum('glow', 60));
     setLabels(recallStr('labels', '1') === '1');
@@ -4038,6 +4131,7 @@ const Orrery = (function () {
     // returns to the search rather than leaving a blank screen.
     if (standalone) {
       model = null;
+      showing = null;
       panel.classList.remove('has-system');
       panel.querySelector('#orr-spine').innerHTML = '';
       panel.querySelector('#orr-name').textContent = '';
@@ -4074,7 +4168,7 @@ const Orrery = (function () {
       const q = new URLSearchParams(location.search);
       const n = q.get('system');
       if (!n) return close();
-      if (!model || model.name.toLowerCase() !== n.toLowerCase()) return open(n);
+      if (!showing || showing.toLowerCase() !== n.toLowerCase()) return open(n);
       const b = bodyNamed(q.get('body'));
       select(b || model.star);
     });
