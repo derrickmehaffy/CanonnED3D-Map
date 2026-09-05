@@ -1374,6 +1374,32 @@ test('the distance axis gains detail when it is given room', async ({ page }) =>
   expect((await spine.boundingBox()).height).toBeCloseTo(short, 0);
 });
 
+/* The axis used to start at a fixed ten light-seconds however far out the
+   system actually began, so Merope — nearest body fourteen hundred Ls,
+   furthest five thousand — was a clot against the right-hand end with two
+   thirds of the width empty. */
+test('the axis spans the system it is drawing', async ({ page }) => {
+  const far = JSON.parse(JSON.stringify(SYSTEM));
+  far.bodies[1].distanceToArrival = 1400;
+  far.bodies[2].distanceToArrival = 5000;
+  await stubDataHosts(page);
+  await stubApi(page, far);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+
+  const ax = await page.locator('.orr-sp-ax').boundingBox();
+  const pip = async (id) => {
+    const b = await page.locator('.orr-sp-ax .pip[data-id="' + id + '"]').boundingBox();
+    return (b.x + b.width / 2 - ax.x) / ax.width;
+  };
+  // The arrival star is zero light-seconds and has no place on a log scale,
+  // so it keeps the far left and the rest of the width is the actual range.
+  expect(await pip(0)).toBeLessThan(0.08);
+  // The nearest body starts the scale and the furthest ends it.
+  expect(await pip(1)).toBeLessThan(0.12);
+  expect(await pip(2)).toBeGreaterThan(0.95);
+});
+
 /* Sol puts a hundred and three things on this axis, and packing all of them
    took thirty lanes of small text — which is not detail, it is noise. So the
    lanes are however many the reader has given it room for, filled in the
@@ -1396,21 +1422,29 @@ test('the axis names what matters first, and says what it is holding back',
       distanceToArrival: 500 + i * 0.4
     });
   }
+  /* And something a long way out, so the axis spans decades and the twenty
+     of them really are packed into a sliver of it. Without this they simply
+     spread across the width and there is nothing to ration. */
+  crowd.bodies.push({
+    bodyId: 90, type: 'Planet', name: 'Testholm 9', subType: 'Icy body',
+    parents: [{ Star: 0 }], radius: 2000, semiMajorAxis: 400,
+    orbitalPeriod: 2920000, distanceToArrival: 200000
+  });
   await stubDataHosts(page);
   await stubApi(page, crowd);
   await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('.orr-row[data-id]')).toHaveCount(23, { timeout: 60_000 });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(24, { timeout: 60_000 });
 
   await page.locator('#orr-sp-more').click();
   const spine = page.locator('#orr-spine');
   const opened = (await spine.boundingBox()).height;
 
   // Everything is still on the axis; only the names are rationed.
-  await expect(page.locator('.orr-sp-ax .pip')).toHaveCount(23);
+  await expect(page.locator('.orr-sp-ax .pip')).toHaveCount(24);
   const named = await page.locator('.orr-sp-de .lb').count();
   expect(named).toBeGreaterThan(2);
-  expect(named).toBeLessThan(23);
-  await expect(page.locator('.orr-sp-de .more')).toContainText(String(23 - named));
+  expect(named).toBeLessThan(24);
+  await expect(page.locator('.orr-sp-de .more')).toContainText(String(24 - named));
 
   /* The star and the planet are what a reader is looking for, so they are
      named before any of the twenty near-identical moons crowding them out. */

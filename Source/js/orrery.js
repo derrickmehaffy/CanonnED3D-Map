@@ -1953,16 +1953,29 @@ const Orrery = (function () {
     if (withLs.length < 2) { host.innerHTML = ''; host.classList.add('empty'); return; }
     host.classList.remove('empty');
 
-    const max = Math.max(...withLs.map(lsOf),
-                        ...withPorts.map((p) => p.st.distanceToArrival), 1);
-    // Log, with everything under 10 Ls pinned to the star end rather than
-    // running off to minus infinity.
-    const at = (ls) => Math.log10(Math.max(ls, 10) / 10) / Math.log10(max / 10 || 1);
+    const every = withLs.map(lsOf)
+      .concat(withPorts.map((p) => p.st.distanceToArrival));
+    const max = Math.max(...every, 1);
+
+    /* The axis spans what the system actually occupies, rather than starting
+       at a fixed ten light-seconds. Merope's nearest body is fourteen hundred
+       out and its furthest five thousand: against a fixed floor that whole
+       system was a clot against the right-hand end with two thirds of the
+       axis empty. Against its own range it spreads across the width.
+
+       The arrival star is zero by definition and has no place on a log scale,
+       so it keeps the far left and the scale runs over everything else. */
+    const lo = Math.max(1, Math.min(...every.filter((v) => v > 0), max));
+    const span = Math.log10(max / lo) || 1;
+    const HEAD = 0.045;                        // where the star sits
+    const at = (ls) => (ls <= 0 ? 0
+      : HEAD + (1 - HEAD) * Math.min(1, Math.max(0, Math.log10(ls / lo) / span)));
 
     const ticks = [];
-    for (let p = 1; Math.pow(10, p) <= max; p++) {
-      ticks.push('<span class="tk" style="left:' + (at(Math.pow(10, p)) * 100) + '%">' +
-        (Math.pow(10, p) >= 1000 ? Math.pow(10, p) / 1000 + 'k' : Math.pow(10, p)) + '</span>');
+    for (let p = Math.ceil(Math.log10(lo)); Math.pow(10, p) <= max; p++) {
+      const v = Math.pow(10, p);
+      ticks.push('<span class="tk" style="left:' + (at(v) * 100) + '%">' +
+        (v >= 1000 ? v / 1000 + 'k' : v) + '</span>');
     }
 
     const tall = spineTall();
