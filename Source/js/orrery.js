@@ -4913,6 +4913,10 @@ const Orrery = (function () {
       .multiplyScalar(renderer.getPixelRatio());
     const rt = new THREE.WebGLRenderTarget(size.x, size.y);
     rt.texture.colorSpace = THREE.SRGBColorSpace;
+    /* Exactly what a frame does before it draws, or a test could read a sky
+       target nothing has evaluated yet — black, and a comparison against it
+       is a comparison against nothing. */
+    if (backdrop && backdrop.mesh.visible) { cam3.updateMatrixWorld(); backdrop.update(renderer, cam3); }
     renderer.setRenderTarget(rt);
     renderer.render(scene, mode3d ? cam3 : cam2);
     const buf = new Uint8Array(w * h * 4);
