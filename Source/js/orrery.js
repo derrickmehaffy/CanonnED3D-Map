@@ -496,6 +496,122 @@ function airOf(b) {
   return { tint, swell, thick: Math.min(1, 0.35 + Math.log10(p / 0.0005) * 0.16) };
 }
 
+/* Shadows, worked out rather than mapped.
+
+   One light, at the star, and geometry the dump already gives: real ring
+   radii on the planet, and for every moon the planet it orbits. So a ring
+   shadow across a gas giant, the planet's own shadow across its rings, and a
+   moon going dark as it passes behind its planet are each a line or two of
+   arithmetic on the ray from the fragment back to the star — which is what
+   a shadow is. Shadow maps would need a cube map per light across a scene
+   that runs from a few thousand kilometres to seven hundred astronomical
+   units, and would have looked broken at every scale but one.
+
+   Injected into three's own Lambert and Basic shaders rather than replacing
+   them, so the map, the fog, the tone mapping and the log-depth all keep
+   working. The same pass wraps the terminator: a body with air is lit a
+   little past ninety degrees, which is what turns a knife-edge into dusk. */
+const SHADE_PARS = [
+  'uniform vec3 uEclC;',      // a sphere that may be in the way, and its radius
+  'uniform float uEclR;',
+  'uniform float uHasEcl;',
+  'uniform vec3 uRingC;',     // a ring plane that may be in the way
+  'uniform vec3 uRingN;',
+  'uniform float uRingIn;',
+  'uniform float uRingOut;',
+  'uniform float uRingA;',
+  'uniform float uHasRing;',
+  'varying vec3 vOrrW;',
+  'float orrShadow() {',
+  '  vec3 L = normalize(-vOrrW);',            // the star sits at the origin
+  '  float s = 1.0;',
+  '  if (uHasEcl > 0.5) {',
+  '    vec3 toC = uEclC - vOrrW;',
+  '    float along = dot(toC, L);',
+  '    if (along > 0.0) {',                   // the sphere is between here and the light
+  '      float d = length(toC - L * along);',
+  '      s *= mix(0.05, 1.0, smoothstep(uEclR * 0.965, uEclR * 1.03, d));',
+  '    }',
+  '  }',
+  '  if (uHasRing > 0.5) {',
+  '    float dn = dot(L, uRingN);',
+  '    if (abs(dn) > 1e-4) {',
+  '      float t = dot(uRingC - vOrrW, uRingN) / dn;',
+  '      if (t > 0.0) {',
+  '        float r = length(vOrrW + L * t - uRingC);',
+  '        float w = (uRingOut - uRingIn) * 0.06;',
+  '        float band = smoothstep(uRingIn - w, uRingIn + w, r) * (1.0 - smoothstep(uRingOut - w, uRingOut + w, r));',
+  '        s *= 1.0 - uRingA * band;',
+  '      }',
+  '    }',
+  '  }',
+  '  return s;',
+  '}'
+].join('\n');
+
+function shadeUniforms() {
+  return {
+    uEclC: { value: new THREE.Vector3() }, uEclR: { value: 0 }, uHasEcl: { value: 0 },
+    uRingC: { value: new THREE.Vector3() }, uRingN: { value: new THREE.Vector3(0, 1, 0) },
+    uRingIn: { value: 0 }, uRingOut: { value: 0 }, uRingA: { value: 0 }, uHasRing: { value: 0 },
+    uWrap: { value: 0.06 }
+  };
+}
+
+/* A body's material, with the shadows and the wrap folded into three's own
+   Lambert. One program for every body — the flags are uniforms — so nothing
+   is compiled twice. */
+function shadedBody(map, wrap) {
+  const mat = new THREE.MeshLambertMaterial({ map });
+  const u = shadeUniforms();
+  u.uWrap.value = wrap;
+  mat.userData.shade = u;
+  mat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, u);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vOrrW;')
+      .replace('#include <project_vertex>',
+        '#include <project_vertex>\nvOrrW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uWrap;\n' + SHADE_PARS)
+      /* The wrap: Lambert cuts the light off at ninety degrees exactly, and a
+         world with air does not. Lifting the floor a little turns the
+         terminator into a band the width of a dusk. */
+      .replace('#include <lights_lambert_pars_fragment>',
+        THREE.ShaderChunk.lights_lambert_pars_fragment.replace(
+          'float dotNL = saturate( dot( geometryNormal, directLight.direction ) );',
+          'float dotNL = saturate( ( dot( geometryNormal, directLight.direction ) + uWrap ) / ( 1.0 + uWrap ) );'))
+      // Only the light from the star is shadowed. The ambient is the sky.
+      .replace('#include <lights_fragment_end>',
+        '#include <lights_fragment_end>\nreflectedLight.directDiffuse *= orrShadow();');
+  };
+  mat.customProgramCacheKey = () => 'orr-body';
+  return mat;
+}
+
+/* A ring's material, which is unlit — rings are drawn as what they are, a
+   band of a colour — but still takes the planet's shadow, because Saturn
+   without its shadow across the rings is a diagram of Saturn. */
+function shadedRing(opts) {
+  const mat = new THREE.MeshBasicMaterial(opts);
+  const u = shadeUniforms();
+  mat.userData.shade = u;
+  mat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, u);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vOrrW;')
+      .replace('#include <project_vertex>',
+        '#include <project_vertex>\nvOrrW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\n' + SHADE_PARS)
+      // A ring in shadow is not black; it is lit by the sky and the planet.
+      .replace('#include <map_fragment>',
+        '#include <map_fragment>\ndiffuseColor.rgb *= mix(0.22, 1.0, orrShadow());');
+  };
+  mat.customProgramCacheKey = () => 'orr-ring';
+  return mat;
+}
+
 /* The same stars, drawn twice.
 
    On screen they are points at a constant pixel size, which is what keeps a
@@ -2532,10 +2648,18 @@ const Orrery = (function () {
           // A star is its own light source, so it is not lit by one — it makes
           // its own, and churns while it does it.
           ? starMaterial(n, starColour(n))
-          : new THREE.MeshLambertMaterial({ map: bodyTexture(n) });
+          : shadedBody(bodyTexture(n), airOf(n.raw) ? 0.28 : 0.07);
         entry.mesh = new THREE.Mesh(geo, mat);
         entry.mesh.userData.node = n;
         scene.add(entry.mesh);
+
+        /* A moon can pass behind its planet, so it carries the planet's
+           radius and — updated every frame — where the planet is. */
+        if (mat.userData.shade && n.parent && n.parent.drawR > 0 && n.parent.type !== 'Star') {
+          mat.userData.shade.uHasEcl.value = 1;
+          mat.userData.shade.uEclR.value = n.parent.drawR;
+          entry.eclipsedBy = n.parent;
+        }
 
         if (n.hole) {
           /* The lens rides a camera-facing quad rather than the sphere,
@@ -2648,7 +2772,7 @@ const Orrery = (function () {
           }
           uv.needsUpdate = true;
 
-          const disc = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+          const disc = new THREE.Mesh(geo, shadedRing({
             map: ringTexture(r, tint),
             side: THREE.DoubleSide, transparent: true,
             opacity: ringOpacity(r, n.raw.rings), depthWrite: false
@@ -2661,6 +2785,26 @@ const Orrery = (function () {
         if (entry.rings.children.length) {
           entry.rings.rotation.z = n.tilt || 0;
           scene.add(entry.rings);
+
+          /* The planet knows its rings: innermost edge to outermost, and how
+             dense they are, which is how dark the band across it is. The
+             normal is the group's own up, which the tilt has already turned. */
+          entry.rings.updateMatrixWorld();
+          const shade = entry.mesh.material.userData.shade;
+          const discs = entry.rings.children;
+          if (shade) {
+          shade.uHasRing.value = 1;
+          shade.uRingIn.value = Math.min(...discs.map((d) => d.geometry.parameters.innerRadius));
+          shade.uRingOut.value = Math.max(...discs.map((d) => d.geometry.parameters.outerRadius));
+          shade.uRingA.value = Math.min(0.85,
+            discs.reduce((a, d) => a + d.material.opacity, 0) / discs.length);
+          shade.uRingN.value.set(0, 1, 0).applyQuaternion(entry.rings.quaternion);
+          }
+          // And the rings know the planet, for its shadow across them.
+          discs.forEach((d) => {
+            d.material.userData.shade.uHasEcl.value = 1;
+            d.material.userData.shade.uEclR.value = n.drawR;
+          });
         } else {
           entry.rings = null;
         }
@@ -3191,7 +3335,13 @@ const Orrery = (function () {
         }
       }
       if (m.line) m.line.position.copy(n.parent ? n.parent._pos : ORIGIN);
-      if (m.rings) m.rings.position.copy(n._pos);
+      if (m.rings) {
+        m.rings.position.copy(n._pos);
+        const own = m.mesh.material.userData.shade;
+        if (own) own.uRingC.value.copy(n._pos);
+        m.rings.children.forEach((d) => d.material.userData.shade.uEclC.value.copy(n._pos));
+      }
+      if (m.eclipsedBy) m.mesh.material.userData.shade.uEclC.value.copy(m.eclipsedBy._pos);
       // Real seconds, not simulated ones: a star's surface should not strobe
       // because the orbits were asked to run at a year a second.
       if (m.mesh && m.mesh.material.uniforms && m.mesh.material.uniforms.uTime) {
@@ -3363,6 +3513,8 @@ const Orrery = (function () {
   function select(node, retarget) {
     selected = node;
     markBody(node);
+    // A selected moon is named over the view like anything else selected.
+    if (labels.length && !labels.some((l) => l.node === node)) buildLabels();
     /* On a phone the two rails take turns, and choosing a body from the list
        means you want to read about it — so the sheet follows you over. */
     if (stacked() && panel.classList.contains('sheet-list')) setSheet('facts');
@@ -4019,8 +4171,12 @@ const Orrery = (function () {
   function buildLabels() {
     const host = panel.querySelector('#orr-labels');
     host.innerHTML = '';
+    /* The star, what orbits it directly — and whatever is selected, which
+       the comment always promised and the filter never delivered: pick a
+       moon and it had no name over it. */
     labels = model.all
-      .filter((n) => n.drawR > 0 && (n === model.star || n.parent === model.star))
+      .filter((n) => n.drawR > 0 &&
+        (n === model.star || n.parent === model.star || n === selected))
       .map((n) => {
         const el = document.createElement('span');
         el.className = 'orr-label' + (n === model.star ? ' star' : '');
@@ -4524,7 +4680,24 @@ const Orrery = (function () {
     }));
   }
 
-  return { open, close, isOpen, page, state, faces, pixels, air };
+  /* What each body is shadowed by, for the suite: the ring band across it, if
+     any, in its own draw radii, and the planet it can pass behind. */
+  function shade() {
+    return meshes.filter((m) => m.mesh && m.mesh.material.userData.shade).map((m) => {
+      const u = m.mesh.material.userData.shade;
+      return {
+        name: m.node.name,
+        wrap: u.uWrap.value,
+        ring: u.uHasRing.value ? { inner: u.uRingIn.value / m.node.drawR,
+                                   outer: u.uRingOut.value / m.node.drawR,
+                                   depth: u.uRingA.value } : null,
+        behind: u.uHasEcl.value ? m.eclipsedBy.name : null,
+        ringsShadowedBy: m.rings ? m.rings.children[0].material.userData.shade.uHasEcl.value === 1 : null
+      };
+    });
+  }
+
+  return { open, close, isOpen, page, state, faces, pixels, air, shade };
 })();
 
 window.Orrery = Orrery;

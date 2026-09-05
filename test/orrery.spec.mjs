@@ -2107,6 +2107,92 @@ test('the search remembers where you have been', async ({ page }) => {
   await expect(page.locator('#orr-name')).toHaveText('Testholm', { timeout: 30_000 });
 });
 
+/* One light, at the star, and geometry the dump already gives — so a ring's
+   shadow across its planet, the planet's across its rings, and a moon going
+   dark behind its planet are each a line of arithmetic on the ray back to the
+   star. The first two are checked as wiring; the third is checked in pixels,
+   because "it is darker" is a claim about what a reader sees. */
+test('a moon behind its planet is in the dark', async ({ page }) => {
+  await stubDataHosts(page);
+  const at = async (meanAnomaly) => {
+    const sys = JSON.parse(JSON.stringify(SYSTEM));
+    /* The planet a quarter-turn round its orbit, so the camera — which sits
+       off the +Z side of whatever it looks at — is looking at the moon's lit
+       face rather than its night side; with the planet at M=0 both readings
+       were a thin crescent and the rest was night. The moon in the planet's
+       own plane: at the planet's own anomaly it sits beyond the planet on the
+       line from the star, dead in its shadow; a half-turn on, it sits between
+       them in full light. Nothing else moves between the two. */
+    sys.bodies[1].meanAnomaly = 270;
+    Object.assign(sys.bodies[2], { orbitalInclination: 0, argOfPeriapsis: 0,
+      ascendingNode: 0, orbitalEccentricity: 0, meanAnomaly, atmosphereType: 'No atmosphere' });
+    await stubApi(page, sys);
+    // Paused from the start, so the clock does not move anything.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/orrery.html?system=Testholm&body=1%20a', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+    await expect.poll(() => page.evaluate(() => window.Orrery.state().selected),
+      { timeout: 20_000 }).toBe('Testholm 1 a');
+    await page.waitForTimeout(900);
+    // The moon's face, read straight off the frame.
+    return page.evaluate(() => {
+      const host = document.querySelector('.orr-labels').getBoundingClientRect();
+      const l = [...document.querySelectorAll('.orr-label')].find((e) => e.classList.contains('on'));
+      const m = new DOMMatrix(getComputedStyle(l).transform);
+      const c = document.querySelector('#orr-canvas').getBoundingClientRect();
+      const x = Math.round(host.x + m.m41 - c.x), y = Math.round(host.y + m.m42 - c.y);
+      const r = Math.max(3, Math.round(window.Orrery.state().selectedRadius
+        / window.Orrery.state().toSelected * c.height * 0.9));
+      const img = window.Orrery.pixels(x - r, y - r, r * 2, r * 2);
+      let sum = 0, n = 0;
+      for (let i = 0; i < img.data.length; i += 4) {
+        // Only the disc, not the sky around it.
+        const px = (i / 4) % img.w, py = Math.floor(i / 4 / img.w);
+        if (Math.hypot(px - r, py - r) > r * 0.8) continue;
+        sum += (img.data[i] + img.data[i + 1] + img.data[i + 2]) / 3; n++;
+      }
+      return sum / n;
+    });
+  };
+
+  const lit = await at(90);
+  const dark = await at(270);
+  expect(lit, 'a moon in the light is bright').toBeGreaterThan(25);
+  // The star's light is gone; what is left is the sky, which is not nothing.
+  expect(dark, 'a moon behind its planet is dark — lit ' + lit.toFixed(1)).toBeLessThan(lit * 0.4);
+  expect(dark).toBeGreaterThan(0.5);
+});
+
+test('rings and planets shadow each other, and dusk is a band', async ({ page }) => {
+  const sys = JSON.parse(JSON.stringify(SYSTEM));
+  sys.bodies[1].rings = [
+    { name: 'Testholm 1 A Ring', type: 'Icy', innerRadius: 8e6, outerRadius: 1.4e7, mass: 1e13 }
+  ];
+  sys.bodies[1].atmosphereType = 'Thin Nitrogen';
+  await stubDataHosts(page);
+  await stubApi(page, sys);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+
+  const shade = await page.evaluate(() => window.Orrery.shade());
+  const planet = shade.find((x) => x.name === 'Testholm 1');
+  const moon = shade.find((x) => x.name === 'Testholm 1 a');
+
+  // The planet knows its ring, edge to edge, in its own radii.
+  expect(planet.ring).not.toBeNull();
+  expect(planet.ring.inner).toBeGreaterThan(1);
+  expect(planet.ring.outer).toBeGreaterThan(planet.ring.inner);
+  expect(planet.ring.depth).toBeGreaterThan(0);
+  // And its rings know it, for its shadow across them.
+  expect(planet.ringsShadowedBy).toBe(true);
+  // The moon knows what it can pass behind; the planet, orbiting a star, does not.
+  expect(moon.behind).toBe('Testholm 1');
+  expect(planet.behind).toBeNull();
+  // A world with air is lit past ninety degrees; a bare one barely.
+  expect(planet.wrap).toBeGreaterThan(0.2);
+  expect(moon.wrap).toBeLessThan(0.1);
+});
+
 /* A link someone typed or pasted in caps is a link to the same system. The
    typeahead is a prefix search over canonical names, so the guard against a
    near-match has to compare letters rather than case. */
