@@ -1625,7 +1625,8 @@ const Orrery = (function () {
       '  <h1>Canonn Orrery</h1>',
       '  <p>Any system Canonn has data for, with its bodies on their real orbits.',
       '     Search above, or start somewhere known.</p>',
-      '  <div class="orr-seeds">',
+      '  <h2 class="orr-seed-h" id="orr-seed-h">Somewhere known</h2>',
+      '  <div class="orr-seeds" id="orr-seeds">',
       '    <button data-sys="Sol">Sol</button>',
       '    <button data-sys="Merope">Merope</button>',
       '    <button data-sys="Colonia">Colonia</button>',
@@ -1976,10 +1977,17 @@ const Orrery = (function () {
     q.addEventListener('input', () => {
       clearTimeout(qTimer);
       const term = q.value.trim();
-      if (term.length < 2) return closeResults();
+      if (term.length < 2) return showRecent();
+      /* Where you have been, narrowed to what you are typing, straight away —
+         and replaced by Canonn's own answer when it arrives. Leaving the
+         unfiltered list up during the wait means the first row under the
+         cursor is a system you did not ask for. */
+      showRecent(term);
       // Typing is faster than the round trip; only ask once it settles.
       qTimer = setTimeout(() => search(term), 220);
     });
+
+    q.addEventListener('focus', () => { if (!q.value.trim()) showRecent(); });
 
     q.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -2018,6 +2026,16 @@ const Orrery = (function () {
     paintResults();
   }
 
+  /* An empty box offers where you have been rather than nothing. */
+  function showRecent(term) {
+    const lo = (term || '').toLowerCase();
+    const was = recents().filter((r) => !lo || r.name.toLowerCase().includes(lo));
+    if (!was.length) return closeResults();
+    qRows = was.map((r) => ({ name: r.name, recent: true }));
+    qSel = -1;
+    paintResults();
+  }
+
   function paintResults() {
     const res = panel.querySelector('#orr-res');
     if (!qRows.length) {
@@ -2026,10 +2044,15 @@ const Orrery = (function () {
       return;
     }
     res.innerHTML = qRows.map((r, i) => {
-      const ly = Math.round(Math.sqrt(r.x * r.x + r.y * r.y + r.z * r.z)).toLocaleString();
-      return '<div class="orr-r' + (i === qSel ? ' on' : '') + '" data-i="' + i +
-        '" role="option"><span class="nm">' + esc(r.name) + '</span>' +
-        '<span class="ly">' + ly + ' ly</span></div>';
+      /* A remembered system is a name and nothing else — it was stored, not
+         searched for, so there are no coordinates to say how far away it is. */
+      const far = r.recent ? 'recent'
+        : Math.round(Math.sqrt(r.x * r.x + r.y * r.y + r.z * r.z)).toLocaleString() + ' ly';
+      return '<div class="orr-r' + (i === qSel ? ' on' : '') +
+        (r.recent ? ' was' : '') + '" data-i="' + i +
+        '" role="option" aria-selected="' + (i === qSel) + '">' +
+        '<span class="nm">' + esc(r.name) + '</span>' +
+        '<span class="ly">' + far + '</span></div>';
     }).join('');
     res.classList.add('open');
   }
@@ -2048,6 +2071,21 @@ const Orrery = (function () {
      out of the fifth system you looked at and you left the orrery entirely.
      Arriving at the page is still a replace, because there is nothing to step
      back to yet. */
+  /* Where you have just been. The search knew every system Canonn holds and
+     nothing at all about the four you had actually opened, which is the list
+     a person wants when they come back to a tab. */
+  const RECENT = 8;
+
+  function recents() {
+    try { return JSON.parse(localStorage.getItem(KEY + 'recent') || '[]'); }
+    catch (e) { return []; }
+  }
+
+  function remember(name) {
+    const was = recents().filter((r) => r.name.toLowerCase() !== name.toLowerCase());
+    keep('recent', JSON.stringify([{ name }].concat(was).slice(0, RECENT)));
+  }
+
   function go(name, id64, replace) {
     if (standalone) {
       const u = new URL(location.href);
@@ -2081,6 +2119,17 @@ const Orrery = (function () {
     const key = String(want).trim().toLowerCase();
     return model.all.filter((n) =>
       shortName(n).toLowerCase() === key || n.name.toLowerCase() === key)[0] || null;
+  }
+
+  /* The empty page offers somewhere to start. Where a reader has already
+     been is a better offer than five systems this file picked. */
+  function paintSeeds() {
+    const was = recents();
+    const host = panel.querySelector('#orr-seeds');
+    if (!was.length || !host) return;
+    host.innerHTML = was.map((r) =>
+      '<button data-sys="' + esc(r.name) + '">' + esc(r.name) + '</button>').join('');
+    panel.querySelector('#orr-seed-h').textContent = 'Where you have been';
   }
 
   function copyLink() {
@@ -4207,6 +4256,7 @@ const Orrery = (function () {
 
     // Another system means none of the last one's faces are wanted again.
     if (model && model.name !== sys.name) dropTextures();
+    remember(sys.name);
     model = buildModel(sys);
     if (!model) {
       stopBoot('bad', 'The dump has no bodies for ' + name + '.');
@@ -4296,6 +4346,7 @@ const Orrery = (function () {
     panel.classList.add('open');
     document.body.classList.add('orrery-open');
     const wanted = new URLSearchParams(location.search).get('system');
+    paintSeeds();
     if (wanted) go(wanted, null, true);
     else panel.querySelector('#orr-q').focus();
 

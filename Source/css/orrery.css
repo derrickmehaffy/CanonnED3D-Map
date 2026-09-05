@@ -81,6 +81,7 @@ body.orrery-open .app{visibility:hidden}
 .orr-r{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
   padding:6px 11px;cursor:pointer}
 .orr-r .nm{font-family:var(--mono,monospace);font-size:11.5px;color:var(--dim,#93A3B1)}
+.orr-r.was .ly{color:#2E6E6D}
 .orr-r .ly{font-family:var(--mono,monospace);font-size:9.5px;color:var(--dimmer,#6E7F8D);
   font-variant-numeric:tabular-nums;white-space:nowrap}
 .orr-r:hover,.orr-r.on{background:var(--panel-2,#111820)}
@@ -652,6 +653,8 @@ body.orr-dragging{user-select:none}
   letter-spacing:.01em;color:#E4EBF1}
 .orr-empty p{margin:0;max-width:44ch;font-size:13.5px;line-height:1.65;
   color:var(--dim,#93A3B1)}
+.orr-seed-h{margin:10px 0 0;font-family:var(--cond,sans-serif);font-size:9.5px;
+  font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--dimmer,#6E7F8D)}
 .orr-seeds{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:4px}
 .orr-seeds button{padding:6px 13px;border:1px solid var(--rule,#1B242E);background:none;
   font-family:var(--mono,monospace);font-size:11.5px;color:var(--dim,#93A3B1);cursor:pointer}

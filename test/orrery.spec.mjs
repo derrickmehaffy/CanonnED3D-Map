@@ -2075,6 +2075,38 @@ test('nothing is set smaller than it can be read at', async () => {
   expect(Math.min(...sizes), 'the smallest type in the stylesheet').toBeGreaterThanOrEqual(9);
 });
 
+/* The search knew every system Canonn holds and nothing about the four you
+   had actually opened, which is the list a person wants when they come back
+   to a tab they left open. */
+test('the search remembers where you have been', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+
+  // An empty box offers where you have been rather than nothing at all.
+  await page.locator('#orr-q').click();
+  const res = page.locator('.orr-res');
+  await expect(res).toBeVisible();
+  await expect(res.locator('.orr-r.was .nm')).toHaveText(['Testholm']);
+  // A remembered system was stored, not searched for, so it has no distance.
+  await expect(res.locator('.orr-r.was .ly')).toHaveText(['recent']);
+
+  /* And typing narrows them straight away rather than leaving the whole list
+     under the cursor while Canonn is asked — the first row you can click has
+     to be a row you meant. */
+  await page.locator('#orr-q').fill('Zz');
+  await expect(res.locator('.orr-r.was')).toHaveCount(0);
+
+  // The empty page offers them too, ahead of the five this file picked.
+  await page.goto('/orrery.html', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-empty')).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('#orr-seed-h')).toHaveText('Where you have been');
+  await expect(page.locator('#orr-seeds button')).toHaveText(['Testholm']);
+  await page.locator('#orr-seeds button').first().click();
+  await expect(page.locator('#orr-name')).toHaveText('Testholm', { timeout: 30_000 });
+});
+
 /* A link someone typed or pasted in caps is a link to the same system. The
    typeahead is a prefix search over canonical names, so the guard against a
    near-match has to compare letters rather than case. */
