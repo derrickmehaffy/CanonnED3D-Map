@@ -1563,6 +1563,7 @@ const Orrery = (function () {
     wireResize();
 
     document.addEventListener('keydown', onKey);
+    document.addEventListener('keydown', trapTab, true);
     /* Every control at once, rather than every control remembering. Captured,
        so it runs before the handler that actually changes something. */
     ['pointerdown', 'pointerup', 'wheel', 'keydown', 'input', 'click']
@@ -1905,14 +1906,46 @@ const Orrery = (function () {
   }
 
   /** Open a system and, on the page, put it in the address bar. */
-  function go(name, id64) {
+  /* Going somewhere is a step in the history, not a rewrite of it.
+
+     Every navigation used replaceState, so no entry was ever created — while
+     a popstate listener sat waiting for entries that could not arrive. Back
+     out of the fifth system you looked at and you left the orrery entirely.
+     Arriving at the page is still a replace, because there is nothing to step
+     back to yet. */
+  function go(name, id64, replace) {
     if (standalone) {
       const u = new URL(location.href);
       u.searchParams.set('system', name);
-      history.replaceState(null, '', u);
+      /* A body named in the address belongs to the system named beside it, so
+         moving to another system drops it — but arriving at the page is not
+         moving, and that is the one case where the body was asked for. */
+      if (!replace) u.searchParams.delete('body');
+      const same = new URL(location.href).searchParams.get('system') === name;
+      history[replace || same ? 'replaceState' : 'pushState']({ system: name }, '', u);
       document.title = name + ' — Canonn Orrery';
     }
     open(name, id64);
+  }
+
+  /* Which body is showing, in the address bar. A link to a system was the only
+     link there was, so "look at Europa" was a link to Sol and a sentence about
+     what to click. Replaces rather than pushes: picking your way down a list
+     of moons should not be forty presses of Back to get out of. */
+  function markBody(n) {
+    if (!standalone || !model) return;
+    const u = new URL(location.href);
+    if (n && n !== model.star) u.searchParams.set('body', shortName(n));
+    else u.searchParams.delete('body');
+    history.replaceState(history.state, '', u);
+  }
+
+  /** The body a link names, matched the way a reader would write it. */
+  function bodyNamed(want) {
+    if (!want) return null;
+    const key = String(want).trim().toLowerCase();
+    return model.all.filter((n) =>
+      shortName(n).toLowerCase() === key || n.name.toLowerCase() === key)[0] || null;
   }
 
   function copyLink() {
@@ -1920,11 +1953,17 @@ const Orrery = (function () {
     if (!name) return;
     const u = new URL('orrery.html', location.href);
     u.searchParams.set('system', name);
+    // Whatever is on screen, including which body — that is what "this" means.
+    if (selected && model && selected !== model.star) {
+      u.searchParams.set('body', shortName(selected));
+    }
     const btn = panel.querySelector('#orr-link');
-    navigator.clipboard.writeText(u.href).then(() => {
-      btn.textContent = 'Link copied';
+    const said = (t) => {
+      btn.textContent = t;
       setTimeout(() => { btn.textContent = 'Copy link'; }, 1400);
-    }).catch(() => { btn.textContent = 'Copy failed'; });
+    };
+    navigator.clipboard.writeText(u.href).then(() => said('Link copied'))
+      .catch(() => said('Copy failed'));
   }
 
   /* ── the spine ────────────────────────────────────────────────────────────
@@ -3044,6 +3083,7 @@ const Orrery = (function () {
 
   function select(node, retarget) {
     selected = node;
+    markBody(node);
     /* On a phone the two rails take turns, and choosing a body from the list
        means you want to read about it — so the sheet follows you over. */
     if (stacked() && panel.classList.contains('sheet-list')) setSheet('facts');
@@ -3302,12 +3342,32 @@ const Orrery = (function () {
      service it offers, the ships and modules it sells, and its whole market.
      None of it needed another request — it arrived with the system. */
 
-  let shownPort = null;
+  let shownPort = null, cameFrom = null;
   const stationOpen = () => !!shownPort;
 
   function closeStation() {
     shownPort = null;
     if (panel) panel.querySelector('#orr-modal').hidden = true;
+    /* Back where it came from. A dialog that takes focus and then drops it
+       wherever leaves a keyboard reader at the top of the document, having to
+       find their way back to the row they were on. */
+    if (cameFrom && cameFrom.isConnected) cameFrom.focus();
+    cameFrom = null;
+  }
+
+  /* Tab stays inside a modal dialog, which is what modal means. It was walking
+     straight out into the two hundred and thirty-nine focusable things behind
+     it, with nothing to say the dialog had been left. */
+  function trapTab(e) {
+    if (e.key !== 'Tab' || !stationOpen()) return;
+    const box = panel.querySelector('.orr-m-box');
+    const stops = [...box.querySelectorAll('button, a[href], input, [tabindex]:not([tabindex="-1"])')]
+      .filter((el) => el.offsetParent !== null);
+    if (!stops.length) return;
+    const first = stops[0], last = stops[stops.length - 1];
+    const on = document.activeElement;
+    if (e.shiftKey && (on === first || !box.contains(on))) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && on === last) { e.preventDefault(); first.focus(); }
   }
 
   /* Commodities, the two ways round that matter. What a station sells is
@@ -3425,6 +3485,7 @@ const Orrery = (function () {
 
     panel.querySelector('#orr-m-b').innerHTML = h;
     panel.querySelector('#orr-m-b').scrollTop = 0;
+    cameFrom = document.activeElement;
     panel.querySelector('#orr-modal').hidden = false;
     panel.querySelector('#orr-m-x').focus();
   }
@@ -3822,7 +3883,11 @@ const Orrery = (function () {
     setSheet(recallStr('sheet', 'facts'));
     setOrbits(recallNum('orbits', 0));
     setSky(recallStr('sky', 'stars'));
-    select(model.star);
+    /* A link can name a body as well as a system, and a link that names one
+       should open on it rather than on the star. */
+    const wanted = standalone
+      ? bodyNamed(new URLSearchParams(location.search).get('body')) : null;
+    select(wanted || model.star);
     invalidate();
     cancelAnimationFrame(loop);
     loop = requestAnimationFrame(animate);
@@ -3864,13 +3929,17 @@ const Orrery = (function () {
     panel.classList.add('open');
     document.body.classList.add('orrery-open');
     const wanted = new URLSearchParams(location.search).get('system');
-    if (wanted) go(wanted);
+    if (wanted) go(wanted, null, true);
     else panel.querySelector('#orr-q').focus();
 
     // Back and forward through the systems someone has looked at.
     window.addEventListener('popstate', () => {
-      const n = new URLSearchParams(location.search).get('system');
-      if (n && (!model || model.name !== n)) open(n);
+      const q = new URLSearchParams(location.search);
+      const n = q.get('system');
+      if (!n) return close();
+      if (!model || model.name.toLowerCase() !== n.toLowerCase()) return open(n);
+      const b = bodyNamed(q.get('body'));
+      select(b || model.star);
     });
   }
 

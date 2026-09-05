@@ -1766,6 +1766,102 @@ test('framing the system puts the system in the frame', async ({ page }) => {
   }
 });
 
+/* Every navigation used replaceState, so no history entry was ever created —
+   while a popstate listener sat waiting for entries that could not arrive.
+   Back out of the fifth system you looked at and you left the orrery. */
+test('back and forward walk the systems you looked at', async ({ page }) => {
+  await stubDataHosts(page);
+  const other = { ...SYSTEM, name: 'Otherholm', id64: 77 };
+  await page.route('**/us-central1-canonn-api-236217.cloudfunctions.net/**', (route) => {
+    const url = route.request().url();
+    const json = (b) => route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify(b) });
+    if (url.includes('/typeahead')) {
+      const q = decodeURIComponent(url.split('q=')[1] || '');
+      const pick = /^o/i.test(q) ? other : SYSTEM;
+      return json({ min_max: [{ id64: pick.id64, name: pick.name, x: 0, y: 0, z: 0 }] });
+    }
+    return json({ system: url.includes('id=77') ? other : SYSTEM });
+  });
+
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+
+  await page.locator('#orr-q').fill('Otherholm');
+  await expect(page.locator('.orr-res .orr-r').first()).toBeVisible({ timeout: 20_000 });
+  await page.locator('.orr-res .orr-r').first().click();
+  await expect(page.locator('#orr-name')).toHaveText('Otherholm', { timeout: 30_000 });
+
+  await page.goBack();
+  await expect(page.locator('#orr-name')).toHaveText('Testholm', { timeout: 30_000 });
+  await page.goForward();
+  await expect(page.locator('#orr-name')).toHaveText('Otherholm', { timeout: 30_000 });
+});
+
+/* A link to a system was the only link there was, so "look at Europa" was a
+   link to Sol and a sentence telling somebody what to click. */
+test('a link can name the body, not just the system', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+
+  await page.goto('/orrery.html?system=Testholm&body=1%20a', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+  await expect.poll(() => page.evaluate(() => window.Orrery.state().selected),
+    { timeout: 20_000 }).toBe('Testholm 1 a');
+
+  // Picking another body rewrites it, so the address bar is always the view.
+  await page.locator('.orr-row[data-id="1"]').click();
+  await expect.poll(() => new URL(page.url()).searchParams.get('body')).toBe('1');
+  // And the star is the system, so it drops out rather than reading as a body.
+  await page.locator('.orr-row[data-id="0"]').click();
+  await expect.poll(() => new URL(page.url()).searchParams.get('body')).toBe(null);
+
+  /* Choosing bodies is not navigation — walking down a list of moons must not
+     be forty presses of Back to get out of. */
+  const before = await page.evaluate(() => history.length);
+  for (const id of [1, 2, 0, 1, 2]) await page.locator(`.orr-row[data-id="${id}"]`).click();
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => history.length),
+    'picking bodies does not fill the history').toBe(before);
+});
+
+/* A dialog that takes focus and then lets Tab walk out of it is not modal,
+   and one that drops focus on close leaves a keyboard reader at the top of
+   the document hunting for the row they were on. */
+test('the station dialog keeps the keyboard inside it', async ({ page }) => {
+  const withPort = JSON.parse(JSON.stringify(SYSTEM));
+  withPort.bodies[1].stations = [{ name: 'Walz Depot', type: 'Outpost',
+    distanceToArrival: 166, id: 3534389760, services: ['Dock', 'Market'] }];
+  await stubDataHosts(page);
+  await stubApi(page, withPort);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+
+  const row = page.locator('.orr-row.stn', { hasText: 'Walz Depot' });
+  await row.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#orr-modal')).toBeVisible();
+
+  const inside = () => page.evaluate(() =>
+    !!document.querySelector('.orr-m-box').contains(document.activeElement));
+  expect(await inside(), 'focus starts in the dialog').toBe(true);
+  // All the way round, forwards and back, without ever leaving.
+  for (let i = 0; i < 12; i++) {
+    await page.keyboard.press('Tab');
+    expect(await inside(), `still inside after ${i + 1} tabs`).toBe(true);
+  }
+  for (let i = 0; i < 4; i++) {
+    await page.keyboard.press('Shift+Tab');
+    expect(await inside(), 'still inside going backwards').toBe(true);
+  }
+
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#orr-modal')).toBeHidden();
+  // And back on the row it was opened from.
+  expect(await page.evaluate(() =>
+    document.activeElement.textContent.includes('Walz Depot'))).toBe(true);
+});
+
 /* A link someone typed or pasted in caps is a link to the same system. The
    typeahead is a prefix search over canonical names, so the guard against a
    near-match has to compare letters rather than case. */
