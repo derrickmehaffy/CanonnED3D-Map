@@ -333,11 +333,12 @@ test('a body shows everything the dump holds about it', async ({ page }) => {
     'Body', 'Orbit', 'Atmosphere', 'Crust', 'Surface materials', 'Rings',
     'Mapped signals', '2 stations'
   ]);
-  // Nearest first, since the question is which one to fly to, and the largest
-  // pad is the thing that decides whether you can dock at all.
+  /* Nearest first, since the question is which one to fly to. An index, not
+     a stack of cards: the detail is a page of its own now, and repeating half
+     of it here made the panel long without making it more useful. */
   const stations = facts.locator('.orr-sec', { hasText: '2 stations' });
-  await expect(stations.locator('.orr-stn-h b')).toHaveText(['Nearer Dock', 'Testholm Hub']);
-  await expect(stations.locator('.orr-stn').first().locator('.pad')).toHaveText('M');
+  await expect(stations.locator('.orr-ports button span'))
+    .toHaveText(['Nearer Dock', 'Testholm Hub']);
   // Proportions are bars, sorted by share, biggest first.
   await expect(facts.locator('.orr-sec', { hasText: 'Surface materials' })
     .locator('.orr-bar .k')).toHaveText(['Iron', 'Nickel', 'Sulphur']);
@@ -609,22 +610,37 @@ test('stations appear where their data actually places them', async ({ page }) =
   await stubDataHosts(page);
   await stubApi(page, withPorts);
   await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
 
   // On the distance axis, because that is the one spatial fact they carry.
   await expect(page.locator('.orr-spine .port')).toHaveCount(3);
   // The axis has to stretch to the furthest of them, not just the bodies.
   await expect(page.locator('.orr-spine')).toContainText('1,200 Ls');
 
-  // Counted in the list against the body they belong to.
-  await expect(page.locator('.orr-row[data-id="1"] .pt')).toHaveText('◆ 2');
-  await expect(page.locator('.orr-row[data-id="0"] .pt')).toHaveCount(0);
+  /* And in the list, under the body they are docked at — nearest first,
+     because the list is read as "what could I dock at, and how far". They
+     were a count on the body's row and a stack of cards on the far side of
+     the window; this is where a reader looks for what is in a system. */
+  const rows = page.locator('.orr-list .orr-row');
+  await expect(rows).toHaveCount(6);
+  await expect(rows.nth(0)).toHaveText(/Testholm/);
+  // The ones the dump attaches to no body belong to the system, so they hang
+  // off the star rather than being lost under a heading meaning "not placed".
+  await expect(rows.nth(1)).toHaveClass(/stn/);
+  await expect(rows.nth(1)).toHaveText(/Loose Platform/);
+  await expect(rows.nth(3)).toHaveText(/Near Dock/);
+  await expect(rows.nth(4)).toHaveText(/Far Dock/);
+  // A station sits one level in from the body it belongs to.
+  expect(await rows.nth(3).evaluate((el) => el.style.getPropertyValue('--depth'))).toBe('2');
 
-  // The ones the dump attaches to no body belong to the system, so they are
-  // read off the star rather than being lost.
-  await page.locator('.orr-row[data-id="0"]').click();
-  await expect(page.locator('.orr-sec', { hasText: 'Elsewhere in the system' }))
-    .toContainText('Loose Platform');
+  /* Sol lists sixty-seven of them against forty bodies, which puts Mercury
+     eleven rows below the star. They belong here, but a reader looking for a
+     body has to be able to put them away. */
+  await page.locator('#orr-stations').click();
+  await expect(page.locator('.orr-list .orr-row.stn')).toHaveCount(0);
+  await expect(page.locator('.orr-list .orr-row')).toHaveCount(3);
+  await page.locator('#orr-stations').click();
+  await expect(page.locator('.orr-list .orr-row.stn')).toHaveCount(3);
 });
 
 /* Getting close to a body at true scale had four separate things in the way,
@@ -1018,39 +1034,134 @@ test('the light controls do something, and are remembered', async ({ page }) => 
    keys on the market id the dump carries, so that is exact; Inara numbers its
    stations itself and that number is nowhere in the dump, so the honest offer
    is a search. */
-test('a station links out to where more is known', async ({ page }) => {
+/* A station is a place, and the dump knows a great deal about one that a card
+   in a column could never hold: who runs it and what state they are in, what
+   the economy is made of, how many pads of each size, where on the surface it
+   stands, every service, the ships and modules it sells, and its market both
+   ways round. None of that needed another request — it arrived with the
+   system. This is the same station's real block out of Sol's dump, trimmed. */
+test('a station says everything the dump knows about it', async ({ page }) => {
   const withPort = JSON.parse(JSON.stringify(SYSTEM));
   withPort.bodies[1].stations = [{
     name: 'Walz Depot', type: 'Planetary Outpost', primaryEconomy: 'Industrial',
     distanceToArrival: 166, id: 3534389760,
+    allegiance: 'Federation', government: 'Democracy',
+    controllingFaction: "Sol Workers' Party", controllingFactionState: 'Civil Liberty',
+    state: 'UnderRepairs',
+    latitude: -50.540871, longitude: -41.765411,
+    economies: { Industrial: 80, Refinery: 20 },
     landingPads: { large: 2, medium: 2, small: 4 },
     services: ['Dock', 'Market', 'Outfitting', 'Shipyard', 'Repair', 'Refuel',
-               'Contacts', 'Missions', 'Crew Lounge', 'Livery']
+               'Contacts', 'Missions', 'Crew Lounge', 'Livery'],
+    shipyard: { ships: [{ name: 'Asp Explorer' }, { name: 'Cobra MkIII' }] },
+    outfitting: { modules: [{ class: 1, name: 'Lightweight Alloy' },
+                            { class: 1, name: 'Reinforced Alloy' },
+                            { class: 4, name: 'Power Plant' }] },
+    market: {
+      commodities: [
+        { name: 'Biowaste', buyPrice: 109, supply: 78658, demand: 0, sellPrice: 100 },
+        { name: 'Platinum', buyPrice: 0, supply: 0, demand: 312797, sellPrice: 56331 },
+        { name: 'Gold', buyPrice: 0, supply: 0, demand: 900201, sellPrice: 50946 }
+      ],
+      prohibitedCommodities: ['Narcotics', 'Slaves']
+    }
   }];
   await stubDataHosts(page);
   await stubApi(page, withPort);
   await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
-  await page.locator('.orr-row[data-id="1"]').click();
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
 
-  const card = page.locator('.orr-stn', { hasText: 'Walz Depot' });
+  // Nothing over the model until it is asked for.
+  await expect(page.locator('#orr-modal')).toBeHidden();
+  await page.locator('.orr-row.stn', { hasText: 'Walz Depot' }).click();
+  const m = page.locator('#orr-modal');
+  await expect(m).toBeVisible();
+
+  /* A station has no orbit of its own, so there is nowhere to fly but the
+     body it stands on — which is what a reader wants in front of them. */
+  expect(await page.evaluate(() => window.Orrery.state().selected)).toBe('Testholm 1');
+
+  await expect(page.locator('#orr-m-name')).toHaveText('Walz Depot');
+  await expect(page.locator('#orr-m-sub')).toHaveText('Planetary Outpost · on 1');
+
+  // Who is holding it, and how that is going.
+  const control = m.locator('.orr-sec', { hasText: 'Control' });
+  await expect(control.locator('dd')).toHaveText(
+    ["Sol Workers' Party", 'Civil Liberty', 'Under Repairs']);
+
+  // Where on the body it stands — the two numbers you fly to it with.
+  await expect(m.locator('.orr-sec', { hasText: 'On the surface' }).locator('dd'))
+    .toHaveText(['-50.5409°', '-41.7654°']);
+
+  await expect(m.locator('.orr-sec', { hasText: 'Landing pads' }).locator('dd'))
+    .toHaveText(['2', '2', '4']);
+  await expect(m.locator('.orr-sec', { hasText: 'Economy' }).locator('.orr-bar .k'))
+    .toHaveText(['Industrial', 'Refinery']);
+
+  // All ten here, unlike the panel, which named the five that decide a trip.
+  await expect(m.locator('.orr-sec', { hasText: '10 services' }).locator('.orr-chip'))
+    .toHaveCount(10);
+  await expect(m.locator('.orr-sec', { hasText: '2 ships' }).locator('.orr-chip'))
+    .toHaveText(['Asp Explorer', 'Cobra MkIII']);
+  /* Six hundred module rows is not a list anyone reads, so they are counted
+     by rating — which is the thing that decides whether the detour is worth
+     making. */
+  await expect(m.locator('.orr-sec', { hasText: '3 modules' }).locator('.orr-bar .k'))
+    .toHaveText(['Class 1', 'Class 4']);
+
+  /* A market both ways round: what it sells cheapest, and what it pays most
+     for. Hundreds of rows is not a market anyone reads either. */
+  const mkt = m.locator('.orr-sec', { hasText: '3 commodities' });
+  await expect(mkt.locator('.orr-mkt').first().locator('.k')).toHaveText(['Biowaste']);
+  await expect(mkt.locator('.orr-mkt').nth(1).locator('.k')).toHaveText(['Platinum', 'Gold']);
+  await expect(mkt.locator('.orr-mkt').nth(1).locator('.p').first()).toHaveText('56,331 cr');
+  await expect(m.locator('.orr-sec', { hasText: 'Will not take' }).locator('.orr-chip'))
+    .toHaveText(['Narcotics', 'Slaves']);
+
   // Exact, because the market id is in the dump.
-  await expect(card.locator('a').first())
+  await expect(m.locator('.orr-links a').first())
     .toHaveAttribute('href', 'https://spansh.co.uk/station/3534389760');
   // A search, and labelled as one rather than pretending to be a deep link.
-  await expect(card.locator('a').nth(1)).toHaveText(/Find on Inara/);
-  await expect(card.locator('a').nth(1))
+  await expect(m.locator('.orr-links a').nth(1)).toHaveText(/Find on Inara/);
+  await expect(m.locator('.orr-links a').nth(1))
     .toHaveAttribute('href', /inara\.cz\/elite\/search\/\?search=Walz%20Depot%20Testholm/);
-  for (const a of await card.locator('a').all()) {
+  for (const a of await m.locator('.orr-links a').all()) {
     await expect(a).toHaveAttribute('rel', 'noopener');
     await expect(a).toHaveAttribute('target', '_blank');
   }
 
-  /* Ten services listed, but only the handful that decide whether the trip is
-     worth making are named; the rest are counted. */
-  await expect(card.locator('.orr-svc i'))
-    .toHaveText(['Market', 'Outfitting', 'Shipyard', 'Repair', 'Refuel']);
-  await expect(card.locator('.orr-svc u')).toHaveText('+5 more');
+  // Escape puts it away, and puts away only it.
+  await page.keyboard.press('Escape');
+  await expect(m).toBeHidden();
+  await expect(page.locator('.orrery.open')).toHaveCount(1);
+
+  // The panel's index opens the same page.
+  await page.locator('.orr-ports button', { hasText: 'Walz Depot' }).click();
+  await expect(m).toBeVisible();
+});
+
+/* A station with a latitude is standing on the ground. Odyssey settlements
+   come through the dump with no type at all, so the coordinates are the only
+   thing that says so — and the list says it back. */
+test('a settlement on the ground reads as one', async ({ page }) => {
+  const withPort = JSON.parse(JSON.stringify(SYSTEM));
+  withPort.bodies[1].stations = [
+    { name: 'Orbital Ring', type: 'Coriolis', distanceToArrival: 500 },
+    { name: "Fung's Claim", distanceToArrival: 501, latitude: 39.95, longitude: 12.1 }
+  ];
+  await stubDataHosts(page);
+  await stubApi(page, withPort);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+
+  await expect(page.locator('.orr-row.stn', { hasText: 'Orbital Ring' }))
+    .not.toHaveClass(/ground/);
+  await expect(page.locator('.orr-row.stn', { hasText: "Fung's Claim" }))
+    .toHaveClass(/ground/);
+
+  // And with no type, it is called what it is rather than left blank.
+  await page.locator('.orr-row.stn', { hasText: "Fung's Claim" }).click();
+  await expect(page.locator('#orr-m-sub')).toHaveText('Surface settlement · on 1');
 });
 
 /* Game tokens are not something to show a reader, and they come in more than

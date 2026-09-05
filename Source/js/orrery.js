@@ -1212,6 +1212,7 @@ const Orrery = (function () {
      and the trans-Neptunian inclinations alone make a tangle you cannot see
      the planets through. */
   let showLabels = true, following = true, orbitMode = 0;   // 0 all, 1 planets, 2 none
+  let showPorts = true;
   let skyMode = 'none', sky = null;                        // none | galaxy | stars
   // The same sky as a picture, for any black hole in the system to bend.
   let lensSky = null, lenses = [];
@@ -1335,7 +1336,13 @@ const Orrery = (function () {
       '<div class="orr-mid">',
       '  <aside class="orr-side orr-left" id="orr-left">',
       '    <div class="orr-s-h">',
-      '      <div class="orr-s-t">Bodies</div>',
+      '      <div class="orr-s-t">System</div>',
+      /* Sol has sixty-seven stations and forty bodies, and with all of them
+         listed Mercury sits eleven rows below the star. They belong here —
+         they are things in the system — but a reader looking for a body
+         should be able to put them away for a moment. */
+      '      <button class="orr-s-tog on" id="orr-stations" aria-pressed="true"',
+      '              title="Show the stations">&#9670;</button>',
       '      <input id="orr-filter" class="orr-filter" type="text" autocomplete="off"',
       '             spellcheck="false" placeholder="Filter" aria-label="Filter bodies">',
       '    </div>',
@@ -1408,6 +1415,22 @@ const Orrery = (function () {
 
       // Nothing asked for yet. The search is the page, so it moves to the
       // middle and brings a few real places to start.
+      /* A station is a place, and everything the dump knows about one is far
+         more than a card in a column can hold: who runs it, what it trades,
+         what it will sell you, and where on the surface it stands. That is a
+         page's worth, so it gets a page — over the top, dismissed with Escape
+         or a click outside, and taking nothing from the model until asked. */
+      '<div class="orr-modal" id="orr-modal" role="dialog" aria-modal="true"',
+      '     aria-labelledby="orr-m-name" hidden>',
+      '  <div class="orr-m-box">',
+      '    <div class="orr-m-h">',
+      '      <div class="orr-m-t"><b id="orr-m-name"></b><span id="orr-m-sub"></span></div>',
+      '      <button class="orr-x" id="orr-m-x" aria-label="Close">&times;</button>',
+      '    </div>',
+      '    <div class="orr-m-b" id="orr-m-b"></div>',
+      '  </div>',
+      '</div>',
+
       '<div class="orr-empty" id="orr-empty">',
       '  <h1>Canonn Orrery</h1>',
       '  <p>Any system Canonn has data for, with its bodies on their real orbits.',
@@ -1444,6 +1467,10 @@ const Orrery = (function () {
     $('orr-reset').onclick = () => { if (model) { frame(); select(model.star, false); } };
     $('orr-orbits').onclick = () => setOrbits((orbitMode + 1) % 3);
     $('orr-link').onclick = copyLink;
+    $('orr-m-x').onclick = () => closeStation();
+    $('orr-modal').addEventListener('mousedown', (e) => {
+      if (e.target === $('orr-modal')) closeStation();
+    });
     $('orr-tools').onclick = (e) => { e.stopPropagation(); showMenu(!menuOpen()); };
     $('orr-light').onclick = (e) => { e.stopPropagation(); showLight(!lightOpen()); };
     document.addEventListener('click', (e) => {
@@ -1451,6 +1478,7 @@ const Orrery = (function () {
       if (lightOpen() && !$('orr-light-p').contains(e.target)) showLight(false);
     });
     $('orr-filter').addEventListener('input', () => renderList());
+    $('orr-stations').onclick = () => setStations(!showPorts);
     $('orr-empty').addEventListener('click', (e) => {
       const b = e.target.closest('[data-sys]');
       if (b) go(b.dataset.sys);
@@ -1592,7 +1620,7 @@ const Orrery = (function () {
       drawSpine();
     });
 
-    setSide('left', recallNum('leftWidth', 262));
+    setSide('left', recallNum('leftWidth', 290));
     setSide('right', recallNum('rightWidth', 276));
     setSpine(recallNum('spineHeight', 37));
     window.addEventListener('resize', () => {
@@ -1769,7 +1797,8 @@ const Orrery = (function () {
     if (!isOpen()) return;
     if (e.key === 'Escape') {
       e.preventDefault();
-      if (menuOpen()) showMenu(false);
+      if (stationOpen()) closeStation();
+      else if (menuOpen()) showMenu(false);
       else if (lightOpen()) showLight(false);
       else close();
     }
@@ -2167,6 +2196,16 @@ const Orrery = (function () {
     const b = panel.querySelector('#orr-follow');
     b.classList.toggle('on', on);
     b.querySelector('b').textContent = on ? 'on' : 'off';
+  }
+
+  function setStations(on) {
+    showPorts = on;
+    keep('stations', on ? '1' : '0');
+    const el = panel.querySelector('#orr-stations');
+    el.classList.toggle('on', on);
+    el.setAttribute('aria-pressed', on ? 'true' : 'false');
+    el.title = on ? 'Hide the stations' : 'Show the stations';
+    renderList();
   }
 
   function setOrbits(mode) {
@@ -2656,25 +2695,10 @@ const Orrery = (function () {
       (u ? '<em>' + u + '</em>' : '') + '</dd></div>').join('') + '</div>';
   }
 
-  /* The services worth knowing before you fly. Walz Depot lists twenty-six of
-     them; naming all twenty-six helps nobody, and these four are the ones that
-     decide whether the trip is worth making. */
-  const KEY_SERVICES = ['Market', 'Outfitting', 'Shipyard', 'Repair', 'Refuel'];
-
-  function serviceChips(st) {
-    const have = st.services || [];
-    if (!have.length) return '';
-    const shown = KEY_SERVICES.filter((k) => have.includes(k));
-    const rest = have.length - shown.length;
-    return '<div class="orr-svc">' +
-      shown.map((k) => '<i>' + k + '</i>').join('') +
-      (rest > 0 ? '<u>+' + rest + ' more</u>' : '') + '</div>';
-  }
-
   /* Out to the wider tooling.
 
-     Spansh keys on the market id, which is the id the dump carries, so that is
-     an exact link to this station. Inara numbers stations itself and that
+     Spansh keys on the market id, which is the id the dump carries, so that
+     is an exact link to this station. Inara numbers stations itself and that
      number is not in the dump, so the honest offer is its search — which does
      land on the station, but it is a search and the label says so. */
   function stationLinks(st, systemName) {
@@ -2687,24 +2711,6 @@ const Orrery = (function () {
       encodeURIComponent(st.name + ' ' + systemName) +
       '" target="_blank" rel="noopener" title="Inara numbers its own stations, so this searches for it by name">Find on Inara <span>&#8599;</span></a>');
     return '<div class="orr-links">' + out.join('') + '</div>';
-  }
-
-  function stationCard(st, systemName) {
-    const pads = st.landingPads || {};
-    const big = pads.large ? 'L' : pads.medium ? 'M' : pads.small ? 'S' : '';
-    const meta = [
-      st.type,
-      st.primaryEconomy,
-      typeof st.distanceToArrival === 'number'
-        ? Math.round(st.distanceToArrival).toLocaleString() + ' Ls' : ''
-    ].filter(Boolean).join(' · ');
-    return '<div class="orr-stn">' +
-      '<div class="orr-stn-h"><b>' + esc(st.name) + '</b>' +
-        (big ? '<i class="pad" title="Largest landing pad">' + big + '</i>' : '') + '</div>' +
-      (meta ? '<div class="orr-stn-m">' + esc(meta) + '</div>' : '') +
-      serviceChips(st) +
-      stationLinks(st, systemName) +
-    '</div>';
   }
 
   const chip = (on, label, kind) =>
@@ -2828,6 +2834,134 @@ const Orrery = (function () {
     return h;
   }
 
+  /* ── a station, in full ────────────────────────────────────────────────────
+     The dump carries far more about a station than a card in a column could
+     hold: who owns it and what state they are in, what the economy is made
+     of, how many pads of each size, where on the surface it stands, every
+     service it offers, the ships and modules it sells, and its whole market.
+     None of it needed another request — it arrived with the system. */
+
+  let shownPort = null;
+  const stationOpen = () => !!shownPort;
+
+  function closeStation() {
+    shownPort = null;
+    if (panel) panel.querySelector('#orr-modal').hidden = true;
+  }
+
+  /* Commodities, the two ways round that matter. What a station sells is
+     what it has supply of; what it pays for is what it has demand for, and
+     the price it pays is the reason to fly there. */
+  function marketRows(list, kind) {
+    const rows = (list || [])
+      .filter((c) => c && c.name && (kind === 'out' ? c.supply > 0 : c.demand > 0))
+      .sort((a, b) => kind === 'out'
+        ? (a.buyPrice || 0) - (b.buyPrice || 0)
+        : (b.sellPrice || 0) - (a.sellPrice || 0))
+      .slice(0, 7);
+    if (!rows.length) return '';
+    return '<div class="orr-mkt">' + rows.map((c) =>
+      '<div><span class="k">' + esc(c.name) + '</span>' +
+      '<span class="p">' + (kind === 'out' ? c.buyPrice : c.sellPrice).toLocaleString() + ' cr</span>' +
+      '<span class="q">' + (kind === 'out' ? c.supply : c.demand).toLocaleString() + '</span></div>')
+      .join('') + '</div>';
+  }
+
+  function openStation(p) {
+    const st = p.st;
+    shownPort = p;
+    const pads = st.landingPads || {};
+    const where = p.on ? shortName(p.on) : model.name;
+
+    panel.querySelector('#orr-m-name').textContent = st.name;
+    panel.querySelector('#orr-m-sub').textContent =
+      [st.type || (onGround(st) ? 'Surface settlement' : 'Station'),
+       (onGround(st) ? 'on ' : 'at ') + where].join(' · ');
+
+    let h = measures([
+      ['Arrival', typeof st.distanceToArrival === 'number'
+        ? Math.round(st.distanceToArrival).toLocaleString() : '', 'Ls'],
+      ['Largest pad', biggestPad(st) === 'L' ? 'Large'
+        : biggestPad(st) === 'M' ? 'Medium' : biggestPad(st) === 'S' ? 'Small' : '', ''],
+      ['Allegiance', st.allegiance, ''],
+      ['Government', st.government, '']
+    ]);
+
+    /* Who is holding it, and how that is going. A station in Civil Unrest or
+       under repairs is a different proposition from the same station a week
+       earlier, and it is the kind of fact the dump has and nothing here said. */
+    h += sect('Control', table([
+      ['Faction', st.controllingFaction],
+      ['Faction state', st.controllingFactionState],
+      ['Station state', st.state && String(st.state).replace(/([a-z])([A-Z])/g, '$1 $2')]
+    ]));
+
+    h += sect('Economy', bars(st.economies, '#B9903F'));
+
+    h += sect('Landing pads', table([
+      ['Large', pads.large], ['Medium', pads.medium], ['Small', pads.small]
+    ]));
+
+    /* Where it actually is on the body. Two numbers, and they are the two a
+       commander types into the ship's own navigation panel to get there. */
+    if (onGround(st)) {
+      h += sect('On the surface', table([
+        ['Latitude', st.latitude.toFixed(4) + '°'],
+        ['Longitude', typeof st.longitude === 'number' ? st.longitude.toFixed(4) + '°' : '']
+      ]));
+    }
+
+    // All of them here, unlike the card, which shows the five that decide a trip.
+    const svc = st.services || [];
+    if (svc.length) {
+      h += sect(svc.length + ' services', '<div class="orr-chips">' +
+        svc.map((k) => '<span class="orr-chip">' + esc(k) + '</span>').join('') + '</div>');
+    }
+
+    const ships = (st.shipyard && st.shipyard.ships) || [];
+    if (ships.length) {
+      h += sect(ships.length + ' ships', '<div class="orr-chips">' +
+        ships.map((x) => '<span class="orr-chip">' + esc(x.name || x.symbol) + '</span>').join('') +
+        '</div>');
+    }
+
+    /* Six hundred module rows is not a list anyone reads. What decides
+       whether the detour is worth it is which ratings are stocked, so the
+       modules are counted by rating rather than named. */
+    const mods = (st.outfitting && st.outfitting.modules) || [];
+    if (mods.length) {
+      const byClass = {};
+      mods.forEach((m) => {
+        const k = 'Class ' + (m.class === undefined ? '?' : m.class);
+        byClass[k] = (byClass[k] || 0) + 1;
+      });
+      h += sect(mods.length.toLocaleString() + ' modules', bars(byClass, '#4C8FB5'));
+    }
+
+    const mkt = st.market || {};
+    const com = mkt.commodities || [];
+    if (com.length) {
+      h += '<div class="orr-sec"><h3>' + com.length + ' commodities</h3>' +
+        (marketRows(com, 'out') ? '<h4 class="orr-mkt-h">Cheapest to buy here</h4>' +
+          marketRows(com, 'out') : '') +
+        (marketRows(com, 'in') ? '<h4 class="orr-mkt-h">Pays most for</h4>' +
+          marketRows(com, 'in') : '') +
+        '</div>';
+    }
+    const banned = mkt.prohibitedCommodities || [];
+    if (banned.length) {
+      h += sect('Will not take', '<div class="orr-chips">' +
+        banned.map((k) => '<span class="orr-chip">' + esc(k) + '</span>').join('') + '</div>');
+    }
+
+    h += '<div class="orr-sec">' + stationLinks(st, model.name) + '</div>';
+
+    panel.querySelector('#orr-m-b').innerHTML = h;
+    panel.querySelector('#orr-m-b').scrollTop = 0;
+    panel.querySelector('#orr-modal').hidden = false;
+    panel.querySelector('#orr-m-x').focus();
+  }
+
   const KM = (m) => Math.round(m / 1000).toLocaleString() + ' km';
 
   function updateFacts() {
@@ -2942,25 +3076,28 @@ const Orrery = (function () {
 
     h += sect('Mapped signals', signalSection(b));
 
-    const ports = (b.stations || []).filter((st) => st && st.name);
+    /* Stations used to be cards down this column, and the ones the dump
+       attaches to no body were gathered under "Elsewhere in the system" —
+       a heading that means "we could not place this", on the panel that is
+       supposed to be about the one body you picked. They are in the list on
+       the left now, under the body they are on, and clicking one says
+       everything rather than five services and two links. */
+    const ports = portsOf(n);
     if (ports.length) {
       h += sect(ports.length + ' station' + (ports.length > 1 ? 's' : ''),
-        ports.slice().sort((x, y) =>
-          (x.distanceToArrival || 0) - (y.distanceToArrival || 0))
-          .map((st) => stationCard(st, model.name)).join(''));
+        '<div class="orr-ports">' + ports.map((x) =>
+          '<button data-port="' + (model.ports || []).indexOf(x) + '">' +
+          '<span>' + esc(x.st.name) + '</span>' +
+          '<em>' + esc(x.st.type || 'Surface') + '</em></button>').join('') + '</div>');
     }
 
-    if (n === model.star) {
-      const loose = (model.ports || []).filter((p) => !p.on).map((p) => p.st);
-      if (loose.length) {
-        h += sect('Elsewhere in the system', loose.slice().sort((x, y) =>
-          (x.distanceToArrival || 0) - (y.distanceToArrival || 0))
-          .map((st) => stationCard(st, model.name)).join(''));
-      }
-    }
-
-    panel.querySelector('#orr-facts').innerHTML = h;
-    panel.querySelector('#orr-facts').scrollTop = 0;
+    const facts = panel.querySelector('#orr-facts');
+    facts.innerHTML = h;
+    facts.scrollTop = 0;
+    facts.onclick = (e) => {
+      const b2 = e.target.closest('[data-port]');
+      if (b2) openStation((model.ports || [])[+b2.dataset.port]);
+    };
   }
 
   /* Names over the view.
@@ -3008,13 +3145,37 @@ const Orrery = (function () {
     return full.indexOf(sys) === 0 ? full.slice(sys.length) : full;
   }
 
-  const portsOn = (n) => (n.raw.stations || []).filter((x) => x && x.name).length;
+  /* Which stations belong on which row.
+
+     A station's own body, and — for the star — the ones the dump attaches to
+     no body at all, which are the system's rather than nobody's. Nearest
+     first, because this list is read as "what could I dock at, and how far". */
+  function portsOf(n) {
+    return (model.ports || [])
+      .filter((p) => p.on === n || (!p.on && n === model.star))
+      .sort((a, b) => (a.st.distanceToArrival || 0) - (b.st.distanceToArrival || 0));
+  }
+
+  /* A station with a latitude is standing on the ground. Odyssey settlements
+     come through with no type at all, so the coordinates are what say so. */
+  const onGround = (st) => typeof st.latitude === 'number';
+  const biggestPad = (st) => {
+    const pads = st.landingPads || {};
+    return pads.large ? 'L' : pads.medium ? 'M' : pads.small ? 'S' : '';
+  };
 
   function renderList() {
-    // Depth-first, so moons sit under the planet they belong to.
+    /* Depth-first, so moons sit under the planet they belong to — and so do
+       the stations, under the body they are docked at or standing on.
+
+       They used to be listed down the right-hand side, the loose ones under
+       a heading reading "Elsewhere in the system", which is a heading that
+       means "we could not place this". The left list is where a reader looks
+       for what is in a system, and a station is one of the things in it. */
     const all = [];
     const walk = (n, depth) => {
       all.push({ n, depth });
+      if (showPorts) portsOf(n).forEach((p) => all.push({ p, parent: n, depth: depth + 1 }));
       n.children.slice()
         .sort((a, b) => (a.aAu || 0) - (b.aAu || 0))
         .forEach((c) => walk(c, depth + 1));
@@ -3022,26 +3183,29 @@ const Orrery = (function () {
     walk(model.star, 0);
 
     /* Filtering keeps a match's parents, so a moon never appears orphaned
-       under a planet that got filtered away — the indent would be a lie. */
+       under a planet that got filtered away — the indent would be a lie. A
+       station keeps the body it is on for exactly the same reason. */
     const term = (panel.querySelector('#orr-filter').value || '').trim().toLowerCase();
     let out = all;
     if (term) {
-      const hit = (n) => (n.name + ' ' + n.sub).toLowerCase().includes(term);
       const keep = new Set();
-      all.forEach(({ n }) => {
-        if (!hit(n)) return;
-        for (let p = n; p; p = p.parent) keep.add(p);
+      all.forEach((row) => {
+        const text = row.p ? row.p.st.name + ' ' + (row.p.st.type || '')
+                           : row.n.name + ' ' + row.n.sub;
+        if (!text.toLowerCase().includes(term)) return;
+        keep.add(row);
+        for (let x = row.p ? row.parent : row.n; x; x = x.parent) keep.add(x);
       });
-      out = all.filter(({ n }) => keep.has(n));
+      out = all.filter((row) => keep.has(row) || keep.has(row.n));
     }
 
     const list = panel.querySelector('#orr-list');
     if (!out.length) {
-      list.innerHTML = '<div class="orr-none">No body here matches “' + esc(term) + '”.</div>';
+      list.innerHTML = '<div class="orr-none">Nothing here matches “' + esc(term) + '”.</div>';
       return;
     }
 
-    list.innerHTML = out.map(({ n, depth }) =>
+    const bodyRow = (n, depth) =>
       '<div class="orr-row" data-id="' + n.id + '" style="--depth:' + depth + '" ' +
       'role="button" tabindex="0" title="' + esc(n.name) + '">' +
       '<span class="dot" style="background:' +
@@ -3051,10 +3215,25 @@ const Orrery = (function () {
       '<span class="nm">' + esc(shortName(n)) + '</span>' +
       signalKinds(n.raw).map(([cls, , label]) =>
         '<i class="sg ' + cls + '" title="' + label + ' signals"></i>').join('') +
-      (portsOn(n) ? '<span class="pt" title="' + portsOn(n) + ' station' +
-        (portsOn(n) > 1 ? 's' : '') + '">&#9670; ' + portsOn(n) + '</span>' : '') +
-      '<span class="ct">' + (n.aAu ? num(n.aAu, n.aAu < 0.1 ? 3 : 2) : '') + '</span></div>'
-    ).join('');
+      '<span class="ct">' + (n.aAu ? num(n.aAu, n.aAu < 0.1 ? 3 : 2) : '') + '</span></div>';
+
+    const portRow = (p, depth) => {
+      const st = p.st, pad = biggestPad(st);
+      const ls = typeof st.distanceToArrival === 'number'
+        ? Math.round(st.distanceToArrival).toLocaleString() : '';
+      return '<div class="orr-row stn' + (onGround(st) ? ' ground' : '') +
+        '" data-port="' + (model.ports || []).indexOf(p) + '" style="--depth:' + depth + '" ' +
+        'role="button" tabindex="0" title="' + esc(st.name) + ' — ' +
+          esc(st.type || 'Surface settlement') + '">' +
+        '<span class="dot"></span>' +
+        '<span class="nm">' + esc(st.name) + '</span>' +
+        (pad ? '<i class="pad" title="Largest landing pad">' + pad + '</i>' : '') +
+        '<span class="ct">' + ls + '</span></div>';
+    };
+
+    list.innerHTML = out.map((row) =>
+      row.p ? portRow(row.p, row.depth) : bodyRow(row.n, row.depth)).join('');
+
     if (selected) {
       const row = list.querySelector('.orr-row[data-id="' + selected.id + '"]');
       if (row) row.classList.add('on');
@@ -3063,8 +3242,27 @@ const Orrery = (function () {
     panel.querySelector('#orr-list').onclick = (e) => {
       const row = e.target.closest('.orr-row');
       if (!row) return;
+      /* A station has no orbit of its own, so there is nowhere to fly but the
+         body it is docked at or standing on — which is what a reader wants in
+         front of them anyway. Focus that, then say what the dump knows. */
+      if (row.dataset.port !== undefined) {
+        const p = (model.ports || [])[+row.dataset.port];
+        if (!p) return;
+        if (p.on) select(p.on);
+        openStation(p);
+        return;
+      }
       const node = model.all.find((n) => n.id === +row.dataset.id);
       if (node) select(node);
+    };
+
+    // A row you can tab to is a row you must be able to open with the keyboard.
+    panel.querySelector('#orr-list').onkeydown = (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const row = e.target.closest('.orr-row');
+      if (!row) return;
+      e.preventDefault();
+      row.click();
     };
 
     panel.querySelector('#orr-legend').innerHTML =
@@ -3152,6 +3350,7 @@ const Orrery = (function () {
     renderList();
     buildLabels();
     drawSpine();
+    setStations(recallStr('stations', '1') === '1');
     setOrbits(recallNum('orbits', 0));
     setSky(recallStr('sky', 'stars'));
     select(model.star);
