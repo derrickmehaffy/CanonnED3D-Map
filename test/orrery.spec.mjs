@@ -1598,6 +1598,174 @@ test('a phone held sideways still has a model in it', async ({ page }) => {
   expect((await page.locator('#orr-left').boundingBox()).width).toBeLessThan(200);
 });
 
+/* Three things that were costing real resources and were invisible to every
+   test here, because each of them was about what the machine does rather than
+   about what the DOM says. All three are measured through the GL context. */
+
+test('rebuilding the scene does not allocate more of the GPU', async ({ page }) => {
+  const rings = JSON.parse(JSON.stringify(SYSTEM));
+  rings.bodies[1].rings = [
+    { name: 'Testholm 1 A Ring', type: 'Icy', innerRadius: 8e6, outerRadius: 1.4e7, mass: 1e12 },
+    { name: 'Testholm 1 B Ring', type: 'Rocky', innerRadius: 1.5e7, outerRadius: 2e7, mass: 3e12 }
+  ];
+  await stubDataHosts(page);
+  await stubApi(page, rings);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+  await page.waitForTimeout(700);
+
+  /* Toggling the scale rebuilds every mesh in the scene. Ring bands were made
+     fresh each time and a body's face is cached, and neither was ever freed —
+     three disposes a material's own resources, never its textures. */
+  const grew = await page.evaluate(async () => {
+    const c = document.querySelector('#orr-canvas');
+    const gl = c.getContext('webgl2') || c.getContext('webgl');
+    let made = 0;
+    const real = gl.createTexture.bind(gl);
+    gl.createTexture = function () { made++; return real(); };
+    const t = document.querySelector('#orr-true'), s = document.querySelector('#orr-spread');
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    // One cycle to settle any first-use upload, then five that must cost nothing.
+    t.click(); await wait(350); s.click(); await wait(350);
+    const settled = made;
+    for (let i = 0; i < 5; i++) { t.click(); await wait(300); s.click(); await wait(300); }
+    return made - settled;
+  });
+  expect(grew, 'GPU textures allocated by five scene rebuilds').toBe(0);
+});
+
+test('a paused orrery stops drawing', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+  await page.waitForTimeout(700);
+
+  const calls = await page.evaluate(async () => {
+    const c = document.querySelector('#orr-canvas');
+    const gl = c.getContext('webgl2') || c.getContext('webgl');
+    let n = 0;
+    const real = gl.drawElements.bind(gl);
+    gl.drawElements = function () { n++; return real.apply(gl, arguments); };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const play = document.querySelector('#orr-play');
+    play.click();                                   // pause
+    await wait(600);                                // let the camera settle
+    n = 0;
+    await wait(1200);
+    const paused = n;
+    n = 0;
+    play.click();                                   // and run again
+    await wait(1200);
+    return { paused, playing: n };
+  });
+
+  /* It was rendering an identical frame sixty times a second for as long as
+     the page was open. Not none, because a star's surface goes on boiling
+     when the orbits are stopped — but a tenth of the rate, which is what a
+     slow boil needs and a sixth of the work. */
+  expect(calls.paused, 'draw calls while paused and still').toBeGreaterThan(0);
+  expect(calls.paused).toBeLessThan(calls.playing / 3);
+  expect(calls.playing, 'draw calls while running').toBeGreaterThan(100);
+});
+
+test('turning the view is not the same as picking something', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+  await page.waitForTimeout(700);
+
+  const at = () => page.evaluate(() => window.Orrery.state().selected);
+
+  /* Where a body actually is on screen. A label is translated to the body's
+     projected point and then offset by its own margin, so the transform is
+     the number wanted and the bounding rect is not. */
+  const where = () => page.evaluate(() => {
+    const host = document.querySelector('.orr-labels').getBoundingClientRect();
+    const l = [...document.querySelectorAll('.orr-label')]
+      .find((e) => e.textContent.trim() === '1' && !e.classList.contains('off'));
+    if (!l) throw new Error('Testholm 1 is not on screen to aim at');
+    const m = new DOMMatrix(getComputedStyle(l).transform);
+    return { x: Math.round(host.x + m.m41), y: Math.round(host.y + m.m42) };
+  });
+
+  /* Framing the system puts every body in shot, which is what both gestures
+     below need to aim at. Done from the bar rather than the canvas, so it is
+     not the thing under test. */
+  const aim = async () => {
+    await page.locator('#orr-reset').click();
+    await expect.poll(at, { timeout: 10_000 }).toBe('Testholm');
+    await page.waitForTimeout(500);
+    return where();
+  };
+
+  // A tap picks, wobble and all.
+  let p = await aim();
+  await page.mouse.move(p.x, p.y);
+  await page.mouse.down();
+  await page.mouse.move(p.x + 2, p.y + 1);
+  await page.mouse.up();
+  await expect.poll(at, { timeout: 5000 }).toBe('Testholm 1');
+
+  /* A drag does not. Picking ran on pointerdown, so starting a rotate gesture
+     near a planet selected it and flew the camera there — in a busy inner
+     system that made the view hard to turn at all. */
+  p = await aim();
+  await page.mouse.move(p.x, p.y);
+  await page.mouse.down();
+  for (let i = 1; i <= 10; i++) await page.mouse.move(p.x + i * 12, p.y + i * 4);
+  await page.mouse.up();
+  await page.waitForTimeout(400);
+  expect(await at(), 'a drag from a body must not select it').toBe('Testholm');
+});
+
+/* "Frame the whole system" did not frame the whole system.
+
+   It sat at a fixed 0.94 of the outermost orbit, which fits nothing: at a 48°
+   vertical field that distance shows about 63 units across a system 100 units
+   in radius. On Sol it read as a reasonable close-up, because there are forty
+   bodies and most of them are inside that — so nobody noticed. On a system
+   with one planet it showed the star and empty space. */
+test('framing the system puts the system in the frame', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+
+  // Widescreen is the case the arithmetic was missing, and portrait the one
+  // where the tilt of the orbit plane decides it instead.
+  for (const [w, h] of [[1600, 800], [1100, 900], [820, 1100]]) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+    await page.waitForTimeout(600);
+
+    const onScreen = async (label) => page.evaluate((want) => {
+      const host = document.querySelector('.orr-labels').getBoundingClientRect();
+      const l = [...document.querySelectorAll('.orr-label')]
+        .find((e) => e.textContent.trim() === want);
+      if (!l || l.classList.contains('off')) return null;
+      const m = new DOMMatrix(getComputedStyle(l).transform);
+      return { x: host.x + m.m41, y: host.y + m.m42,
+               l: host.x, r: host.right, t: host.y, b: host.bottom };
+    }, label);
+
+    for (const pass of ['on opening', 'after framing']) {
+      if (pass === 'after framing') {
+        await page.locator('#orr-reset').click();
+        await page.waitForTimeout(500);
+      }
+      const at = `${w}x${h} ${pass}`;
+      const p = await onScreen('1');
+      expect(p, `the planet is drawn at ${at}`).not.toBeNull();
+      // Inside the canvas, not merely inside the label's 6% of overscan.
+      expect(p.x, `planet not off the left at ${at}`).toBeGreaterThan(p.l);
+      expect(p.x, `planet not off the right at ${at}`).toBeLessThan(p.r);
+      expect(p.y, `planet not off the top at ${at}`).toBeGreaterThan(p.t);
+      expect(p.y, `planet not off the bottom at ${at}`).toBeLessThan(p.b);
+    }
+  }
+});
+
 /* A link someone typed or pasted in caps is a link to the same system. The
    typeahead is a prefix search over canonical names, so the guard against a
    near-match has to compare letters rather than case. */

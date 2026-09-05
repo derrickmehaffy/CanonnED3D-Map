@@ -123,7 +123,12 @@ function glowTexture() {
    like itself. Radial only — the geometry's UVs are rewritten so u runs from
    the inner edge to the outer, which is the axis the structure lives on. */
 function ringTexture(ring, tint) {
-  const rnd = seeded('ring|' + (ring.name || '') + '|' + ring.innerRadius);
+  /* Cached like a body's face, and for the same reason: a ring always looks
+     like itself, so making it again on every scene rebuild was making a new
+     GPU texture every time the reader toggled the scale. */
+  const key = 'ring|' + (ring.name || '') + '|' + ring.innerRadius + '|' + tint;
+  if (TEX_CACHE.has(key)) return TEX_CACHE.get(key);
+  const rnd = seeded(key);
   const w = 512;
   const c = document.createElement('canvas');
   c.width = w; c.height = 1;
@@ -159,6 +164,7 @@ function ringTexture(ring, tint) {
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  TEX_CACHE.set(key, tex);
   return tex;
 }
 
@@ -827,7 +833,19 @@ function paintCraters(ctx, w, h, rnd, b, count) {
   }
 }
 
+/* Faces and ring bands, kept so a body looks the same every time you come
+   back to it and so rebuilding the scene costs nothing.
+
+   Nothing here is ever freed by disposing a material: three disposes a
+   material's own resources and not its textures, so every one of these would
+   otherwise be a GPU allocation that outlives the page's interest in it.
+   Cleared, and actually disposed, when the reader moves to another system. */
 const TEX_CACHE = new Map();
+
+function dropTextures() {
+  TEX_CACHE.forEach((t) => t.dispose());
+  TEX_CACHE.clear();
+}
 
 function bodyTexture(n) {
   const key = n.raw.id64 || n.name;
@@ -1545,8 +1563,14 @@ const Orrery = (function () {
     wireResize();
 
     document.addEventListener('keydown', onKey);
-    window.addEventListener('resize', () => { resize(); drawSpine(); });
-    canvas.addEventListener('pointerdown', onPick);
+    /* Every control at once, rather than every control remembering. Captured,
+       so it runs before the handler that actually changes something. */
+    ['pointerdown', 'pointerup', 'wheel', 'keydown', 'input', 'click']
+      .forEach((t) => panel.addEventListener(t, invalidate, true));
+    window.addEventListener('resize', () => { resize(); drawSpine(); invalidate(); });
+    canvas.addEventListener('pointerdown', onDown);
+    canvas.addEventListener('pointerup', onUp);
+    canvas.addEventListener('pointercancel', () => { downAt = null; });
     initGL();
   }
 
@@ -2165,6 +2189,7 @@ const Orrery = (function () {
     controls.enableRotate = mode3d;
     if (!mode3d) { controls.minPolarAngle = controls.maxPolarAngle = 0; }
     controls.target.set(0, 0, 0);
+    controls.addEventListener('change', invalidate);
     controls.update();
   }
 
@@ -2405,14 +2430,68 @@ const Orrery = (function () {
   }
 
   /** Put the camera where the whole system fits. */
+  /* Far enough out that the whole system is actually in shot.
+
+     This used to sit at a fixed 0.94 of the outermost orbit and call it
+     framed, which fits nothing: at a 48° vertical field that distance shows
+     about 63 units across a system 100 units in radius, so the outer orbits
+     ran off both sides. On Sol it read as a reasonable close-up because there
+     are forty bodies and most of them are inside that; on a system with one
+     planet, "Frame the system" showed the star and empty space.
+
+     The distance is worked out instead. The orbit plane is seen at an angle,
+     so it projects as wide as the system and only sin(elevation) as tall, and
+     the camera has to clear whichever of those the screen is tighter on —
+     which on a wide window is the width, and is why the aspect is in here. */
+  const EYE = new THREE.Vector3(0.22, 0.46, 0.78).normalize();
+
+  /* How far back the outermost orbit has to be seen from to fit on screen.
+
+     Started as arithmetic — a tilted circle projects as wide as the system
+     and only sin(elevation) as tall — but arithmetic on the target plane is
+     not the answer under a perspective camera: the near side of the orbit is
+     a third of the distance closer than the far side and projects
+     correspondingly larger, which is what was still pushing bodies off the
+     right-hand edge after the first fix.
+
+     So the estimate is only a starting point, and then the ring itself is
+     projected and the camera backed off until every point on it is inside.
+     Two or three passes, once, when the view is framed. */
+  function fitDistance(R, dir) {
+    const half = THREE.MathUtils.degToRad(cam3.fov) / 2;
+    const aspect = Math.max(0.2, cam3.aspect || 1);
+    let d = Math.max(
+      (R * Math.max(0.15, Math.abs(dir.y))) / Math.tan(half),
+      R / (Math.tan(half) * aspect)
+    );
+    const probe = new THREE.PerspectiveCamera(cam3.fov, aspect, 0.1, 1e7);
+    for (let pass = 0; pass < 8; pass++) {
+      probe.position.copy(dir).multiplyScalar(d);
+      probe.lookAt(0, 0, 0);
+      probe.updateMatrixWorld();
+      probe.updateProjectionMatrix();
+      let worst = 0;
+      for (let k = 0; k < 24; k++) {
+        const a = (k / 24) * Math.PI * 2;
+        tmp.set(Math.cos(a) * R, 0, Math.sin(a) * R).project(probe);
+        worst = Math.max(worst, Math.abs(tmp.x), Math.abs(tmp.y));
+      }
+      // Nine tenths of the frame, so nothing sits on the edge of it.
+      if (worst <= 0.9) break;
+      d *= Math.max(1.02, worst / 0.9);
+    }
+    return d;
+  }
+
   function frame() {
-    const span = ORBIT_OUT * 1.25;
-    cam3.position.set(span * 0.22, span * 0.46, span * 0.78);
+    resize();                                   // so the aspect below is current
+    const d = fitDistance(ORBIT_OUT, EYE);
+    cam3.position.copy(EYE).multiplyScalar(d);
     // Relative to the system, not an absolute figure: adaptClip() takes over
     // from here anyway, but a hardcoded 0.05 is only ever right for one scale.
-    cam3.near = span * 0.0004; cam3.far = span * 40; cam3.updateProjectionMatrix();
-    cam2.position.set(0, span * 3, 0);
-    cam2.far = span * 40;
+    cam3.near = d * 0.0005; cam3.far = d * 50; cam3.updateProjectionMatrix();
+    cam2.position.set(0, d * 3, 0);
+    cam2.far = d * 50;
     controls.target.set(0, 0, 0);
     resize();
     controls.update();
@@ -2420,6 +2499,7 @@ const Orrery = (function () {
 
   function resize() {
     if (!renderer || !isOpen()) return;
+    invalidate();
     const r = canvas.parentNode.getBoundingClientRect();
     const w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height));
     renderer.setSize(w, h, false);
@@ -2882,16 +2962,61 @@ const Orrery = (function () {
     return n._pos.copy(place(n.parent)).add(tmp);
   }
 
+  /* Draw when there is something to draw.
+
+     A paused orrery with a still camera was rendering an identical frame sixty
+     times a second — the whole GPU cost of the scene, indefinitely, for a
+     picture nobody was changing. On a laptop that is the fan; on a phone it is
+     the battery, and this is a page people leave open.
+
+     The frame loop itself keeps running, because OrbitControls needs it to
+     damp and because starting and stopping a rAF loop is how you get a stutter
+     on the first move. What stops is the render. Anything that could change
+     the picture marks it dirty: the clock while it runs, the controls while
+     they move or settle, and any pointer or key that lands on the panel —
+     which covers every button without each one having to remember. */
+  let dirty = true, idleAt = 0;
+  const invalidate = () => { dirty = true; };
+
   function animate(now) {
     if (!isOpen()) return;
     loop = requestAnimationFrame(animate);
     const dt = lastFrame ? Math.min((now - lastFrame) / 1000, 0.1) : 0;
     lastFrame = now;
+    // Real seconds, and they keep running: a star's surface is not the orbit
+    // clock and does not stop when the orbits do.
     wallClock += dt;
-    draw(dt);
+    if (playing || dirty) { dirty = false; idleAt = now; return draw(dt); }
+    /* Paused and untouched. The star's surface is the only thing still
+       moving, and redrawing the whole scene sixty times a second for a slow
+       boil is the waste — so it gets a tenth of that, which is more than
+       enough for something that takes seconds to change. */
+    if (now - idleAt >= 100) { idleAt = now; draw(dt); return; }
+    controls.update();
   }
 
   /* ── selection ────────────────────────────────────────────────────────── */
+
+  /* Picking waits to see whether this was a click or the start of a drag.
+
+     It ran on pointerdown, so beginning a rotate gesture anywhere near a
+     planet selected it and flew the camera there — in a busy inner system it
+     was hard to turn the view at all. Four pixels is enough to tell a tap from
+     a drag and small enough that a shaky hand still selects. */
+  let downAt = null;
+
+  function onDown(e) {
+    downAt = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId };
+  }
+
+  function onUp(e) {
+    const d = downAt;
+    downAt = null;
+    if (!d || d.id !== e.pointerId) return;
+    if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 4) return;
+    if (performance.now() - d.t > 700) return;      // a press-and-hold is not a pick
+    onPick(e);
+  }
 
   function onPick(e) {
     const r = canvas.getBoundingClientRect();
@@ -2948,13 +3073,19 @@ const Orrery = (function () {
        the dolly is multiplicative, and 175 units down to Mercury is a hundred
        and sixty ticks. Twelve times a body's own radius puts it about ten
        degrees across: big enough to look at, with some sky left around it. */
-    const want = n === model.star ? ORBIT_OUT * 1.5
+    /* The star means the whole system, and how far back that has to be seen
+       from depends on the shape of the window — which a fixed multiple of the
+       outermost orbit cannot know. It was 1.5 times, and 1.5 times fits about
+       two thirds of the system on a wide screen: opening a system with one
+       planet in it showed the star and nothing else. */
+    const cam = mode3d ? cam3 : cam2;
+    const dir = mode3d ? cam.position.clone().sub(controls.target) : null;
+    if (dir && dir.lengthSq() < 1e-6) dir.set(0.3, 0.5, 0.8);
+    const want = n === model.star
+        ? fitDistance(ORBIT_OUT, dir ? dir.clone().normalize() : EYE)
       : n.children.some((c) => c.a > 0) ? Math.max(...n.children.map((c) => c.a || 0)) * 4.5
       : n.drawR * 12;
-    const cam = mode3d ? cam3 : cam2;
     if (mode3d) {
-      const dir = cam.position.clone().sub(controls.target);
-      if (dir.lengthSq() < 1e-6) dir.set(0.3, 0.5, 0.8);
       cam.position.copy(n._pos).add(dir.setLength(want));
     } else {
       cam.zoom = Math.max(0.35, (ORBIT_OUT * 1.12) / want);
@@ -3648,6 +3779,8 @@ const Orrery = (function () {
     }
     if (!isOpen()) return;                    // closed while we were fetching
 
+    // Another system means none of the last one's faces are wanted again.
+    if (model && model.name !== sys.name) dropTextures();
     model = buildModel(sys);
     if (!model) {
       stopBoot('bad', 'The dump has no bodies for ' + name + '.');
@@ -3690,6 +3823,7 @@ const Orrery = (function () {
     setOrbits(recallNum('orbits', 0));
     setSky(recallStr('sky', 'stars'));
     select(model.star);
+    invalidate();
     cancelAnimationFrame(loop);
     loop = requestAnimationFrame(animate);
   }
