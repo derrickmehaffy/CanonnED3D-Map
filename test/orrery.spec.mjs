@@ -1970,6 +1970,37 @@ test('the marks in the list have a key', async ({ page }) => {
   await expect(key).toBeHidden();
 });
 
+/* Thirty-nine of Sol's forty bodies carry an atmosphereType and ten a full
+   composition by gas, and none of it was drawn — every world was a painted
+   ball with a knife-edge terminator. */
+test('a world with air is drawn with air', async ({ page }) => {
+  const sys = JSON.parse(JSON.stringify(SYSTEM));
+  sys.bodies[1].atmosphereType = 'Hot thick Carbon dioxide';
+  sys.bodies[1].atmosphereComposition = { 'Carbon dioxide': 96.5, Nitrogen: 3.5 };
+  sys.bodies[1].surfacePressure = 93.19;
+  sys.bodies[2].atmosphereType = 'No atmosphere';
+  await stubDataHosts(page);
+  await stubApi(page, sys);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+  await page.waitForTimeout(700);
+
+  const air = await page.evaluate(() => window.Orrery.air());
+  const withAir = air.filter((a) => a.air);
+  expect(withAir.map((a) => a.name)).toEqual(['Testholm 1']);
+  // A shell standing off the surface, not a coat of paint on it.
+  expect(withAir[0].swell).toBeGreaterThan(1.01);
+  expect(withAir[0].swell).toBeLessThan(1.1);
+  /* Carbon dioxide is warm, not the pale blue of a nitrogen sky — the colour
+     comes off the biggest share of the composition. */
+  expect(withAir[0].tint.r).toBeGreaterThan(withAir[0].tint.b);
+  // And it never takes a click away from the body it belongs to.
+  expect(withAir[0].clickable).toBe(false);
+
+  // A star makes its own light and is not wearing air.
+  expect(air.filter((a) => a.name === 'Testholm')[0].air).toBe(false);
+});
+
 /* A link someone typed or pasted in caps is a link to the same system. The
    typeahead is a prefix search over canonical names, so the guard against a
    near-match has to compare letters rather than case. */
@@ -2104,10 +2135,35 @@ test('a black hole is a shadow with a ring, not a glowing ball', async ({ page }
   });
   await page.goto('/orrery.html?system=Annihilator', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('.orr-row')).toHaveCount(2, { timeout: 60_000 });
-  await page.waitForTimeout(1500);
+
+  /* Framed on the hole itself rather than on the system. Opening a system
+     frames the whole of it, which is right — and puts a hole with a shadow a
+     few thousand kilometres across on about four pixels, which no photometry
+     can say anything about. The claim under test is what a hole looks like
+     when you go and look at one. */
+  await page.locator('.orr-row[data-id="1"]').click();
+  const wide = () => page.evaluate(() =>
+    (window.Orrery.state().holes.filter((h) => h.name === 'Annihilator B')[0] || {})
+      .screen.shadowPx || 0);
+  await expect.poll(wide, { timeout: 20_000 }).toBeGreaterThan(10);
+
+  /* And then back off until eight shadow radii — the span these bands are
+     measured across, out past the lens and into ordinary sky — fits on the
+     frame. Selecting a body puts it twelve of its own radii away, which is
+     the right distance to look at one and too close to measure one. */
+  const box = await page.locator('#orr-canvas').boundingBox();
+  const room = Math.min(box.width, box.height) / 2 / 8;
+  for (let i = 0; i < 30 && (await wide()) > room; i++) {
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.wheel(0, 120);
+    await page.waitForTimeout(120);
+  }
+  expect(await wide(), 'a shadow that fits the measurement').toBeLessThan(room);
+  await page.waitForTimeout(1200);
 
   const profile = await page.evaluate(() => {
-    const at = window.Orrery.state().holes[0].screen;
+    const at = window.Orrery.state().holes
+      .filter((h) => h.name === 'Annihilator B')[0].screen;
     // Out to eight shadow radii, which reaches past the lens and into the
     // ordinary sky on the same frame, so the two are directly comparable.
     const half = Math.round(at.shadowPx * 8);
@@ -2126,14 +2182,17 @@ test('a black hole is a shadow with a ring, not a glowing ball', async ({ page }
       }
       return n ? sum / n : null;
     };
-    return {
+    const out = {
       shadowPx: at.shadowPx,
       inside: band(0, 0.8),      // the shadow
-      wound: band(1.05, 1.6),    // the far side of the sky, many times over
-      ring: band(1.8, 2.5),      // where the light piles up
+      ring: band(1.0, 1.6),      // where the light piles up, at the shadow's edge
       mid: band(3.0, 4.2),       // still under the lens, bent only gently
       sky: band(5.5, 8)          // past the lens, the sky itself
     };
+    // And the whole way out, in fifths of a shadow radius, for the fall-off.
+    out.steps = [];
+    for (let r = 1.0; r < 3.2; r += 0.2) out.steps.push(band(r, r + 0.2));
+    return out;
   });
 
   const seen = ' — ' + JSON.stringify(profile);
@@ -2141,6 +2200,19 @@ test('a black hole is a shadow with a ring, not a glowing ball', async ({ page }
   expect(profile.inside, 'the shadow is black' + seen).toBeLessThan(1);
   expect(profile.ring, 'and light piles up just outside it' + seen)
     .toBeGreaterThan(profile.sky * 1.08);
+
+  /* And falls away from there to the sky it started as, without climbing
+     again on the way. This replaced an assertion that there is a darker band
+     between the shadow and the ring: there was one, and it was real, but it
+     was a fact about looking at the other hole in this system from across the
+     system rather than about black holes. Where the ring lands — and whether
+     anything separates from it — depends on how far away the observer is, so
+     the assertion held only at the distance it was written at. The fall-off
+     is the claim that holds wherever you stand. */
+  for (let i = 1; i < profile.steps.length; i++) {
+    expect(profile.steps[i], 'brightness falls away from the ring, step ' + i + seen)
+      .toBeLessThan(profile.steps[i - 1] * 1.06);
+  }
 
   /* Away from the ring the lens hands the sky back at the brightness it found
      it. Lensing moves light, it does not destroy it, and this is the number
@@ -2150,14 +2222,6 @@ test('a black hole is a shadow with a ring, not a glowing ball', async ({ page }
      became a continuum with clouds in it. */
   expect(profile.mid, 'surface brightness is conserved' + seen)
     .toBeGreaterThan(profile.sky * 0.75);
-
-  /* Between the shadow and the ring is a darker band, and it should be there:
-     those rays wind past the hole several times before they leave, so what
-     they show is an average of the whole sky rather than of this part of it.
-     This system sits near the galactic core, where the local sky is brighter
-     than the galaxy's average — so the average reads as a gap. */
-  expect(profile.wound, 'the wound band is dimmer than its surroundings' + seen)
-    .toBeLessThan(profile.sky);
 
   expect(errors.filter((e) => /shader|GLSL|WebGL|THREE/i.test(e))).toEqual([]);
 });

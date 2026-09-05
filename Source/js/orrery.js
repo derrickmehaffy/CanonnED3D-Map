@@ -405,6 +405,97 @@ const NEBULA_FRAG = [
   '}'
 ].join('\n');
 
+/* Air.
+
+   Thirty-nine of Sol's forty bodies carry an atmosphereType and ten of them a
+   full composition by gas, and none of it was ever drawn — every world was a
+   painted ball with a knife-edge terminator. A planet with air does not have
+   a hard edge: it has a limb that catches the light and a day that fades into
+   night rather than stopping at it.
+
+   A shell a little larger than the body, drawn back-face so the fresnel peaks
+   at the silhouette where a real limb is brightest, lit only on the side
+   facing the star — with enough wrap past the terminator to soften it, which
+   is the second thing this buys. Additive, no depth write: it is light in the
+   way, not a surface. */
+const AIR_VERT = [
+  'varying vec3 vN;',
+  'varying vec3 vW;',
+  '#include <common>',
+  '#include <logdepthbuf_pars_vertex>',
+  'void main() {',
+  '  vec4 wp = modelMatrix * vec4(position, 1.0);',
+  '  vW = wp.xyz;',
+  '  vN = normalize(mat3(modelMatrix) * normal);',
+  '  gl_Position = projectionMatrix * viewMatrix * wp;',
+  '  #include <logdepthbuf_vertex>',
+  '}'
+].join('\n');
+
+const AIR_FRAG = [
+  'uniform vec3 uColor;',
+  'uniform float uRim;',
+  'uniform float uThick;',
+  'varying vec3 vN;',
+  'varying vec3 vW;',
+  '#include <common>',
+  '#include <logdepthbuf_pars_fragment>',
+  'void main() {',
+  /* Drawn back-face, so the normal points away from the camera and has to be
+     turned round before any of this means anything. */
+  '  vec3 N = normalize(-vN);',
+  '  vec3 V = normalize(cameraPosition - vW);',
+  /* The star sits at the origin of the scene, so the direction to the light
+     is simply the direction back to nothing. */
+  '  vec3 L = normalize(-vW);',
+  '  float fres = pow(1.0 - max(dot(N, V), 0.0), uRim);',
+  /* Wrapped a little past ninety degrees, which is what makes the terminator
+     a band rather than an edge — and is also true: air scatters light round
+     the limb, which is why dusk lasts. */
+  '  float lit = clamp((dot(N, L) + 0.30) / 1.30, 0.0, 1.0);',
+  '  float a = fres * uThick * (0.06 + lit * 0.94);',
+  '  gl_FragColor = vec4(uColor * a, a);',
+  '  #include <logdepthbuf_fragment>',
+  '  #include <tonemapping_fragment>',
+  '  #include <colorspace_fragment>',
+  '}'
+].join('\n');
+
+/* What the air is made of, and therefore what colour its limb is. Keyed on
+   the words the dump actually uses; anything unrecognised gets the pale blue
+   of a thin nitrogen sky rather than nothing at all. */
+const AIR_TINT = [
+  [/ammonia/i, 0xC8D67A],
+  [/carbon dioxide|co2/i, 0xD7A07A],
+  [/sulphur|sulfur/i, 0xD9C86A],
+  [/methane/i, 0x8FD2C4],
+  [/water/i, 0xBFD6E8],
+  [/helium|hydrogen/i, 0xB9A6D6],
+  [/argon|neon/i, 0xA9BCD8],
+  [/oxygen/i, 0x9FC4E8],
+  [/nitrogen/i, 0x8FB4DC]
+];
+
+function airOf(b) {
+  const type = b.atmosphereType || '';
+  if (!type || /^no atmosphere$/i.test(type) || /none/i.test(type)) return null;
+
+  /* Composition first where there is one — it names the gases by share, and
+     the biggest share is what the limb takes its colour from. */
+  const comp = b.atmosphereComposition || {};
+  const top = Object.keys(comp).sort((x, y) => comp[y] - comp[x])[0] || type;
+  let tint = 0x8FB4DC;
+  for (const [re, hex] of AIR_TINT) { if (re.test(top)) { tint = hex; break; } }
+
+  /* How far it stands off the surface. Pressure runs from a whisper to
+     Venus's ninety atmospheres and beyond, so it goes in as a log — and is
+     held between a haze and a shell, because neither nothing nor a balloon is
+     what a planet looks like. */
+  const p = Math.max(0.0005, b.surfacePressure || 0.01);
+  const swell = 1.012 + Math.min(0.055, Math.log10(p / 0.0005) * 0.011);
+  return { tint, swell, thick: Math.min(1, 0.35 + Math.log10(p / 0.0005) * 0.16) };
+}
+
 /* The same stars, drawn twice.
 
    On screen they are points at a constant pixel size, which is what keeps a
@@ -2314,6 +2405,7 @@ const Orrery = (function () {
     if (pips) { scene.remove(pips); pips.geometry.dispose(); pips.material.dispose(); pips = null; }
     meshes.forEach((m) => {
       if (m.mesh) { scene.remove(m.mesh); m.mesh.geometry.dispose(); m.mesh.material.dispose(); }
+      if (m.air) { m.air.geometry.dispose(); m.air.material.dispose(); }
       if (m.lens) { scene.remove(m.lens); m.lens.geometry.dispose(); m.lens.material.dispose(); }
       if (m.line) { scene.remove(m.line); m.line.geometry.dispose(); m.line.material.dispose(); }
       if (m.rings) {
@@ -2406,7 +2498,28 @@ const Orrery = (function () {
           lens.raycast = () => {};
           entry.lens = lens;
           scene.add(lens);
-        } else if (isStar) {
+        } else if (!isStar) {
+          // A world with air gets a limb, and a terminator that is a band.
+          const air = airOf(n.raw);
+          if (air) {
+            const shell = new THREE.Mesh(
+              new THREE.SphereGeometry(n.drawR * air.swell, 20, 14),
+              new THREE.ShaderMaterial({
+                uniforms: {
+                  uColor: { value: new THREE.Color(air.tint) },
+                  uRim: { value: 2.6 },
+                  uThick: { value: air.thick }
+                },
+                vertexShader: AIR_VERT, fragmentShader: AIR_FRAG,
+                blending: THREE.AdditiveBlending, transparent: true,
+                depthWrite: false, side: THREE.BackSide
+              }));
+            shell.raycast = () => {};       // the body underneath takes the click
+            entry.air = shell;
+            entry.mesh.add(shell);
+          }
+        }
+        if (isStar) {
           const glow = new THREE.Sprite(new THREE.SpriteMaterial({
             map: glowTexture(), color: starColour(n), transparent: true, opacity: 0.85,
             blending: THREE.AdditiveBlending, depthWrite: false
@@ -4323,7 +4436,21 @@ const Orrery = (function () {
     return { w, h, data: out };
   }
 
-  return { open, close, isOpen, page, state, faces, pixels };
+  /* What each body is wearing, for the suite. An atmosphere is a shell and a
+     colour and nothing a state dump would otherwise carry. */
+  function air() {
+    return meshes.filter((m) => m.mesh).map((m) => ({
+      name: m.node.name,
+      air: !!m.air,
+      swell: m.air ? m.air.geometry.parameters.radius / m.node.drawR : 0,
+      tint: m.air ? m.air.material.uniforms.uColor.value : null,
+      // Whether it still has three's own raycast, which is what would make it
+      // steal a click from the body underneath it.
+      clickable: !!m.air && m.air.raycast === THREE.Mesh.prototype.raycast
+    }));
+  }
+
+  return { open, close, isOpen, page, state, faces, pixels, air };
 })();
 
 window.Orrery = Orrery;
