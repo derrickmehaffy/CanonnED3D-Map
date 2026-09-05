@@ -1676,8 +1676,13 @@ test('a paused orrery stops drawing', async ({ page }) => {
      when the orbits are stopped — but a tenth of the rate, which is what a
      slow boil needs and a sixth of the work. */
   expect(calls.paused, 'draw calls while paused and still').toBeGreaterThan(0);
-  expect(calls.paused).toBeLessThan(calls.playing / 3);
-  expect(calls.playing, 'draw calls while running').toBeGreaterThan(100);
+  /* The claim is the throttle: paused, it draws ten frames a second and no
+     more. Three bodies is three draw calls a frame, so twelve seconds' worth
+     is the ceiling over 1.2 s. Comparing against the running rate instead
+     made this fail whenever the machine was busy enough to drag running
+     down toward the idle rate, which under a parallel suite it often is. */
+  expect(calls.paused / 3 / 1.2, 'paused frames per second').toBeLessThanOrEqual(12);
+  expect(calls.playing, 'running draws at least as often as paused').toBeGreaterThanOrEqual(calls.paused);
 });
 
 test('turning the view is not the same as picking something', async ({ page }) => {
