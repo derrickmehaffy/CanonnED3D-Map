@@ -1583,6 +1583,7 @@ const Orrery = (function () {
       '  <a class="orr-tb sys" id="orr-signals" target="_blank" rel="noopener"',
       '     title="This system in Signals, which knows every body Canonn has a record of">Signals <span>&#8599;</span></a>',
       '  <button class="orr-tb sys" id="orr-link" title="Copy a link straight to this system">Copy link</button>',
+      '  <button class="orr-tb sys wide" id="orr-snap" title="Save this view as a PNG">Save image</button>',
       '  <div class="orr-rail">',
       '    <button class="orr-tb" id="orr-tools" aria-haspopup="true" aria-expanded="false"',
       '            title="Canonn tools">&#8862; Tools</button>',
@@ -1606,7 +1607,7 @@ const Orrery = (function () {
       '<div class="orr-mid">',
       '  <aside class="orr-side orr-left" id="orr-left">',
       '    <div class="orr-s-h">',
-      '      <div class="orr-s-t">System</div>',
+      '      <h2 class="orr-s-t">System</h2>',
       /* Sol has sixty-seven stations and forty bodies, and with all of them
          listed Mercury sits eleven rows below the star. They belong here —
          they are things in the system — but a reader looking for a body
@@ -1618,11 +1619,13 @@ const Orrery = (function () {
       '      <button class="orr-s-key" id="orr-key" aria-haspopup="true"',
       '              aria-expanded="false" aria-label="What the marks mean">?</button>',
       '      <input id="orr-filter" class="orr-filter" type="text" autocomplete="off"',
-      '             spellcheck="false" placeholder="Filter" aria-label="Filter bodies">',
+      '             spellcheck="false" placeholder="Filter" aria-label="Filter bodies and stations"',
+      '             title="A body or station name, a class, a service, a pad size — anything the list knows">',
       '    </div>',
-      '    <div class="orr-list" id="orr-list"></div>',
+      '    <div class="orr-list" id="orr-list" role="tree" aria-label="Bodies and stations"></div>',
       '  </aside>',
-      '  <div class="orr-stage"><canvas id="orr-canvas"></canvas>',
+      '  <div class="orr-stage"><h2 class="orr-sr">Model</h2>',
+      '    <canvas id="orr-canvas" aria-label="The system, drawn. Use [ and ] to step through its bodies." role="img"></canvas>',
       '    <div class="orr-labels" id="orr-labels"></div>',
       /* ── how it is drawn ──────────────────────────────────────────────────
          On the map, over the thing they change. These lived behind a View
@@ -1674,6 +1677,7 @@ const Orrery = (function () {
       '  <aside class="orr-side orr-right" id="orr-right">',
       '    <div class="orr-grip orr-grip-r" id="orr-grip-r" role="separator"',
       '         aria-label="Resize the detail panel" tabindex="0"></div>',
+      '    <h2 class="orr-sr">Detail</h2>',
       '    <div class="orr-facts" id="orr-facts"></div>',
       '  </aside>',
       '</div>',
@@ -1775,6 +1779,7 @@ const Orrery = (function () {
     $('orr-reset').onclick = () => { if (model) { frame(); select(model.star, false); } };
     $('orr-orbits').onclick = () => setOrbits((orbitMode + 1) % 3);
     $('orr-link').onclick = copyLink;
+    $('orr-snap').onclick = saveFrame;
     $('orr-m-x').onclick = () => closeStation();
     $('orr-modal').addEventListener('mousedown', (e) => {
       if (e.target === $('orr-modal')) closeStation();
@@ -1782,6 +1787,7 @@ const Orrery = (function () {
     $('orr-tools').onclick = (e) => { e.stopPropagation(); showMenu(!menuOpen()); };
     $('orr-menu').addEventListener('click', (e) => {
       if (e.target.closest('[data-act="copy"]')) { copyLink(); showMenu(false); }
+      if (e.target.closest('[data-act="snap"]')) { saveFrame(); showMenu(false); }
     });
     $('orr-light').onclick = (e) => { e.stopPropagation(); showLight(!lightOpen()); };
     $('orr-key').onclick = (e) => { e.stopPropagation(); showKey(!keyOpen()); };
@@ -1957,12 +1963,14 @@ const Orrery = (function () {
       /* On a phone the header keeps only the system's name and this button, so
          the two things that are about the system on screen fold in here —
          first, because that is what they are for. */
-      const here = model && stacked() ? [
+      const here = model ? [
         '<a role="menuitem" class="only-phone" target="_blank" rel="noopener" href="' +
           esc('https://signals.canonn.tech/?system=' + encodeURIComponent(model.name)) +
           '"><span>Open in Signals</span><em>every body</em></a>',
         '<button role="menuitem" class="only-phone" data-act="copy">' +
           '<span>Copy link to ' + esc(model.name) + '</span><em>this system</em></button>',
+        '<button role="menuitem" class="only-narrow" data-act="snap">' +
+          '<span>Save image</span><em>this view</em></button>',
         '<div class="orr-menu-r only-phone"></div>'
       ].join('') : '';
 
@@ -2248,6 +2256,26 @@ const Orrery = (function () {
     panel.querySelector('#orr-seed-h').textContent = 'Where you have been';
   }
 
+  /* The view, as a file. People screenshot these to post, and the renderer is
+     right here. Drawn fresh and read in the same task, which is the one
+     moment the drawing buffer is guaranteed still to hold the frame without
+     asking the browser to preserve it for every frame nobody saves. */
+  function saveFrame() {
+    if (!model) return;
+    draw(0);
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      const what = selected && selected !== model.star ? ' - ' + shortName(selected) : '';
+      a.download = (model.name + what + '.png').replace(/[\/\\:*?"<>|]/g, '-');
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    }, 'image/png');
+  }
+
   function copyLink() {
     const name = model ? model.name : (panel.querySelector('#orr-name').textContent || '');
     if (!name) return;
@@ -2485,6 +2513,19 @@ const Orrery = (function () {
     else if (e.key === ' ') { e.preventDefault(); setPlaying(!playing); }
     else if (e.key === ',') setRate(rateIx - 1);
     else if (e.key === '.') setRate(rateIx + 1);
+    /* The model had no way in without a pointer. Square brackets walk the
+       bodies in the order the list shows them, from wherever focus happens
+       to be — the same idea as the comma and the full stop. */
+    else if ((e.key === '[' || e.key === ']') && model &&
+             !/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) {
+      e.preventDefault();
+      const order = [];
+      const walk = (n) => { if (n.drawR > 0) order.push(n);
+        n.children.slice().sort((a, b) => (a.aAu || 0) - (b.aAu || 0)).forEach(walk); };
+      walk(model.star);
+      const i = Math.max(0, order.indexOf(selected));
+      select(order[(i + (e.key === ']' ? 1 : order.length - 1)) % order.length]);
+    }
   }
 
   function initGL() {
@@ -2573,6 +2614,7 @@ const Orrery = (function () {
       if (m.air) { m.air.geometry.dispose(); m.air.material.dispose(); }
       if (m.lens) { scene.remove(m.lens); m.lens.geometry.dispose(); m.lens.material.dispose(); }
       if (m.line) { scene.remove(m.line); m.line.geometry.dispose(); m.line.material.dispose(); }
+      if (m.trail) { scene.remove(m.trail); m.trail.geometry.dispose(); m.trail.material.dispose(); }
       if (m.rings) {
         scene.remove(m.rings);
         m.rings.children.forEach((d) => { d.geometry.dispose(); d.material.dispose(); });
@@ -2701,6 +2743,35 @@ const Orrery = (function () {
           entry.glow = glow;
           entry.mesh.add(glow);
         }
+      }
+
+      /* A trail: where the body has just been, fading behind it.
+
+         At speed the bodies jump around their orbits with nothing showing
+         the motion, which is what makes the rate control hard to read. A
+         sixth of an orbit, sampled on the body's own clock rather than the
+         frame's so it is the same length at any rate, drawn additively so it
+         fades to nothing rather than to a colour. */
+      if (n.P > 0 && n.drawR > 0) {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TRAIL_N * 3), 3));
+        const col = new Float32Array(TRAIL_N * 3);
+        const tint = new THREE.Color(n.type === 'Star' ? starColour(n) : tintOf(n.sub));
+        for (let i = 0; i < TRAIL_N; i++) {
+          const f = Math.pow(i / (TRAIL_N - 1), 1.6) * 0.55;
+          col[i * 3] = tint.r * f; col[i * 3 + 1] = tint.g * f; col[i * 3 + 2] = tint.b * f;
+        }
+        geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+        geo.setDrawRange(0, 0);
+        entry.trail = new THREE.Line(geo, new THREE.LineBasicMaterial({
+          vertexColors: true, transparent: true, blending: THREE.AdditiveBlending,
+          depthWrite: false
+        }));
+        entry.trail.frustumCulled = false;
+        entry.trail.raycast = () => {};
+        entry.hist = [];
+        entry.histAt = null;
+        scene.add(entry.trail);
       }
 
       /* The path, sampled once in the body's own plane and then carried
@@ -2970,6 +3041,22 @@ const Orrery = (function () {
     panel.querySelector('#orr-2d').setAttribute('aria-pressed', String(!on3d));
     makeControls();
     frame();
+    skyForMode();
+  }
+
+  /* A parallel projection has no eye point, so a sky sphere shows one tiny
+     cap of itself and 2D was drawn against nothing — which read as a bug
+     rather than as a property of the projection. The image the lens bends is
+     a plain picture as well as a sphere: told to be a picture, three lays it
+     flat across the whole frame, which is the honest sky for a view that has
+     no direction. The point stars are directions and stay with 3D. */
+  function skyForMode() {
+    if (lensSky) {
+      lensSky.texture.mapping = mode3d
+        ? THREE.EquirectangularReflectionMapping : THREE.UVMapping;
+    }
+    if (sky) sky.visible = mode3d;
+    invalidate();
   }
 
   function setLabels(on) {
@@ -3000,6 +3087,17 @@ const Orrery = (function () {
     resize();
   }
 
+  /* Which row is the tab stop: the one with focus if there is one, else the
+     selected body, else the first. */
+  function roveList(focused) {
+    const rows = [...panel.querySelectorAll('#orr-list .orr-row')];
+    if (!rows.length) return;
+    const on = focused
+      || rows.find((r) => selected && +r.dataset.id === selected.id)
+      || rows[0];
+    rows.forEach((r) => r.setAttribute('tabindex', r === on ? '0' : '-1'));
+  }
+
   function setStations(on) {
     showPorts = on;
     keep('stations', on ? '1' : '0');
@@ -3020,6 +3118,7 @@ const Orrery = (function () {
       if (!m.line) return;
       const moon = m.node.parent && m.node.parent !== model.star;
       m.line.visible = mode === 0 || (mode === 1 && !moon);
+      if (m.trail) m.trail.visible = m.line.visible;
     });
   }
 
@@ -3208,6 +3307,7 @@ const Orrery = (function () {
     lensSky = bakeSky(coords, skyMode, geo);
     scene.background = lensSky.texture;
     syncLenses();
+    skyForMode();
   }
 
   /* ── glow ──────────────────────────────────────────────────────────────────
@@ -3342,6 +3442,7 @@ const Orrery = (function () {
         m.rings.children.forEach((d) => d.material.userData.shade.uEclC.value.copy(n._pos));
       }
       if (m.eclipsedBy) m.mesh.material.userData.shade.uEclC.value.copy(m.eclipsedBy._pos);
+      if (m.trail) trailStep(m, n);
       // Real seconds, not simulated ones: a star's surface should not strobe
       // because the orbits were asked to run at a year a second.
       if (m.mesh && m.mesh.material.uniforms && m.mesh.material.uniforms.uTime) {
@@ -3420,6 +3521,29 @@ const Orrery = (function () {
 
   const ORIGIN = new THREE.Vector3();
   const step = new THREE.Vector3();
+  const TRAIL_N = 40;
+
+  /* One sample every 1/240th of the body's orbit, so forty of them is a sixth
+     of the way round however fast the clock runs. A jump in the clock — Now,
+     or a change of direction — means the history no longer joins up, and it
+     is dropped rather than drawn across the system. */
+  function trailStep(m, n) {
+    const every = n.P / 240;
+    if (m.histAt !== null && Math.abs(simDays - m.histAt) > every * 6) { m.hist.length = 0; m.histAt = null; }
+    if (m.histAt !== null && Math.abs(simDays - m.histAt) < every) return;
+    m.histAt = simDays;
+    m.hist.push(n._pos.x, n._pos.y, n._pos.z);
+    if (m.hist.length > TRAIL_N * 3) m.hist.splice(0, m.hist.length - TRAIL_N * 3);
+    const pts = m.hist.length / 3;
+    const pos = m.trail.geometry.getAttribute('position');
+    // Oldest first, so the colour ramp fades in toward the body.
+    const start = TRAIL_N - pts;
+    for (let i = 0; i < pts; i++) {
+      pos.setXYZ(start + i, m.hist[i * 3], m.hist[i * 3 + 1], m.hist[i * 3 + 2]);
+    }
+    pos.needsUpdate = true;
+    m.trail.geometry.setDrawRange(start, pts);
+  }
 
   function place(n) {
     if (n._done) return n._pos;
@@ -3510,11 +3634,20 @@ const Orrery = (function () {
     if (hits.length) select(hits[0].object.userData.node);
   }
 
+  let lastPick = null;    // the body chosen before this one: "how far from there"
+
   function select(node, retarget) {
+    if (selected && selected !== node) lastPick = selected;
     selected = node;
     markBody(node);
     // A selected moon is named over the view like anything else selected.
     if (labels.length && !labels.some((l) => l.node === node)) buildLabels();
+    // The tree says which row is chosen, and the tab stop moves to it.
+    if (panel) {
+      panel.querySelectorAll('#orr-list .orr-row[data-id]').forEach((r) =>
+        r.setAttribute('aria-selected', String(+r.dataset.id === node.id)));
+      roveList();
+    }
     /* On a phone the two rails take turns, and choosing a body from the list
        means you want to read about it — so the sheet follows you over. */
     if (stacked() && panel.classList.contains('sheet-list')) setSheet('facts');
@@ -3922,6 +4055,41 @@ const Orrery = (function () {
   }
 
   const KM = (m) => Math.round(m / 1000).toLocaleString() + ' km';
+  const AU_LS = 499.005;                       // light-seconds in an AU
+
+  /* Where a body is right now, in AU from the arrival star.
+
+     The drawn position is on the drawn scale — in Spread a log, in neither
+     mode a distance anybody could quote — so it cannot be measured from. Each
+     hop up the tree is the drawn offset scaled back by that body's own AU per
+     drawn unit, which is exact because the drawn ellipse is the true ellipse
+     at a different size. */
+  const pA = new THREE.Vector3(), pB = new THREE.Vector3(), pT = new THREE.Vector3();
+  function physical(n, out) {
+    out.set(0, 0, 0);
+    for (let x = n; x && x.parent; x = x.parent) {
+      positionAt(x, simDays, pT);
+      if (x.a > 0) pT.multiplyScalar(x.aAu / x.a);
+      out.add(pT);
+    }
+    return out;
+  }
+
+  /* An orrery invites "how far is that from that", and there was no way to
+     ask it. There is no mode: pick a body, then pick another, and the second
+     one says how far it is from the first — right now, since both are moving. */
+  function fromLast(n) {
+    if (!lastPick || lastPick === n) return '';
+    const au = physical(n, pA).distanceTo(physical(lastPick, pB));
+    const ls = au * AU_LS;
+    return sect('From ' + esc(shortName(lastPick)), table([
+      ['Right now', au >= 0.01 ? num(au, 3) + ' AU'
+        : Math.round(au * AU_KM).toLocaleString() + ' km'],
+      ['Light takes', ls >= 60 ? num(ls / 60, 1) + ' min' : ls >= 1 ? num(ls, 1) + ' s'
+        : num(ls * 1000, 0) + ' ms']
+    ]) + '<div class="orr-note-i">Pick another body and it will say how far that is from '
+      + esc(shortName(n)) + '.</div>');
+  }
 
   /* ── the system ────────────────────────────────────────────────────────────
      Every dump carries a block about the system itself — who lives there, who
@@ -4100,6 +4268,8 @@ const Orrery = (function () {
       h += '<div class="orr-note-i">Last updated ' + esc(when(b.updateTime)) + '</div>';
     }
 
+    h += fromLast(n);
+
     h += sect('Orbit', table([
       ['Orbits', n.parent && n.parent.name],
       ['Semi-major axis', n.aAu && num(n.aAu, n.aAu < 0.1 ? 5 : 3) + ' AU'],
@@ -4227,6 +4397,16 @@ const Orrery = (function () {
     return pads.large ? 'L' : pads.medium ? 'M' : pads.small ? 'S' : '';
   };
 
+  /* What a station can be searched by. "Which one here has a large pad and a
+     shipyard" is the question people actually ask, and every field it takes
+     is already loaded — so the filter reads them all, not just the name. */
+  function stationText(st) {
+    const pads = st.landingPads || {};
+    return [st.name, st.type, (st.services || []).join(' '),
+      pads.large ? 'large pad' : pads.medium ? 'medium pad' : pads.small ? 'small pad' : '',
+      st.primaryEconomy, st.allegiance, st.government].filter(Boolean).join(' ');
+  }
+
   function renderList() {
     /* Depth-first, so moons sit under the planet they belong to — and so do
        the stations, under the body they are docked at or standing on.
@@ -4253,8 +4433,7 @@ const Orrery = (function () {
     if (term) {
       const keep = new Set();
       all.forEach((row) => {
-        const text = row.p ? row.p.st.name + ' ' + (row.p.st.type || '')
-                           : row.n.name + ' ' + row.n.sub;
+        const text = row.p ? stationText(row.p.st) : row.n.name + ' ' + row.n.sub;
         if (!text.toLowerCase().includes(term)) return;
         keep.add(row);
         for (let x = row.p ? row.parent : row.n; x; x = x.parent) keep.add(x);
@@ -4268,9 +4447,13 @@ const Orrery = (function () {
       return;
     }
 
+    /* A tree, and announced as one: which level a row is on is the whole
+       point of the indent, and a hundred and eight buttons in a row said
+       nothing about it. One tab stop for the lot, with the arrows inside. */
     const bodyRow = (n, depth) =>
       '<div class="orr-row" data-id="' + n.id + '" style="--depth:' + depth + '" ' +
-      'role="button" tabindex="0" title="' + esc(n.name) + '">' +
+      'role="treeitem" aria-level="' + (depth + 1) + '" aria-selected="' + (n === selected) +
+      '" tabindex="-1" title="' + esc(n.name) + '">' +
       '<span class="dot" style="background:' +
         (n.type === 'Star' ? '#' + starColour(n).getHexString()
           : n.drawR ? '#' + new THREE.Color(tintOf(n.sub)).getHexString() : 'transparent') +
@@ -4286,7 +4469,8 @@ const Orrery = (function () {
         ? Math.round(st.distanceToArrival).toLocaleString() : '';
       return '<div class="orr-row stn' + (onGround(st) ? ' ground' : '') +
         '" data-port="' + (model.ports || []).indexOf(p) + '" style="--depth:' + depth + '" ' +
-        'role="button" tabindex="0" title="' + esc(st.name) + ' — ' +
+        'role="treeitem" aria-level="' + (depth + 1) + '" aria-selected="false" tabindex="-1" ' +
+        'title="' + esc(st.name) + ' — ' +
           esc(st.type || 'Surface settlement') +
           (p.guessed && p.on ? ' — placed at ' + esc(shortName(p.on)) +
             ' from its arrival distance; the dump does not say' : '') + '">' +
@@ -4321,13 +4505,22 @@ const Orrery = (function () {
       if (node) select(node);
     };
 
-    // A row you can tab to is a row you must be able to open with the keyboard.
+    roveList();
+
+    /* One tab stop, arrows within it, Enter to open — the way a tree works,
+       and the difference between reaching the last of Sol's hundred and eight
+       rows in a moment and in a hundred and eight presses of Tab. */
     panel.querySelector('#orr-list').onkeydown = (e) => {
-      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const rows = [...panel.querySelectorAll('#orr-list .orr-row')];
       const row = e.target.closest('.orr-row');
-      if (!row) return;
-      e.preventDefault();
-      row.click();
+      if (!row || !rows.length) return;
+      const i = rows.indexOf(row);
+      const to = (k) => { e.preventDefault(); rows[k].focus(); roveList(rows[k]); };
+      if (e.key === 'ArrowDown') return to(Math.min(rows.length - 1, i + 1));
+      if (e.key === 'ArrowUp') return to(Math.max(0, i - 1));
+      if (e.key === 'Home') return to(0);
+      if (e.key === 'End') return to(rows.length - 1);
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); row.click(); }
     };
 
     /* Mouse words on a device with no mouse are no help at all. */
@@ -4337,7 +4530,7 @@ const Orrery = (function () {
       (touch
         ? 'drag to orbit &middot; pinch to zoom &middot; tap a body'
         : 'drag to orbit &middot; scroll to zoom &middot; click a body' +
-          '<br><span class="dim">space pauses &middot; , and . change speed</span>');
+          '<br><span class="dim">space pauses &middot; , and . change speed &middot; [ and ] step bodies</span>');
   }
 
   /* ── open / close ─────────────────────────────────────────────────────── */
@@ -4543,7 +4736,10 @@ const Orrery = (function () {
         // The backdrop and the sky a black hole bends are meant to be the one
         // image, and this is where that is either true or it is not.
         baked: lensSky ? lensSky.width : 0,
-        isBackdrop: !!(lensSky && scene.background === lensSky.texture)
+        isBackdrop: !!(lensSky && scene.background === lensSky.texture),
+        // Laid flat for the 2D view, or wrapped round the 3D one.
+        flat: !!(lensSky && lensSky.texture.mapping === THREE.UVMapping),
+        visible: !!(sky && sky.visible)
       },
       /* Every black hole, in the terms its shader works in: the horizon it
          was given, the shadow that horizon draws, how far out the lens runs,
@@ -4581,6 +4777,9 @@ const Orrery = (function () {
       }),
       ambient: ambientPct,
       glow: glowPct,
+      // Where each body has just been: how many points its trail is drawing.
+      trails: meshes.filter((m) => m.trail).map((m) =>
+        ({ name: m.node.name, points: m.trail.geometry.drawRange.count })),
       // The star's own clock, in real seconds — deliberately not the orbit
       // clock, so its surface does not strobe when time is run fast.
       starTime: (() => {

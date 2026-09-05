@@ -443,7 +443,10 @@ body.orr-dragging{user-select:none}
   min-height:0;background:var(--panel,#0C1116)}
 .orr-left{border-right:1px solid var(--rule,#1B242E)}
 .orr-right{width:var(--right-w,276px);border-left:1px solid var(--rule,#1B242E)}
-.orr-s-t{font-family:var(--cond,sans-serif);font-size:9.5px;
+/* Headings the eye does not need and the outline does. */
+.orr-sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;
+  clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.orr-s-t{margin:0;font-weight:400;font-family:var(--cond,sans-serif);font-size:9.5px;
   letter-spacing:.16em;text-transform:uppercase;color:var(--dimmer,#6E7F8D)}
 .orr-s-h{display:flex;align-items:center;gap:8px;padding:10px 13px 8px}
 /* Labelled. It was a teal diamond, which tells a reader nothing about what
@@ -464,6 +467,7 @@ body.orr-dragging{user-select:none}
 .orr-row{display:flex;align-items:center;gap:8px;padding:4px 6px;cursor:pointer;
   padding-left:calc(6px + var(--depth,0) * 15px);border-left:2px solid transparent}
 .orr-row:hover{background:var(--panel-2,#111820)}
+.orr-row:focus-visible{outline:2px solid var(--amber,#FF9D00);outline-offset:-2px}
 .orr-row.on{background:var(--panel-2,#111820);border-left-color:var(--amber,#FF9D00)}
 .orr-row .dot{width:9px;height:9px;border-radius:50%;flex:none}
 /* A hairline down the indent, so a moon reads as belonging to its planet
@@ -708,7 +712,7 @@ body.orr-dragging{user-select:none}
    that are about Canonn rather than about this system fold into the menu
    that is already there for the tools. */
 @media (max-width:1080px){
-  .orr-tb.wide{display:none}
+  .orr-tb.wide,.orrery.has-system .orr-tb.sys.wide{display:none}
   .orr-menu .only-narrow{display:flex}
 }
 /* And below this even the two system links fold in, so the name keeps its

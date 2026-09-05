@@ -329,8 +329,9 @@ test('a body shows everything the dump holds about it', async ({ page }) => {
   // What is true about it, before any of the numbers.
   await expect(facts.locator('.orr-chip'))
     .toHaveText(['Landable', 'Terraformed', 'Tidally locked', 'Ringed']);
+  // "From Testholm" is there because the star was what was picked before.
   await expect(facts.locator('.orr-sec h3')).toHaveText([
-    'Body', 'Orbit', 'Atmosphere', 'Crust', 'Surface materials', 'Rings',
+    'Body', 'From Testholm', 'Orbit', 'Atmosphere', 'Crust', 'Surface materials', 'Rings',
     'Mapped signals', '2 stations'
   ]);
   /* Nearest first, since the question is which one to fly to. An index, not
@@ -2191,6 +2192,195 @@ test('rings and planets shadow each other, and dusk is a band', async ({ page })
   // A world with air is lit past ninety degrees; a bare one barely.
   expect(planet.wrap).toBeGreaterThan(0.2);
   expect(moon.wrap).toBeLessThan(0.1);
+});
+
+/* A parallel projection has no eye point, so a sky sphere shows one tiny cap
+   of itself and 2D was drawn against nothing — which read as a bug rather
+   than as a property of the projection. */
+test('2D has a sky too', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page, { ...SYSTEM, coords: { x: 120, y: -30, z: 4200 } });
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+  await page.waitForTimeout(600);
+
+  const sky = () => page.evaluate(() => window.Orrery.state().sky);
+  expect((await sky()).flat).toBe(false);
+  expect((await sky()).visible).toBe(true);
+
+  await page.locator('#orr-2d').click();
+  await page.waitForTimeout(600);
+  // The same image the lens bends, laid flat; the point stars are directions
+  // and have no meaning in a view with none.
+  expect((await sky()).flat).toBe(true);
+  expect((await sky()).visible).toBe(false);
+  expect((await sky()).isBackdrop).toBe(true);
+
+  // And it is actually there in the frame: a corner of the view, away from
+  // the model, has structure in it rather than being black.
+  const spread = await page.evaluate(() => {
+    const img = window.Orrery.pixels(8, 8, 160, 100);
+    let lo = 255, hi = 0;
+    for (let i = 0; i < img.data.length; i += 4) {
+      const v = (img.data[i] + img.data[i + 1] + img.data[i + 2]) / 3;
+      lo = Math.min(lo, v); hi = Math.max(hi, v);
+    }
+    return hi - lo;
+  });
+  expect(spread, 'the 2D backdrop has something in it').toBeGreaterThan(6);
+
+  await page.locator('#orr-3d').click();
+  await page.waitForTimeout(400);
+  expect((await sky()).flat).toBe(false);
+});
+
+/* "Which station here has a large pad and a shipyard" is the question people
+   actually ask, and every field it takes was already loaded. */
+test('the filter finds a station by what it can do', async ({ page }) => {
+  const sys = JSON.parse(JSON.stringify(SYSTEM));
+  sys.bodies[1].stations = [
+    { name: 'Big Dock', type: 'Orbis Starport', distanceToArrival: 500,
+      landingPads: { large: 4, medium: 2, small: 2 }, services: ['Dock', 'Shipyard', 'Refuel'] },
+    { name: 'Small Post', type: 'Outpost', distanceToArrival: 505,
+      landingPads: { medium: 1 }, services: ['Dock', 'Refuel'] }
+  ];
+  await stubDataHosts(page);
+  await stubApi(page, sys);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row.stn')).toHaveCount(2, { timeout: 60_000 });
+
+  const hits = async (term) => {
+    await page.locator('#orr-filter').fill(term);
+    await page.waitForTimeout(150);
+    return page.locator('.orr-row.stn .nm').allTextContents();
+  };
+  expect(await hits('shipyard')).toEqual(['Big Dock']);
+  expect(await hits('large pad')).toEqual(['Big Dock']);
+  expect(await hits('refuel')).toEqual(['Big Dock', 'Small Post']);
+  expect(await hits('outfitting')).toEqual([]);
+  await expect(page.locator('.orr-none')).toBeVisible();
+});
+
+/* An orrery invites "how far is that from that" and there was no way to ask.
+   There is no mode: pick a body, then another, and the second says how far
+   it is from the first — right now, since both are moving. */
+test('the panel says how far this is from the last body picked', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.emulateMedia({ reducedMotion: 'reduce' });     // hold the clock
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+
+  // Nothing to measure from yet: the star was chosen, not picked after another.
+  await expect(page.locator('.orr-facts')).not.toContainText('From ');
+
+  await page.locator('.orr-row[data-id="1"]').click();
+  await page.locator('.orr-row[data-id="2"]').click();
+  const from = page.locator('.orr-sec', { hasText: 'From 1' });
+  await expect(from).toBeVisible();
+  /* The moon orbits at 0.0026 AU with an eccentricity of 0.05, so right now
+     it is somewhere between 369,000 and 409,000 km away — and under a
+     hundredth of an AU it is said in kilometres, which is how anyone would
+     say it. Drawn-scale distances are a log in Spread and would have given
+     nonsense; this is worked out on the real ellipse. */
+  const km = parseInt((await from.locator('dd').first().textContent()).replace(/[^0-9]/g, ''), 10);
+  expect(km).toBeGreaterThan(360_000);
+  expect(km).toBeLessThan(420_000);
+  await expect(from.locator('dd').nth(1)).toContainText(/1\.[23] s/);
+
+  // And it chains: pick the star now and it measures from the moon.
+  await page.locator('.orr-row[data-id="0"]').click();
+  await expect(page.locator('.orr-sec', { hasText: 'From 1 a' }).locator('dd').first())
+    .toContainText('AU');
+});
+
+/* A hundred and eight rows, each its own tab stop, announcing nothing about
+   which level it was on — which is the whole point of the indent. */
+test('the list is a tree you can walk with the arrows', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+
+  await expect(page.locator('#orr-list')).toHaveAttribute('role', 'tree');
+  await expect(page.locator('.orr-row[role="treeitem"]')).toHaveCount(3);
+  await expect(page.locator('.orr-row[data-id="2"]')).toHaveAttribute('aria-level', '3');
+  // One tab stop for the lot.
+  await expect(page.locator('.orr-row[tabindex="0"]')).toHaveCount(1);
+
+  const focused = () => page.evaluate(() => document.activeElement.dataset.id);
+  await page.locator('.orr-row[tabindex="0"]').focus();
+  await page.keyboard.press('ArrowDown');
+  expect(await focused()).toBe('1');
+  await page.keyboard.press('End');
+  expect(await focused()).toBe('2');
+  // Moving focus does not fly the camera around; choosing does.
+  expect(await page.evaluate(() => window.Orrery.state().selected)).toBe('Testholm');
+  await page.keyboard.press('Enter');
+  await expect.poll(() => page.evaluate(() => window.Orrery.state().selected)).toBe('Testholm 1 a');
+  await expect(page.locator('.orr-row[data-id="2"]')).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('Home');
+  expect(await focused()).toBe('0');
+
+  /* And the model itself can be walked from anywhere, the way , and . run the
+     clock from anywhere: ] is the next body, [ the one before. */
+  await page.locator('#orr-canvas').click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press(']');
+  await expect.poll(() => page.evaluate(() => window.Orrery.state().selected)).toBe('Testholm');
+  await page.keyboard.press(']');
+  await expect.poll(() => page.evaluate(() => window.Orrery.state().selected)).toBe('Testholm 1');
+  await page.keyboard.press('[');
+  await expect.poll(() => page.evaluate(() => window.Orrery.state().selected)).toBe('Testholm');
+});
+
+/* People screenshot these to post, and the renderer is right here. */
+test('the view can be saved as a picture', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=Testholm&body=1', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+  await page.waitForTimeout(600);
+
+  const [dl] = await Promise.all([
+    page.waitForEvent('download', { timeout: 20_000 }),
+    page.locator('#orr-snap').click()
+  ]);
+  // Named for what is in it, and a PNG.
+  expect(dl.suggestedFilename()).toBe('Testholm - 1.png');
+  const path = await dl.path();
+  expect(readFileSync(path).length).toBeGreaterThan(10_000);
+});
+
+/* At speed the bodies jump around their orbits with nothing showing the
+   motion, which is what made the rate control hard to read. */
+test('a moving body leaves a trail', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+
+  /* A sixth of an orbit, sampled on the body's own clock: at a day a second
+     the moon — twenty-seven days round — collects a point every couple of
+     hours of its time, and the planet, a year round, barely one. */
+  // Polled, not timed: under software rendering the first seconds go on
+  // baking the sky and compiling shaders, and a frame is not a fixed thing.
+  const moonPts = () => page.evaluate(() =>
+    window.Orrery.state().trails.find((t) => t.name === 'Testholm 1 a').points);
+  await expect.poll(moonPts, { timeout: 20_000 }).toBeGreaterThan(8);
+  const trails = await page.evaluate(() => window.Orrery.state().trails);
+  const moon = trails.find((t) => t.name === 'Testholm 1 a');
+  const planet = trails.find((t) => t.name === 'Testholm 1');
+  expect(moon.points).toBeLessThanOrEqual(40);
+  expect(planet.points).toBeLessThan(moon.points);
+  // The star does not move and has no trail to leave.
+  expect(trails.find((t) => t.name === 'Testholm')).toBeUndefined();
+
+  // Now is a jump in the clock: a trail drawn across that jump would be a
+  // line across the system to somewhere the body never went.
+  await page.locator('#orr-now').click();
+  await page.waitForTimeout(200);
+  expect((await page.evaluate(() => window.Orrery.state().trails))
+    .find((t) => t.name === 'Testholm 1 a').points).toBeLessThan(3);
 });
 
 /* A link someone typed or pasted in caps is a link to the same system. The
