@@ -1052,6 +1052,80 @@ test('signal names are read out, not printed raw', async ({ page }) => {
   await expect(signals).not.toContainText('_NAME');
 });
 
+/* The dump carries far more than the counts. Blaa Hypai BN-I b26-1 B 4 — the
+   system that turned this up — reads "$SAA_SignalType_Guardian;: 1" and then
+   names what is there: a Guardian Codex and a Relic Tower. Showing only the 1
+   threw away the reason to fly. Both bodies below are that system's real
+   blocks, copied out of the dump. */
+test('a mapped signal says what is down there, not just how many', async ({ page }) => {
+  const sig = JSON.parse(JSON.stringify(SYSTEM));
+  sig.bodies[1].signals = {
+    signals: { '$SAA_SignalType_Guardian;': 1 },
+    genuses: [],
+    guardian: ['Guardian Codex', 'Guardian Relic Tower']
+  };
+  sig.bodies[2].signals = {
+    signals: { '$SAA_SignalType_Biological;': 2 },
+    // Two genuses seen from orbit; only one of them identified on the ground.
+    genuses: ['$Codex_Ent_Electricae_Genus_Name;', '$Codex_Ent_Bacterial_Genus_Name;'],
+    biology: ['Electricae Radialem - Magenta'],
+    influencingStar: { name: 'Testholm', subType: 'G (White-Yellow) Star' }
+  };
+  await stubDataHosts(page);
+  await stubApi(page, sig);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+
+  await page.locator('.orr-row[data-id="1"]').click();
+  const guard = page.locator('.orr-sec', { hasText: 'Mapped signals' });
+  await expect(guard.locator('.orr-find span')).toHaveText(
+    ['Guardian Codex', 'Guardian Relic Tower']);
+  // Guardian sites are Bifrost's subject, so that is where the way out goes.
+  await expect(guard.locator('a[href*="ruins.canonn.tech"]')).toHaveCount(1);
+
+  await page.locator('.orr-row[data-id="2"]').click();
+  const bio = page.locator('.orr-sec', { hasText: 'Mapped signals' });
+  // The genus token is read out as the codex prints it, and the species that
+  // nobody has landed on and named says so rather than being left out.
+  await expect(bio.locator('.orr-find span')).toHaveText(
+    ['Electricae Radialem — Magenta', 'Bacterium']);
+  await expect(bio.locator('.orr-find.dim em')).toHaveText('not identified');
+  await expect(bio).toContainText('Lit by Testholm');
+  await expect(bio).not.toContainText('$Codex_Ent');
+});
+
+/* Twenty-two bodies and one of them has the Guardian site. Reading the panel
+   for each is twenty-two clicks; the list says which one before you click. */
+test('the list marks the bodies worth clicking', async ({ page }) => {
+  const sig = JSON.parse(JSON.stringify(SYSTEM));
+  sig.bodies[1].signals = { signals: { '$SAA_SignalType_Guardian;': 1 } };
+  sig.bodies[2].signals = { signals: {
+    '$SAA_SignalType_Biological;': 3, '$SAA_SignalType_Geological;': 1 } };
+  await stubDataHosts(page);
+  await stubApi(page, sig);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+
+  await expect(page.locator('.orr-row[data-id="0"] .sg')).toHaveCount(0);
+  await expect(page.locator('.orr-row[data-id="1"] .sg.gua')).toHaveCount(1);
+  await expect(page.locator('.orr-row[data-id="2"] .sg.bio')).toHaveCount(1);
+  await expect(page.locator('.orr-row[data-id="2"] .sg.geo')).toHaveCount(1);
+  // The marks have to be visible to be marks.
+  const box = await page.locator('.orr-row[data-id="1"] .sg.gua').boundingBox();
+  expect(box.width).toBeGreaterThan(2);
+});
+
+/* A link someone typed or pasted in caps is a link to the same system. The
+   typeahead is a prefix search over canonical names, so the guard against a
+   near-match has to compare letters rather than case. */
+test('a system opens whatever case its name is written in', async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=TESTHOLM', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+  await expect(page.locator('#orr-msg')).toHaveClass(/gone/);
+});
+
 /* The list, the detail and the distance axis all take a drag, and the sizes
    are remembered — they are how a reader sets the tool up for what they are
    doing, not a mode. */

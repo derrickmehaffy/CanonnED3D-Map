@@ -13,6 +13,12 @@
   font-family:var(--sans,'IBM Plex Sans',system-ui,sans-serif)
 }
 .orrery.open{display:grid}
+
+/* Signal kinds get their own five colours, because they are the one thing on
+   this page a reader scans for rather than reads. They are deliberately not
+   the interface's amber or ion: those already mean "selected" and "station",
+   and a fifth meaning on the same two hues would be no meaning at all. */
+.orrery{--bio:#6FBF73;--geo:#D08B3C;--gua:#A98BE0;--thg:#B9D94A;--hum:#93A3B1}
 /* Rows named, not counted. The spine hides itself below 960px, and with rows
    assigned by source order that shifted everything up one — the stage took
    the "auto" track and collapsed to its content while the time bar inherited
@@ -132,6 +138,14 @@ body.orrery-open .app{visibility:hidden}
 
 .orr-row .pt{font-family:var(--mono,monospace);font-size:8.5px;color:var(--ion,#4DE3E1);
   opacity:.75;flex:none}
+/* What is on the body, marked on the row. Finding the one Guardian site in a
+   system of twenty-two was twenty-two clicks; now it is a glance. */
+.orr-row .sg{flex:none;width:5px;height:5px;font-style:normal;border-radius:1px}
+.orr-row .sg.bio{background:var(--bio)}
+.orr-row .sg.geo{background:var(--geo)}
+.orr-row .sg.gua{background:var(--gua)}
+.orr-row .sg.thg{background:var(--thg)}
+.orr-row .sg.hum{background:var(--hum);opacity:.6}
 .orr-item b .pad{float:right;font-style:normal;font-family:var(--mono,monospace);
   font-size:9px;color:var(--dimmer,#6E7F8D);border:1px solid var(--rule,#1B242E);
   padding:0 4px;margin-left:6px}
@@ -359,6 +373,26 @@ body.orr-dragging{user-select:none}
 .orr-bar .t i{display:block;height:100%;background:var(--ion,#4DE3E1)}
 .orr-bar .v{font-family:var(--mono,monospace);font-size:9.5px;color:var(--dimmer,#6E7F8D);
   text-align:right;font-variant-numeric:tabular-nums}
+
+/* Named finds, under the counts they belong to. A count says something is
+   there; the name is the reason to go. An unidentified genus is dimmed and
+   says so, because for a lot of readers that is the most interesting row on
+   the page. */
+.orr-finds{margin-top:7px}
+.orr-finds h4{margin:0 0 3px;font-family:var(--cond,sans-serif);font-size:9px;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--dimmer,#6E7F8D);font-weight:600}
+.orr-find{display:flex;align-items:baseline;gap:7px;padding:2px 0}
+.orr-find i{flex:none;width:5px;height:5px;border-radius:1px;transform:translateY(-1px)}
+.orr-find i.bio{background:var(--bio)}
+.orr-find i.geo{background:var(--geo)}
+.orr-find i.gua{background:var(--gua)}
+.orr-find span{flex:1;min-width:0;font-family:var(--mono,monospace);font-size:10.5px;
+  color:var(--text,#CAD4DC);overflow-wrap:anywhere}
+.orr-find em{flex:none;font-style:normal;font-family:var(--cond,sans-serif);font-size:9.5px;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--dimmer,#6E7F8D)}
+.orr-find.dim span{color:var(--dimmer,#6E7F8D)}
+.orr-note-i{margin-top:7px;font-family:var(--mono,monospace);font-size:9.5px;
+  line-height:1.6;color:var(--dimmer,#6E7F8D)}
 
 .orr-item{padding:5px 8px;border:1px solid var(--rule,#1B242E);margin-bottom:3px}
 .orr-item b{display:block;font-family:var(--cond,sans-serif);font-size:11.5px;

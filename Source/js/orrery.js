@@ -1245,8 +1245,12 @@ const Orrery = (function () {
       const r = await fetch(API + '/typeahead?q=' + encodeURIComponent(name));
       const j = await r.json();
       const row = j && j.min_max && j.min_max[0];
-      // typeahead is a prefix search, so only an exact name is this system.
-      if (!row || row.name !== name) throw new Error('not in the dump');
+      /* typeahead is a prefix search, so only an exact name is this system —
+         but "exact" is about the letters, not their case. A link someone
+         typed or pasted in caps is a link to the same system, and refusing
+         it read as the system being missing. */
+      const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
+      if (!row || !same(row.name, name)) throw new Error('not in the dump');
       id = row.id64;
     }
     const r = await fetch(API + '/codex/dump?id=' + id + '&caller=CanonnED3D');
@@ -2609,6 +2613,101 @@ const Orrery = (function () {
     return words.charAt(0).toUpperCase() + words.slice(1);
   }
 
+  /* Genus tokens name a genus the way the game's code does, not the way the
+     codex prints it: "$Codex_Ent_Shrubs_Genus_Name;" is Frutexa on every
+     page a commander has ever read. The ones that differ are named here; the
+     rest are already themselves and fall through. */
+  const GENUS_NAMES = {
+    aleoids: 'Aleoida', bacterial: 'Bacterium', brancae: 'Brain Tree',
+    cactoid: 'Cactoida', clypeus: 'Clypeus', conchas: 'Concha',
+    cone: 'Bark Mound', electricae: 'Electricae', fonticulus: 'Fonticulua',
+    fumerolas: 'Fumerola', fungoids: 'Fungoida', ground_struct_ice: 'Crystalline Shard',
+    osseus: 'Osseus', recepta: 'Recepta', shrubs: 'Frutexa', sphere: 'Anemone',
+    stratum: 'Stratum', thargoid_barnacle: 'Thargoid Barnacle',
+    tube: 'Sinuous Tuber', tubus: 'Tubus', tussocks: 'Tussock',
+    vents: 'Amphora Plant'
+  };
+
+  function genusName(k) {
+    const bare = String(k)
+      .replace(/^\$?Codex_Ent_/i, '')
+      .replace(/_Genus_Name;?$/i, '')
+      .replace(/_Name;?$/i, '')
+      .replace(/;$/, '');
+    return GENUS_NAMES[bare.toLowerCase()] ||
+      bare.replace(/_/g, ' ').replace(/(^|\s)\w/g, (c) => c.toUpperCase());
+  }
+
+  /* Which kind of signal a body carries, for the marks in the list on the
+     left. Only the four worth crossing a system for. */
+  const SIGNAL_KINDS = [
+    ['bio', 'biological', 'Biological'],
+    ['geo', 'geological', 'Geological'],
+    ['gua', 'guardian', 'Guardian'],
+    ['thg', 'thargoid', 'Thargoid'],
+    ['hum', 'human', 'Human']
+  ];
+
+  function signalKinds(b) {
+    const counts = (b.signals && b.signals.signals) || {};
+    const keys = Object.keys(counts).map((k) => signalName(k).toLowerCase());
+    return SIGNAL_KINDS.filter(([, key]) => keys.indexOf(key) > -1);
+  }
+
+  /* What is actually down there, rather than how many pings came back.
+
+     The dump carries both, and until now only the counts were shown. "Guardian
+     1" is the fact that something is there; "Guardian Codex, Guardian Relic
+     Tower" is the reason to fly. Genuses the scanner saw but nobody has
+     identified are said to be exactly that, because a commander reading this
+     is deciding whether the trip is worth making and an unidentified genus is
+     the strongest reason there is. */
+  function finds(title, rows, kind) {
+    if (!rows.length) return '';
+    return '<div class="orr-finds"><h4>' + title + '</h4>' + rows.map((r) =>
+      '<div class="orr-find' + (r.dim ? ' dim' : '') + '">' +
+      '<i class="' + kind + '"></i><span>' + esc(r.name) + '</span>' +
+      (r.note ? '<em>' + esc(r.note) + '</em>' : '') + '</div>').join('') + '</div>';
+  }
+
+  function signalSection(b) {
+    const s = b.signals || {};
+    const counts = s.signals || {};
+    const named = (a) => (a || []).filter(Boolean);
+    const bio = named(s.biology), geo = named(s.geology), gua = named(s.guardian);
+    if (!Object.keys(counts).length && !bio.length && !geo.length && !gua.length) return '';
+
+    let h = table(Object.entries(counts).map(([k, v]) => [signalName(k), String(v)]));
+
+    /* A genus with no species named against it has been scanned from orbit
+       and never landed on. Matching is by name because that is the only join
+       the dump gives: "Bacterium Alcyoneum - Teal" carries its own genus. */
+    const seen = named(s.genuses).map(genusName);
+    const unknown = seen.filter((g) =>
+      !bio.some((sp) => sp.toLowerCase().indexOf(g.toLowerCase()) > -1));
+
+    h += finds('Biology', bio.map((name) => ({ name: name.replace(/\s*-\s*/, ' — ') }))
+      .concat(unknown.map((name) => ({ name, note: 'not identified', dim: true }))), 'bio');
+    h += finds('Geology', geo.map((name) => ({ name })), 'geo');
+    h += finds('Guardian', gua.map((name) => ({ name })), 'gua');
+
+    if (gua.length) {
+      h += '<div class="orr-links"><a href="https://ruins.canonn.tech/" ' +
+        'target="_blank" rel="noopener" title="Bifrost, Canonn\u2019s Guardian site survey">' +
+        'Bifrost <span>&#8599;</span></a></div>';
+    }
+
+    /* Which star is feeding the biology. Canonn solves this from the system's
+       own geometry — the dump says so — and it is the fact that decides
+       whether a genus can be here at all. */
+    const lit = s.influencingStar;
+    if (lit && lit.name) {
+      h += '<div class="orr-note-i">Lit by ' + esc(shortName(lit.name)) +
+        (lit.subType ? ' &middot; ' + esc(lit.subType) : '') + '</div>';
+    }
+    return h;
+  }
+
   const KM = (m) => Math.round(m / 1000).toLocaleString() + ' km';
 
   function updateFacts() {
@@ -2721,11 +2820,7 @@ const Orrery = (function () {
         KM(r.innerRadius) + ' to ' + KM(r.outerRadius) + '</span></div>').join(''));
     }
 
-    const sig = b.signals && b.signals.signals;
-    if (sig && Object.keys(sig).length) {
-      h += sect('Mapped signals', table(
-        Object.entries(sig).map(([k, v]) => [signalName(k), String(v)])));
-    }
+    h += sect('Mapped signals', signalSection(b));
 
     const ports = (b.stations || []).filter((st) => st && st.name);
     if (ports.length) {
@@ -2788,8 +2883,9 @@ const Orrery = (function () {
 
   /** "Col 173 Sector LB-W b31-0 A 2" is "A 2" once you know the system. */
   function shortName(n) {
+    const full = typeof n === 'string' ? n : n.name;
     const sys = model.name + ' ';
-    return n.name.indexOf(sys) === 0 ? n.name.slice(sys.length) : n.name;
+    return full.indexOf(sys) === 0 ? full.slice(sys.length) : full;
   }
 
   const portsOn = (n) => (n.raw.stations || []).filter((x) => x && x.name).length;
@@ -2833,6 +2929,8 @@ const Orrery = (function () {
           : n.drawR ? '#' + new THREE.Color(tintOf(n.sub)).getHexString() : 'transparent') +
         (n.drawR ? '' : ';box-shadow:inset 0 0 0 1px var(--dimmer)') + '"></span>' +
       '<span class="nm">' + esc(shortName(n)) + '</span>' +
+      signalKinds(n.raw).map(([cls, , label]) =>
+        '<i class="sg ' + cls + '" title="' + label + ' signals"></i>').join('') +
       (portsOn(n) ? '<span class="pt" title="' + portsOn(n) + ' station' +
         (portsOn(n) > 1 ? 's' : '') + '">&#9670; ' + portsOn(n) + '</span>' : '') +
       '<span class="ct">' + (n.aAu ? num(n.aAu, n.aAu < 0.1 ? 3 : 2) : '') + '</span></div>'
