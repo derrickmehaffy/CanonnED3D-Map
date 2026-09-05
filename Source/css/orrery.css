@@ -114,16 +114,44 @@ body.orrery-open .app{visibility:hidden}
    view draws each body against its own parent, so a moon of Neptune and a
    moon of Earth look alike; here they do not, and "how far is the fly-out" —
    the question every commander actually asks — is answered at a glance. */
-.orr-spine{display:flex;align-items:center;gap:12px;padding:9px 14px 13px;
-  border-bottom:1px solid var(--rule,#1B242E);background:var(--panel,#0C1116)}
+.orr-spine{display:flex;flex-direction:column;gap:4px;padding:6px 14px 8px;
+  overflow:hidden;border-bottom:1px solid var(--rule,#1B242E);
+  background:var(--panel,#0C1116)}
 .orr-spine.empty{display:none}
-.orr-sp-lb{flex:none;font-family:var(--cond,sans-serif);font-size:9px;letter-spacing:.16em;
+.orr-sp-top{flex:none;display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+/* The label is the control: dragging the handle is how a reader who has found
+   the handle resizes this, and everybody else needs a thing that says the
+   detail is there. */
+.orr-sp-lb{display:flex;align-items:baseline;gap:5px;padding:0;background:none;border:0;
+  cursor:pointer;font-family:var(--cond,sans-serif);font-size:9px;letter-spacing:.16em;
   text-transform:uppercase;color:var(--dimmer,#6E7F8D)}
+.orr-sp-lb:hover{color:var(--amber,#FF9D00)}
+.orr-sp-lb i{font-style:normal;font-size:8px;letter-spacing:0}
 .orr-sp-max{flex:none;font-family:var(--mono,monospace);font-size:9.5px;
   color:var(--dimmer,#6E7F8D);font-variant-numeric:tabular-nums}
-.orr-sp-ax{position:relative;flex:1;height:15px;
+.orr-sp-ax{position:relative;flex:none;height:15px;
   background:linear-gradient(to right,var(--star,#6E7F8D),var(--rule,#1B242E));
   background-size:100% 1px;background-position:0 7px;background-repeat:no-repeat}
+
+/* Taller used to mean a taller version of the same thing, which is not more
+   detail, it is more empty band. Past the height a row of names fits in, the
+   axis names what is on it — packed into as many lanes as it takes for none
+   of them to overlap. */
+.orr-sp-de{position:relative;flex:1;min-height:0;margin-top:9px;overflow-y:auto;
+  scrollbar-width:thin;scrollbar-color:var(--rule,#1B242E) transparent}
+.orr-sp-de::after{content:"";display:block;height:calc(var(--lanes,1) * 15px)}
+.orr-sp-de::-webkit-scrollbar{width:8px}
+.orr-sp-de::-webkit-scrollbar-thumb{background:var(--rule,#1B242E);
+  border:2px solid var(--panel,#0C1116)}
+.orr-sp-de .lb{position:absolute;display:block;max-width:190px;padding:0 3px 0 8px;
+  font-family:var(--mono,monospace);font-size:9px;line-height:13px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;color:var(--dim,#93A3B1);cursor:pointer}
+.orr-sp-de .lb::before{content:"";position:absolute;left:1px;top:5px;width:4px;height:4px;
+  border-radius:50%;background:var(--c,#8B8579)}
+.orr-sp-de .lb.port{color:var(--dimmer,#6E7F8D)}
+.orr-sp-de .lb.port::before{border-radius:0;background:var(--ion,#4DE3E1)}
+.orr-sp-de .lb:hover{color:var(--amber,#FF9D00)}
+.orr-sp-de .lb.on{color:var(--amber,#FF9D00)}
 .orr-sp-ax .tk{position:absolute;top:9px;font-family:var(--mono,monospace);font-size:8px;
   color:var(--dimmer,#6E7F8D);transform:translateX(-50%);pointer-events:none}
 .orr-sp-ax .pip{position:absolute;top:3px;width:8px;height:8px;margin-left:-4px;

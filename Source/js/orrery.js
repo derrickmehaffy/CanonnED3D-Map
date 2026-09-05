@@ -1566,7 +1566,7 @@ const Orrery = (function () {
   }
 
   function setSpine(px) {
-    const h = Math.round(Math.max(0, Math.min(120, px)));
+    const h = Math.round(Math.max(0, Math.min(spineMax(), px)));
     const el = panel.querySelector('#orr-spine');
     el.style.height = h + 'px';
     // Below the point where an axis can be read, it is simply put away.
@@ -1622,7 +1622,7 @@ const Orrery = (function () {
 
     setSide('left', recallNum('leftWidth', 290));
     setSide('right', recallNum('rightWidth', 276));
-    setSpine(recallNum('spineHeight', 37));
+    setSpine(recallNum('spineHeight', COMPACT));
     window.addEventListener('resize', () => {
       setSide('left', left.getBoundingClientRect().width);
       setSide('right', right.getBoundingClientRect().width);
@@ -1737,6 +1737,58 @@ const Orrery = (function () {
      orbit view cannot show: that draws each body against its own parent, so a
      moon of Neptune and a moon of Earth look alike. Here they do not. */
 
+  /* Two heights of the same axis.
+
+     Dragging it taller used to give a taller version of exactly the same
+     thing, which is not more detail, it is more empty band. Past the height a
+     row of names will fit in, it lays the names out: every body and every
+     station against the distance it actually sits at, packed into as many
+     lanes as it takes for none of them to overlap. The compact axis answers
+     "how spread out is this system"; this one answers "what is at 500 Ls".
+
+     COMPACT is the height below which there is no room for a name, and the
+     height the toggle drops back to. */
+  const COMPACT = 46, LANE = 15;
+  /* However tall it is allowed to get. Sol packs a hundred and three names
+     into thirty lanes, which is taller than most windows; past this it
+     scrolls rather than taking the model's room. */
+  const spineMax = () => Math.round(Math.min(340, window.innerHeight * 0.4));
+  const spineTall = () => parseInt(
+    panel.querySelector('#orr-spine').style.height || '0', 10) >= COMPACT + 14;
+
+  /* Opened, it takes the height it actually needs — however many lanes the
+     names pack into — up to the point where it would be eating the model.
+     Past that it scrolls, because a system with a hundred and seven things in
+     it is a system where some of them are going to be below the fold. */
+  function toggleSpine() {
+    if (spineTall()) { setSpine(COMPACT); drawSpine(); return; }
+    setSpine(spineMax());
+    drawSpine();
+    setSpine(Math.min(spineMax(), COMPACT + 9 + lastLanes * LANE + 6));
+    drawSpine();
+  }
+
+  /* Greedy lane packing: names in distance order, each dropped into the first
+     lane whose last name has already ended. Monospace, so a character is a
+     known width and no measuring pass is needed. */
+  let lastLanes = 1;
+
+  function laneOut(items, width) {
+    const lanes = [];
+    items.forEach((it) => {
+      const w = it.text.length * 5.3 + 10;
+      const x = Math.min(it.at * width, width - w);
+      let k = 0;
+      while (k < lanes.length && lanes[k] > x - 4) k++;
+      if (k === lanes.length) lanes.push(0);
+      lanes[k] = x + w;
+      it.x = Math.max(0, x);
+      it.lane = k;
+    });
+    lastLanes = Math.max(1, lanes.length);
+    return lastLanes;
+  }
+
   function drawSpine() {
     const host = panel.querySelector('#orr-spine');
     if (!model) { host.innerHTML = ''; return; }
@@ -1765,8 +1817,14 @@ const Orrery = (function () {
         (Math.pow(10, p) >= 1000 ? Math.pow(10, p) / 1000 + 'k' : Math.pow(10, p)) + '</span>');
     }
 
+    const tall = spineTall();
     host.innerHTML =
-      '<span class="orr-sp-lb">Arrival distance</span>' +
+      '<div class="orr-sp-top">' +
+        '<button class="orr-sp-lb" id="orr-sp-more" aria-expanded="' + (tall ? 'true' : 'false') +
+          '" title="' + (tall ? 'Back to the axis alone' : 'Name everything on the axis') + '">' +
+          'Arrival distance <i>' + (tall ? '&#9652;' : '&#9662;') + '</i></button>' +
+        '<span class="orr-sp-max">' + Math.round(max).toLocaleString() + ' Ls</span>' +
+      '</div>' +
       '<div class="orr-sp-ax">' + ticks.join('') +
         withLs.map((n) => {
           const moon = n.parent && n.parent !== model.star;
@@ -1783,14 +1841,50 @@ const Orrery = (function () {
           'title="' + esc(p.st.name) + (p.st.type ? ' — ' + esc(p.st.type) : '') + ' &middot; ' +
             Math.round(p.st.distanceToArrival).toLocaleString() + ' Ls"></span>').join('') +
       '</div>' +
-      '<span class="orr-sp-max">' + Math.round(max).toLocaleString() + ' Ls</span>';
+      (tall ? detailRows(withLs, withPorts, at, lsOf) : '');
 
-    host.querySelector('.orr-sp-ax').onclick = (e) => {
-      const pip = e.target.closest('.pip');
-      if (!pip) return;
-      const n = model.all.find((x) => x.id === +pip.dataset.id);
+    host.querySelector('#orr-sp-more').onclick = toggleSpine;
+    host.onclick = (e) => {
+      const hit = e.target.closest('[data-id],[data-port]');
+      if (!hit) return;
+      if (hit.dataset.port !== undefined) {
+        const p = (model.ports || [])[+hit.dataset.port];
+        if (!p) return;
+        if (p.on) select(p.on);
+        openStation(p);
+        return;
+      }
+      const n = model.all.find((x) => x.id === +hit.dataset.id);
       if (n) select(n);
     };
+  }
+
+  /* Every body and every station named against the distance it sits at.
+
+     The axis alone tells you a system is spread over four decades; this tells
+     you what is in each of them, which is the question a commander is
+     actually asking when they look at how far the fly-out is. */
+  function detailRows(withLs, withPorts, at, lsOf) {
+    const width = panel.querySelector('#orr-spine').getBoundingClientRect().width - 28 || 900;
+    const items = withLs.map((n) => ({
+      at: at(lsOf(n)), ls: lsOf(n), kind: 'body', node: n,
+      text: shortName(n)
+    })).concat(withPorts.map((p) => ({
+      at: at(p.st.distanceToArrival), ls: p.st.distanceToArrival, kind: 'port', port: p,
+      text: p.st.name
+    }))).sort((a, b) => a.at - b.at);
+
+    const lanes = laneOut(items, width);
+    return '<div class="orr-sp-de" style="--lanes:' + lanes + '">' + items.map((it) =>
+      '<span class="lb ' + it.kind + (it.node && selected === it.node ? ' on' : '') + '" ' +
+      (it.kind === 'body'
+        ? 'data-id="' + it.node.id + '" style="--c:' +
+          (it.node.type === 'Star' ? '#' + starColour(it.node).getHexString()
+            : '#' + new THREE.Color(tintOf(it.node.sub)).getHexString()) + ';'
+        : 'data-port="' + (model.ports || []).indexOf(it.port) + '" style="') +
+      'left:' + it.x + 'px;top:' + (it.lane * LANE) + 'px" ' +
+      'title="' + esc(it.text) + ' — ' + Math.round(it.ls).toLocaleString() + ' Ls">' +
+      esc(it.text) + '</span>').join('') + '</div>';
   }
 
   function onKey(e) {

@@ -1308,6 +1308,57 @@ test('the header carries the same links in the map and on the page', async ({ pa
   await expect(page.locator('#orr-find')).toBeHidden();
 });
 
+/* Dragging the axis taller used to give a taller version of exactly the same
+   thing, which is not more detail — it is more empty band. Past the height a
+   row of names fits in, it names what is on it. */
+test('the distance axis gains detail when it is given room', async ({ page }) => {
+  const many = JSON.parse(JSON.stringify(SYSTEM));
+  many.bodies[1].stations = [{ name: 'Walz Depot', type: 'Outpost', distanceToArrival: 480 }];
+  await stubDataHosts(page);
+  await stubApi(page, many);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+
+  // Compact: an axis, and nothing named on it.
+  const spine = page.locator('#orr-spine');
+  await expect(page.locator('.orr-sp-ax .pip')).toHaveCount(3);
+  await expect(page.locator('.orr-sp-de')).toHaveCount(0);
+  const short = (await spine.boundingBox()).height;
+
+  await page.locator('#orr-sp-more').click();
+  const tall = (await spine.boundingBox()).height;
+  expect(tall).toBeGreaterThan(short + 20);
+
+  /* Every body and every station, against the distance it actually sits at —
+     and packed into lanes, so two things at nearly the same distance are two
+     readable names rather than one on top of the other. */
+  const labels = page.locator('.orr-sp-de .lb');
+  await expect(labels).toHaveCount(4);
+  await expect(page.locator('.orr-sp-de .lb.port')).toHaveText('Walz Depot');
+  const boxes = await labels.evaluateAll((els) =>
+    els.map((e) => e.getBoundingClientRect()));
+  for (let i = 0; i < boxes.length; i++) {
+    for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i], b = boxes[j];
+      const over = a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+      expect(over, 'labels ' + i + ' and ' + j + ' overlap').toBe(false);
+    }
+  }
+
+  // A name on the axis picks the body, the same as its pip does.
+  await page.locator('.orr-sp-de .lb', { hasText: '1 a' }).click();
+  expect(await page.evaluate(() => window.Orrery.state().selected)).toBe('Testholm 1 a');
+  // And a station on it opens the station.
+  await page.locator('.orr-sp-de .lb.port').click();
+  await expect(page.locator('#orr-modal')).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  // Back to the axis alone, and it is remembered as a preference.
+  await page.locator('#orr-sp-more').click();
+  await expect(page.locator('.orr-sp-de')).toHaveCount(0);
+  expect((await spine.boundingBox()).height).toBeCloseTo(short, 0);
+});
+
 /* A link someone typed or pasted in caps is a link to the same system. The
    typeahead is a prefix search over canonical names, so the guard against a
    near-match has to compare letters rather than case. */
