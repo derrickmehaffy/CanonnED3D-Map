@@ -1611,6 +1611,19 @@
     Action.selectedPoint = pt;
     if (Action.addCursorOnSelect) Action.addCursorOnSelect(pt.x, pt.y, pt.z);
     if (Action.moveGridTo) Action.moveGridTo(pt.x, pt.y, pt.z);
+    /* And the name that hangs off the cursor. Action.moveToObj — what clicking
+       a star in the 3D view runs — writes these two through HUD.addText, and
+       they are children of cursor.selection, so they ride along with it. Moving
+       the cursor without rewriting them carried the last star clicked in the
+       map over to whatever was picked from the list: the card said one system
+       and the map said another, which read as the map not having updated at
+       all. Same arguments as moveToObj, so both routes label it identically. */
+    if (window.HUD && HUD.addText && Action.cursor && Action.cursor.selection) {
+      HUD.addText('system', pt.name, 8, 20, 0, 6, Action.cursor.selection);
+      HUD.addText('coords',
+        Math.round(pt.x) + ', ' + Math.round(pt.y) + ', ' + Math.round(-pt.z),
+        8, 15, 0, 3, Action.cursor.selection);
+    }
   }
 
   /* The orrery is a second WebGL context and a few hundred lines that most

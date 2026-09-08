@@ -286,3 +286,47 @@ test('a shared link waits for the map to load rather than missing it',
   await expect(page.locator('#card .c-h'))
     .toContainText('Test System 042', { timeout: 30_000 });
 });
+
+/* ── the cursor's label ─────────────────────────────────────────────────── */
+
+test('picking from the list renames the cursor, not just moves it',
+  async ({ page }) => {
+  /* Action.moveToObj — what clicking a star in the 3D view runs — writes the
+     cursor's name and coordinate labels through HUD.addText. Those two meshes
+     are children of Action.cursor.selection, so they travel with the cursor.
+     selectInMap moved the cursor without rewriting them, which left the
+     previous star's name hanging over the new one: the card said one system
+     and the map said another, and the map looked like it had not updated. */
+  await onMap(page);
+  await page.locator(rail('systems')).click();
+
+  await page.waitForFunction(() => window.Ed3d && Ed3d.font && window.Action &&
+    window.System && System.points && System.points.length > 2, { timeout: 30_000 });
+
+  // Click a star the way the engine does, so the labels exist and name it.
+  const first = await page.evaluate(() => {
+    const i = System.points.length - 1, p = System.points[i];
+    Action.oldSel = null; Action.moveToObj(i, p);
+    return p.name;
+  });
+  const labelled = () => page.evaluate(() => ({
+    sys: Ed3d.textSel.system.geometry.uuid,
+    coords: Ed3d.textSel.coords.geometry.uuid,
+    at: Math.round(Action.cursor.selection.position.x)
+  }));
+  await expect.poll(async () => (await labelled()).sys).toBeTruthy();
+  const before = await labelled();
+
+  // Now pick a different system out of the list.
+  const rows = page.locator('.sysrow[data-sys]');
+  const name = await rows.filter({ hasNotText: first }).first().getAttribute('data-sys');
+  expect(name).not.toBe(first);
+  await page.locator(`.sysrow[data-sys="${name}"]`).click();
+
+  // The cursor moves...
+  await expect.poll(async () => (await labelled()).at).not.toBe(before.at);
+  // ...and it is relabelled rather than carrying the old name along.
+  const after = await labelled();
+  expect(after.sys).not.toBe(before.sys);
+  expect(after.coords).not.toBe(before.coords);
+});
