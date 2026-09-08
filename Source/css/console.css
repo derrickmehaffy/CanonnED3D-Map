@@ -529,3 +529,19 @@ body.card-dragging{user-select:none;cursor:grabbing}
    both simpler and easier to tune. Kept well short of washing out: the lines
    should read as blueprint, not glow. */
 #tmpl-img{filter:brightness(1.8) saturate(1.2)}
+
+
+/* Saved views: a place you framed and want back. Same row as a layer, so the
+   panel reads as one thing, with a way to forget one. */
+.marks{margin:6px 0 10px}
+.marks .layer{cursor:pointer}
+.marks .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.marks .mk-x{flex:none;padding:0 4px;background:none;border:0;color:var(--dimmer);
+  font-size:15px;line-height:1;cursor:pointer}
+.marks .mk-x:hover{color:var(--amber)}
+/* A panel action across the full width. `.wide` belongs to the card's action
+   grid and does nothing out here, which left these two sitting side by side
+   at a hundred pixels each. */
+.p-act{display:block;width:100%;margin-top:8px;border:1px solid var(--rule);
+  padding:7px 8px;font-size:11.5px;color:var(--text);background:none;cursor:pointer}
+.p-act:hover{border-color:var(--ion);color:var(--ion)}

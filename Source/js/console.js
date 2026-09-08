@@ -776,6 +776,32 @@
     return h;
   }
 
+  /* Views worth coming back to.
+
+     A map is a place you navigate, and the way back to a spot you found was
+     to find it again. These are per map, because a camera position means
+     nothing on a different one. */
+  function marks() {
+    try { return JSON.parse(recall('marks.' + MAPNAME, '[]')) || []; } catch (e) { return []; }
+  }
+  function saveMarks(list) { remember('marks.' + MAPNAME, JSON.stringify(list.slice(0, 12))); }
+
+  function markHtml() {
+    var list = marks();
+    var h = '<div class="s-t" style="margin-top:18px">Saved views</div>';
+    if (!list.length) {
+      h += '<div class="note">Nothing saved yet. Frame something worth coming ' +
+           'back to and press Save this view.</div>';
+    } else {
+      h += '<div class="marks">' + list.map(function (m, i) {
+        return '<div class="layer"><span class="nm" data-mark="' + i + '">' +
+          esc(m.n) + '</span><button class="mk-x" data-markx="' + i + '" ' +
+          'aria-label="Forget ' + esc(m.n) + '">&times;</button></div>';
+      }).join('') + '</div>';
+    }
+    return h + '<button class="p-act" id="marksave">Save this view</button>';
+  }
+
   function panelCamera() {
     return '<div class="s-t">Camera</div><div class="s-sub">Ed3d\'s own camera, driven from here</div>' +
       '<div class="btnrow">' +
@@ -787,7 +813,11 @@
       '<span class="vv" id="camdist">—</span></div>' +
       '<input type="range" id="camrange" min="200" max="30000" step="100" style="width:100%">' +
       '<div class="note">Top down is the same view as the 2D button. Zoom and pan ' +
-      'are the arrows in the bottom-right corner.</div>';
+      'are the arrows in the bottom-right corner.</div>' +
+      markHtml() +
+      '<button class="p-act" id="mapshot">Save image</button>' +
+      '<div class="note">A PNG of the map as it is on screen, at the size it is ' +
+      'drawn.</div>';
   }
 
   function panelRoutes() {
@@ -934,9 +964,65 @@
     if (srt) { sysSort = srt.dataset.sort; renderPanel(); return; }
     var cam = e.target.closest('[data-cam]');
     if (cam) { doCamera(cam.dataset.cam); return; }
+    if (e.target.id === 'marksave') { addMark(); return; }
+    if (e.target.id === 'mapshot') { saveImage(e.target); return; }
+    var mx = e.target.closest('[data-markx]');
+    if (mx) {
+      var drop = marks(); drop.splice(+mx.dataset.markx, 1); saveMarks(drop); renderPanel();
+      return;
+    }
+    var mk = e.target.closest('[data-mark]');
+    if (mk) { gotoMark(marks()[+mk.dataset.mark]); return; }
     var swt = e.target.closest('[data-sw]');
     if (swt) { doDisplay(swt.dataset.sw, !swt.classList.contains('on')); return; }
   });
+
+  /* ── saved views, and the view as a file ──────────────────────────────── */
+
+  function addMark() {
+    if (typeof camera === 'undefined') return;
+    var list = marks();
+    var name = (sel && sel.n) ? sel.n : 'View ' + (list.length + 1);
+    list.unshift({
+      n: name,
+      p: [camera.position.x, camera.position.y, camera.position.z],
+      t: [controls.target.x, controls.target.y, controls.target.z]
+    });
+    saveMarks(list);
+    renderPanel();
+  }
+
+  function gotoMark(m) {
+    if (!m || typeof camera === 'undefined') return;
+    controls.target.set(m.t[0], m.t[1], m.t[2]);
+    moveTo({ x: m.p[0], y: m.p[1], z: m.p[2] });
+  }
+
+  /* The map as a PNG.
+
+     The renderer is created without preserveDrawingBuffer — which is right,
+     since paying for it on every frame so that one in a thousand can be saved
+     is the wrong trade — so the buffer only holds the frame until the browser
+     composites. Drawing and reading in the same task is the one moment it is
+     guaranteed to still be there. */
+  function saveImage(btn) {
+    if (typeof renderer === 'undefined' || !renderer) return;
+    var label = btn.textContent;
+    try {
+      renderer.render(scene, camera);
+      renderer.domElement.toBlob(function (blob) {
+        if (!blob) { btn.textContent = 'Could not save'; return; }
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = (MAPNAME + (sel ? ' - ' + sel.n : '') + '.png')
+          .replace(/[\/\\:*?"<>|]/g, '-');
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+        btn.textContent = 'Saved';
+        setTimeout(function () { btn.textContent = label; }, 1400);
+      }, 'image/png');
+    } catch (e) { btn.textContent = 'Could not save'; }
+  }
 
   /* ── camera ───────────────────────────────────────────────────────────── */
   function camDist() {

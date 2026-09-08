@@ -174,3 +174,52 @@ test('a dropped journal is plotted as a route', async ({ page }) => {
   await expect(added).toBeVisible({ timeout: 20_000 });
   await expect(added.locator('.ct')).toHaveText('3');
 });
+
+/* ── views worth keeping, and the view as a file ────────────────────────── */
+
+test('a view can be saved and come back to', async ({ page }) => {
+  await onMap(page);
+  await page.locator(rail('camera')).click();
+
+  await expect(page.locator('.marks [data-mark]')).toHaveCount(0);
+  await page.locator('[data-cam="top"]').click();
+  await page.locator('#marksave').click();
+  await expect(page.locator('.marks [data-mark]')).toHaveCount(1);
+
+  // Somewhere else entirely, then back to the saved one.
+  await page.locator('[data-cam="side"]').click();
+  await page.waitForTimeout(400);
+  const away = await page.evaluate(() => Math.round(camera.position.y));
+
+  await page.locator('.marks [data-mark]').first().click();
+  await expect.poll(() => page.evaluate(() => Math.round(camera.position.y)),
+    { timeout: 10_000 }).toBeGreaterThan(away);
+
+  // And it is kept per map, so it is still there on the next visit.
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await waitForScene(page, expect);
+  await page.locator(rail('camera')).click();
+  await expect(page.locator('.marks [data-mark]')).toHaveCount(1);
+
+  // Forgetting one takes it away.
+  await page.locator('.marks [data-markx]').first().click();
+  await expect(page.locator('.marks [data-mark]')).toHaveCount(0);
+});
+
+test('the map can be saved as a picture', async ({ page }) => {
+  await onMap(page);
+  await page.locator(rail('camera')).click();
+
+  const [dl] = await Promise.all([
+    page.waitForEvent('download', { timeout: 20_000 }),
+    page.locator('#mapshot').click()
+  ]);
+  expect(dl.suggestedFilename()).toMatch(/\.png$/);
+  const path = await dl.path();
+  const { readFileSync } = await import('node:fs');
+  const bytes = readFileSync(path);
+  expect(bytes.length).toBeGreaterThan(10_000);
+  // A PNG, and not a blank one — the renderer has no preserveDrawingBuffer, so
+  // drawing and reading have to happen in the same task or this is empty.
+  expect(bytes.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+});
