@@ -42,7 +42,7 @@ const colours = [
 ];
 
 
-const API_ENDPOINT = 'https://us-central1-canonn-api-236217.cloudfunctions.net/query/thargoid/nhss'
+const API_ENDPOINT = window.CanonnAPI.query('thargoid/nhss')
 const API_LIMIT = 2000;
 function getURLParameter(name) {
 	return decodeURIComponent((new RegExp('[?|&]' + name + '=' + '([^&;]+?)(&|#|;|$)').exec(location.search) || [null, ''])[1].replace(/\+/g, '%20')) || null;

@@ -63,3 +63,73 @@ test('no page still asks for the deleted nav', async ({ page }) => {
   }
   expect(gone, 'a page asked for a file that no longer exists').toEqual([]);
 });
+
+/* ── one address for Canonn's data ──────────────────────────────────────── */
+
+import { readdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', 'Source');
+const read = (p) => readFileSync(join(SRC, p), 'utf8');
+const pages = readdirSync(SRC).filter((f) => f.endsWith('.html'));
+
+test('only canonn-api.js names the cloud-functions host', () => {
+  /* The host, the region and the project id were pasted into twelve call
+     sites across ten files. They are in one file now, and the point of that
+     is lost the first time somebody pastes it back. */
+  const named = [];
+  const walk = (dir, rel = '') => {
+    for (const e of readdirSync(join(SRC, dir), { withFileTypes: true })) {
+      const path = rel ? rel + '/' + e.name : e.name;
+      if (e.isDirectory()) { if (e.name !== 'vendor') walk(join(dir, e.name), path); continue; }
+      if (!/\.(js|html|mjs)$/.test(e.name)) continue;
+      if (path.endsWith('js/canonn-api.js')) continue;
+      if (readFileSync(join(SRC, dir, e.name), 'utf8').includes('cloudfunctions.net')) {
+        named.push(path);
+      }
+    }
+  };
+  walk('.');
+  expect(named, 'these should ask CanonnAPI for the URL instead').toEqual([]);
+});
+
+test('every page that runs the console also loads the API', () => {
+  /* Missing this tag does not cost you the star colours it is nearest to —
+     it throws before the console is wired up, and costs you the command
+     palette, the systems list and the card. Two pages shipped without it
+     because both of their smoke tests happened to be skipped. */
+  const missing = pages.filter((f) => {
+    const html = read(f);
+    return html.includes('js/console.js') && !html.includes('js/canonn-api.js');
+  });
+  expect(missing).toEqual([]);
+});
+
+test('the API is loaded before anything that uses it', () => {
+  /* A classic script runs in document order, and every classic script runs
+     before every deferred or module one. So the rule is only about the
+     classic scripts: canonn-api.js has to be the first of them that wants it.
+     Reading the tags rather than the file text matters — the first pass at
+     this matched the words "console.js" inside an HTML comment. */
+  const USERS = /js\/console\.js|js\/codex-overlay\.js|data\/MapData-/;
+  const late = [];
+
+  for (const f of pages) {
+    const scripts = [...read(f).matchAll(/<script\b([^>]*)>/gi)]
+      .map((m) => m[1])
+      .filter((attrs) => /\bsrc\s*=/.test(attrs))
+      .map((attrs) => ({
+        src: (attrs.match(/\bsrc\s*=\s*["']([^"']+)["']/) || [])[1] || '',
+        // Anything that does not run in document order runs after all of it.
+        later: /\bdefer\b|\basync\b|type\s*=\s*["']module["']/i.test(attrs)
+      }));
+
+    const api = scripts.findIndex((t) => t.src.includes('js/canonn-api.js'));
+    if (api < 0) continue;
+    expect(scripts[api].later, f + ': canonn-api.js must run in document order').toBe(false);
+    const early = scripts.findIndex((t, i) => i < api && !t.later && USERS.test(t.src));
+    if (early >= 0) late.push(f + ': ' + scripts[early].src);
+  }
+  expect(late, 'canonn-api.js has to come first').toEqual([]);
+});

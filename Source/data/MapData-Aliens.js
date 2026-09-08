@@ -152,7 +152,7 @@ var canonnEd3d_aliens = {
 	},
 
 	streamNHSS: async function () {
-		const NHSS_BASE = 'https://us-central1-canonn-api-236217.cloudfunctions.net/query/thargoid/nhss/systems';
+		const NHSS_BASE = window.CanonnAPI.query('thargoid/nhss/systems');
 		const limit = 2000;
 		let offset = 0;
 		let keepGoing = true;

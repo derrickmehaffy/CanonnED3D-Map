@@ -77,7 +77,7 @@ var CanonnCodexOverlay = (function () {
     ["#2B65EC","Ocean"],["#ECE5B6","Tan"]
   ];
 
-  var API_BASE = 'https://us-central1-canonn-api-236217.cloudfunctions.net/query/codex';
+  var API_BASE = window.CanonnAPI.query('codex');
 
   function getURLParameter(name) {
     return decodeURIComponent(

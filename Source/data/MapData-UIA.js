@@ -1,6 +1,6 @@
 // External API endpoints no longer used directly — data is cached as local static files.
 // To refresh: run fetch-uia-waypoints.ps1 from the repo root.
-// const API_ENDPOINT = `https://us-central1-canonn-api-236217.cloudfunctions.net/query`;
+// const API_ENDPOINT = window.CanonnAPI.query('');
 // const EDSM_ENDPOINT = `https://www.edsm.net/api-v1`;
 
 const numberOfUIAs = 9;

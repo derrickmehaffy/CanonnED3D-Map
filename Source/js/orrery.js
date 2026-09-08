@@ -1373,7 +1373,7 @@ const Orrery = (function () {
 
   /* ── data ─────────────────────────────────────────────────────────────── */
 
-  const API = 'https://us-central1-canonn-api-236217.cloudfunctions.net/query';
+  const API = window.CanonnAPI.query('').replace(/\/$/, '');
 
   /* The console already fetched this exact dump to find the system's star,
      so ask it before asking the network: opening the orrery on the system you

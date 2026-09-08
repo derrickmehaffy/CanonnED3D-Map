@@ -1163,7 +1163,7 @@ var HUD = {
 
     function getApiUrl(q) {
       var encoded = encodeURIComponent(q);
-      return 'https://us-central1-canonn-api-236217.cloudfunctions.net/query/typeahead?q=' + encoded;
+      return window.CanonnAPI.query('typeahead', { q: q });
     }
 
     function closeResults() {

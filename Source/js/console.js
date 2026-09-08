@@ -1203,7 +1203,15 @@
      network, a full localStorage — each ends with the block simply absent,
      because the rest of the card is still worth reading. */
   var Star = (function () {
-    var API = 'https://us-central1-canonn-api-236217.cloudfunctions.net/query';
+    /* Asked for lazily, and survives not being there. This ran at evaluation
+       time once, so the two pages that were missing the canonn-api script tag
+       did not lose the star colours — they lost the entire console, from the
+       command palette to the systems list, to a TypeError thrown before any
+       of it was wired up. One optional block is not worth the page. */
+    function api(path, params) {
+      var A = window.CanonnAPI;
+      return A ? A.query(path, params) : null;
+    }
     var TTL = 30 * 24 * 3600 * 1000;
     var mem = {}, inflight = {};
 
@@ -1300,12 +1308,14 @@
     }
 
     async function load(name) {
-      var hit = await get(API + '/typeahead?q=' + encodeURIComponent(name));
+      var ask = api('typeahead', { q: name });
+      if (!ask) return null;
+      var hit = await get(ask);
       var row = hit && hit.min_max && hit.min_max[0];
       // typeahead is a prefix search, so it answers for names that merely
       // start with what was asked. Only an exact match is this system.
       if (!row || row.name !== name || !row.id64) return null;
-      var dump = await get(API + '/codex/dump?id=' + row.id64 + '&caller=CanonnED3D');
+      var dump = await get(api('codex/dump', { id: row.id64, caller: 'CanonnED3D' }));
       keepDump(name, dump && dump.system);
       return digest(dump && dump.system);
     }

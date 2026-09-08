@@ -42,7 +42,7 @@ const colours = [
 ];
 
 
-const API_ENDPOINT = 'https://us-central1-canonn-api-236217.cloudfunctions.net/query/codex'
+const API_ENDPOINT = window.CanonnAPI.query('codex')
 function getURLParameter(name) {
 	return decodeURIComponent((new RegExp('[?|&]' + name + '=' + '([^&;]+?)(&|#|;|$)').exec(location.search) || [null, ''])[1].replace(/\+/g, '%20')) || null;
 }

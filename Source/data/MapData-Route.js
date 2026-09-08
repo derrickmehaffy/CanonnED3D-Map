@@ -41,7 +41,7 @@ const colours = [
 	["#7F462C", "Sepia"], ["#C36241", "Rust"], ["#E56E94", "Blush"], ["#1589FF", "Dodger"], ["#835C3B", "Brown"], ["#A23BEC", "Jasmine"], ["#2B65EC", "Ocean"], ["#ECE5B6", "Tan"]
 ];
 
-const API_ENDPOINT = `https://us-central1-canonn-api-236217.cloudfunctions.net/get_codex_route`;
+const API_ENDPOINT = window.CanonnAPI.fn('get_codex_route');
 const API_LIMIT = 10000;
 
 const codex = axios.create({
@@ -368,7 +368,7 @@ var canonnEd3d_route = {
 			sSystem = getUrlParameter("startSystem");
 			eSystem = getUrlParameter("endSystem");
 			jRange = getUrlParameter("jumpRange");
-			canonnEd3d_route.parseGmp('https://us-central1-canonn-api-236217.cloudfunctions.net/get_gmp_route?startSystem=' + sSystem + '&endSystem=' + eSystem + '&jumpRange=' + jRange, resolve)
+			canonnEd3d_route.parseGmp(window.CanonnAPI.fn('get_gmp_route', { startSystem: sSystem, endSystem: eSystem, jumpRange: jRange }), resolve)
 		});
 
 		Promise.all([p1, p2]).then(function () {
