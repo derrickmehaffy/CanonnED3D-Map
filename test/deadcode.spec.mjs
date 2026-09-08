@@ -24,20 +24,42 @@ test('no dead vendor file is requested', async ({ page }) => {
   expect(requested).toEqual([]);
 });
 
-test('nav renders without contacting w3schools', async ({ page }) => {
+test('the old nav is gone, and nothing reaches w3schools for it', async ({ page }) => {
   const thirdParty = [];
   page.on('request', (r) => {
     if (new URL(r.url()).hostname.endsWith('w3schools.com')) thirdParty.push(r.url());
   });
 
   await stubDataHosts(page);
-  // Every page linked from the nav is now on the console, which replaces
-  // include/nav.html. The pages lcunfool unlinked still carry it, so one of
-  // those is what keeps this assertion alive; it retires with them. dcoh.html
-  // used to be that page and is on the console now.
+  /* The console replaced include/nav.html on every page linked from it; the
+     six pages nobody linked kept carrying the nav, and were the last thing
+     holding both it and the local w3data replacement alive. They are on the
+     console too now, so the nav and its loader are deleted — and this asserts
+     the state that replaced them rather than the one they were in. */
   await page.goto('/cmdr.html', { waitUntil: 'load' });
+  await waitForScene(page, expect);
 
-  // nav.html contains <div id="cssmenu">.
-  await expect(page.locator('#cssmenu')).toBeAttached({ timeout: 30_000 });
+  // The nav's own container, on a page that carried it until now.
+  await expect(page.locator('#cssmenu')).toHaveCount(0);
+  // And the console's, which is what it was replaced by.
+  await expect(page.locator('.app .top')).toBeVisible();
   expect(thirdParty, 'no request reached w3schools.com').toEqual([]);
+});
+
+test('no page still asks for the deleted nav', async ({ page }) => {
+  const gone = [];
+  page.on('response', (r) => {
+    const path = new URL(r.url()).pathname;
+    if (/include\/nav\.html$|nav-include\.js$/.test(path)) gone.push(path + ' → ' + r.status());
+  });
+
+  await stubDataHosts(page);
+  /* Two of the six converted pages, and one that was always on the console.
+     Not route_data, which pages.json marks offlineSkip: its data cannot be
+     stubbed into something the map will draw. */
+  for (const p of ['/carrier_data.html', '/cloud_data.html', REFERENCE_PAGE]) {
+    await page.goto(p, { waitUntil: 'load' });
+    await waitForScene(page, expect);
+  }
+  expect(gone, 'a page asked for a file that no longer exists').toEqual([]);
 });

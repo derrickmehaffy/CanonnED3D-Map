@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 
 <head>
@@ -23,7 +23,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/randomcolor/0.5.4/randomColor.js"></script>
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/date-fns/1.28.5/date_fns.min.js"></script>
-  <link rel="stylesheet" type="text/css" href="css/menu.css" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;450;500&display=swap">
   <link rel="stylesheet" type="text/css" href="css/style.css" />
 
   <!-- Custom CSS -->
@@ -33,31 +33,20 @@
       width: 350px;
     }
 
-    #edmap {
-      position: fixed;
-      top: 6%;
-      right: 0;
-      width: 100%;
-      height: 93%;
-      z-index: -1;
-    }
   </style>
 
-  <title>CanonnED3D - Maps</title>
+  <title>CanonnED3D - Prisons</title>
 
 </head>
 
 <body bgcolor="#000000">
-  <script src="js/nav-include.js"></script>
-  <div w3-include-html="include/nav.html"></div>
-
-  <script>
-    w3IncludeHTML();
-  </script>
 
   <div id="edmap">
-    <div id="loading">
-      <img src="img/Canonn-Logo.gif" alt="Loading" height="300" width="300" />
+    <div id="loading" role="status" aria-live="polite">
+      <div id="bootlogo"></div>
+      <div id="bootfallback">Canonn R&amp;D</div>
+      <div id="bootbar"><i></i></div>
+      <p id="bootmsg">Initialising</p>
     </div>
     <!-- Launch ED3Dmap -->
     <script src="vendor/tween-js/Tween.js"></script>
@@ -71,14 +60,20 @@
     </script>
     <script type="module" src="js/main.js?v=7"></script>
     <link href="css/styles.css" rel="stylesheet" type="text/css" />
+    <!-- Last, deliberately: the console owns layout, and style.css / styles.css
+         define #edmap, #loading, #nav-controls and #hud too. -->
+    <link rel="stylesheet" type="text/css" href="css/console.css" />
+    <!-- Per-page console options; everything here has a working default. -->
+    <script>window.CONSOLE = { unit: 'prison' };</script>
     <!-- Canonn MapData-output.js -->
     <script defer src="data/MapData-Prisons.js"></script>
-    <script type "text/javascript">
+    <script>
       document.addEventListener('DOMContentLoaded', function () {
         canonnEd3d_route.init();
       });
     </script>
   </div>
+  <script defer src="js/console.js"></script>
 </body>
 
 </html>
