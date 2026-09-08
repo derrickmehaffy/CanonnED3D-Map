@@ -181,6 +181,77 @@ const RING_TINT = {
   'Metal Rich': 0xC2A16A
 };
 
+/* A belt is rock, not glass.
+
+   Drawn as one flat annulus at a fixed opacity it read as exactly that: a
+   solid semi-transparent disc with a hard rim at each edge, which is the
+   one thing a field of loose rock does not look like. Two parts instead.
+
+   The rock itself is the belt — a few thousand points scattered through the
+   annulus, more of them through the middle of the band than at either rim
+   so it thins out instead of ending in a line, with a little scatter above
+   and below the plane because a belt has a thickness. Sized in pixels
+   rather than in world units: the drawn scale between Spread and true scale
+   differs by orders of magnitude, and grain that survives both is grain
+   that does not depend on either.
+
+   Behind it, the same annulus as before as a haze — but its brightness
+   falls to nothing at both rims, so there is no edge left to read as the
+   edge of a disc, and it only fills in the space between the rocks when the
+   view is far enough out that they no longer cover it. */
+const BELT_N = 2600;
+
+function beltOf(r, ri, ro) {
+  const g = new THREE.Object3D();
+  const span = ro - ri;
+  g.userData.belt = r.name;
+  g.userData.inner = ri;
+  g.userData.outer = ro;
+  const tint = new THREE.Color(RING_TINT[r.type] || 0x9A8F7E);
+
+  const haze = new THREE.RingGeometry(ri, ro, 160, 12);
+  const hp = haze.getAttribute('position');
+  const hc = new Float32Array(hp.count * 3);
+  for (let i = 0; i < hp.count; i++) {
+    const d = Math.sqrt(hp.getX(i) * hp.getX(i) + hp.getY(i) * hp.getY(i));
+    const t = span > 0 ? Math.min(1, Math.max(0, (d - ri) / span)) : 0.5;
+    // Additive, so brightness is the alpha: zero at both rims, full mid-belt.
+    const f = Math.sin(Math.PI * t) * 0.09;
+    hc[i * 3] = tint.r * f; hc[i * 3 + 1] = tint.g * f; hc[i * 3 + 2] = tint.b * f;
+  }
+  haze.setAttribute('color', new THREE.BufferAttribute(hc, 3));
+  const mist = new THREE.Mesh(haze, new THREE.MeshBasicMaterial({
+    vertexColors: true, transparent: true, side: THREE.DoubleSide,
+    depthWrite: false, blending: THREE.AdditiveBlending
+  }));
+  mist.rotation.x = Math.PI / 2;
+  mist.raycast = () => {};
+  g.add(mist);
+
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(BELT_N * 3), col = new Float32Array(BELT_N * 3);
+  for (let i = 0; i < BELT_N; i++) {
+    // Two uniforms averaged: a soft hump through the middle of the band.
+    const rad = ri + span * (Math.random() + Math.random()) / 2;
+    const a = Math.random() * Math.PI * 2;
+    const h = (Math.random() + Math.random() + Math.random() - 1.5) * span * 0.05;
+    pos[i * 3] = Math.cos(a) * rad; pos[i * 3 + 1] = h; pos[i * 3 + 2] = Math.sin(a) * rad;
+    const b = 0.3 + Math.random() * 0.7;
+    col[i * 3] = tint.r * b; col[i * 3 + 1] = tint.g * b; col[i * 3 + 2] = tint.b * b;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const rocks = new THREE.Points(geo, new THREE.PointsMaterial({
+    size: 1.5, sizeAttenuation: false, vertexColors: true,
+    transparent: true, opacity: 0.8, depthWrite: false,
+    blending: THREE.AdditiveBlending
+  }));
+  rocks.frustumCulled = false;
+  rocks.raycast = () => {};
+  g.add(rocks);
+  return g;
+}
+
 /* ── the sky ────────────────────────────────────────────────────────────────
    Not a photograph pasted behind the scene, and no longer a scatter of dots
    either: clouds and dust rendered into one equirectangular image, with a
@@ -2510,7 +2581,12 @@ const Orrery = (function () {
       if (m.line) { scene.remove(m.line); m.line.geometry.dispose(); m.line.material.dispose(); }
       if (m.belts) {
         scene.remove(m.belts);
-        m.belts.children.forEach((d) => { d.geometry.dispose(); d.material.dispose(); });
+        // A belt is a group of a haze and a field of rock, so walk it rather
+        // than assuming each child carries the geometry itself.
+        m.belts.traverse((d) => {
+          if (d.geometry) d.geometry.dispose();
+          if (d.material) d.material.dispose();
+        });
       }
       if (m.rings) {
         scene.remove(m.rings);
@@ -2675,15 +2751,7 @@ const Orrery = (function () {
         n.raw.belts.forEach((r) => {
           const ri = model.toDraw(r.innerRadius / AU_M), ro = model.toDraw(r.outerRadius / AU_M);
           if (!(ro > ri) || !(ri > 0)) return;
-          const disc = new THREE.Mesh(new THREE.RingGeometry(ri, ro, 160, 1),
-            new THREE.MeshBasicMaterial({
-              color: RING_TINT[r.type] || 0x9A8F7E, transparent: true, opacity: 0.045,
-              side: THREE.DoubleSide, depthWrite: false
-            }));
-          disc.rotation.x = Math.PI / 2;
-          disc.raycast = () => {};
-          disc.userData.belt = r.name;
-          entry.belts.add(disc);
+          entry.belts.add(beltOf(r, ri, ro));
         });
         if (entry.belts.children.length) scene.add(entry.belts); else entry.belts = null;
       }
@@ -4808,8 +4876,12 @@ const Orrery = (function () {
         const m = model && meshes.filter((x) => x.node === model.star)[0];
         return m && m.belts ? m.belts.children.map((d) => ({
           name: d.userData.belt,
-          inner: d.geometry.parameters.innerRadius,
-          outer: d.geometry.parameters.outerRadius
+          inner: d.userData.inner,
+          outer: d.userData.outer,
+          // How many rocks the band is actually made of, so "a belt" can be
+          // told from "a disc" from outside.
+          rocks: (d.children.filter((k) => k.isPoints)[0] || { geometry:
+            { attributes: { position: { count: 0 } } } }).geometry.attributes.position.count
         })) : [];
       })(),
       orbits: model ? model.star.children.filter((k) => k.a > 0)

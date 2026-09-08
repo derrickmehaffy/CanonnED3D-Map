@@ -2437,6 +2437,11 @@ test('a belt is drawn where it is, between the planets either side of it', async
   expect(r.belt.inner).toBeGreaterThan(r.one);
   expect(r.belt.outer).toBeLessThan(r.five);
   expect(r.belt.outer).toBeGreaterThan(r.belt.inner);
+  /* And it is made of rock rather than being one flat annulus: as a single
+     disc at a fixed opacity it read as a solid semi-transparent plate with a
+     hard rim at each edge, which is the one thing loose rock does not look
+     like. */
+  expect(r.belt.rocks).toBeGreaterThan(500);
 
   // At true scale it is simply 2.06 to 3.27 AU on the planets' own scale.
   await page.locator('#orr-true').click();
