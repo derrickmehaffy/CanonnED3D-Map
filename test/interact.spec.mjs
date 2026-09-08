@@ -223,3 +223,66 @@ test('the map can be saved as a picture', async ({ page }) => {
   // drawing and reading have to happen in the same task or this is empty.
   expect(bytes.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
 });
+
+/* ── links that name a system ───────────────────────────────────────────── */
+
+test('a link can name a system, and the map still knows which map it is',
+  async ({ page }) => {
+  await onMap(page);
+
+  // Pick one from the list, and the address bar says which.
+  await page.locator(rail('systems')).click();
+  const row = page.locator('.sysrow[data-sys]').first();
+  const name = await row.getAttribute('data-sys');
+  await row.click();
+  await expect.poll(() => new URL(page.url()).searchParams.get('system')).toBe(name);
+
+  // Choosing systems is not navigation, so it must not fill the history.
+  const depth = await page.evaluate(() => history.length);
+  await page.locator('.sysrow[data-sys]').nth(1).click();
+  await page.locator('.sysrow[data-sys]').nth(2).click();
+  expect(await page.evaluate(() => history.length)).toBe(depth);
+
+  /* And the link opens on it. A catalogue entry carrying no parameters only
+     matched a URL carrying none, so a system in the address made the map stop
+     recognising itself and call itself "Canonn map". */
+  const label = await page.locator('#mapname').textContent();
+  expect(label).not.toBe('Canonn map');
+
+  await page.goto('/voyager.html?system=' + encodeURIComponent(name),
+    { waitUntil: 'domcontentloaded' });
+  await waitForScene(page, expect);
+  await expect(page.locator('#card .c-h')).toContainText(name, { timeout: 30_000 });
+  await expect(page.locator('#mapname')).toHaveText(label);
+
+  // The card can hand that link out.
+  await expect(page.locator('#clink')).toBeVisible();
+});
+
+test('a shared link waits for the map to load rather than missing it',
+  async ({ page }) => {
+  /* Read once at startup this worked on the small maps and quietly did
+     nothing on the rest: the systems arrive well after the page does. The
+     data here is pushed in by hand, long after, which is the case that used
+     to fail. */
+  await stubDataHosts(page);
+  await page.goto('/gr-data.html?system=Test%20System%20042',
+    { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.app .top')).toBeVisible({ timeout: 30_000 });
+  await page.waitForFunction(() => window.Ed3d && Ed3d.updateSystems, { timeout: 30_000 });
+
+  // Nothing to find yet, so nothing is claimed.
+  await expect(page.locator('#card .c-h')).toHaveCount(0);
+
+  await page.evaluate(() => new Promise((res) => Ed3d.updateSystems({
+    categories: { 'Site type': { a: { name: 'Alpha', color: 'FF9D00' } } },
+    systems: Array.from({ length: 100 }, (_, i) => ({
+      name: 'Test System ' + String(i).padStart(3, '0'),
+      coords: { x: i * 3, y: 0, z: i }, cat: ['a']
+    }))
+  }, res)));
+
+  // And now it is answered.
+  await expect(page.locator('#card .c-h'))
+    .toContainText('Test System 042', { timeout: 30_000 });
+});

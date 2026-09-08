@@ -681,6 +681,7 @@
     if (panel === 'layers' || panel === 'systems') renderPanel();
     feedNow();
     applyMapBloom();
+    tryWanted();
   }
 
   if (window.Ed3d && Ed3d.on) Ed3d.on('systemsChanged', syncToData);
@@ -1643,7 +1644,7 @@
     btn.textContent = 'Opening\u2026';
     loadOrrery().then(function (O) {
       btn.disabled = false; btn.innerHTML = label;
-      O.open(name, id64);
+      O.open(name, id64, { from: location.pathname.replace(/^\//, '') });
     }).catch(function () {
       btn.disabled = false; btn.textContent = 'Orrery unavailable';
     });
@@ -1722,7 +1723,8 @@
         // button that always fails is worse than no button.
         '<button class="wide alt" id="correry" hidden>Open the orrery <span class="ax">&#9678;</span></button>' +
         '<a class="wide" href="https://signals.canonn.tech/?system=' + q + '" target="_blank" rel="noopener">Open in Signals <span class="ax">&#8599;</span></a>' +
-        '<button id="ccopy">Copy name</button><button id="ccentre">Centre here</button>' +
+        '<button id="ccopy">Copy name</button><button id="clink">Copy link</button>' +
+      '<button id="ccentre">Centre here</button>' +
       '</div>' +
       '<button class="c-reset" id="creset">Reset position</button>';
     $('creset').onclick = resetCardBox;
@@ -1756,6 +1758,12 @@
         b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy name'; }, 1200);
       }).catch(function () { b.textContent = 'Copy failed'; });
     };
+    $('clink').onclick = function () {
+      var b = this;
+      navigator.clipboard.writeText(systemLink(s.n)).then(function () {
+        b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy link'; }, 1200);
+      }).catch(function () { b.textContent = 'Copy failed'; });
+    };
     $('ccentre').onclick = function () {
       controls.target.set(s.x, s.y, -s.z);
       moveTo({ x: s.x - 120, y: s.y + 90, z: -s.z + 120 });
@@ -1767,8 +1775,53 @@
 
   /* Select a system and fly the camera to it. Shared by the palette and the
      systems list so they behave identically. */
+  /* A link to a system on this map.
+
+     The card could open the orrery and copy a name, and there was no way at
+     all to send somebody "look at this one" — the address bar said the same
+     thing on every system of every map. It says which now, and reading it
+     back is the same call the systems list makes. */
+  function systemLink(name) {
+    var u = new URL(location.href);
+    u.searchParams.set('system', name);
+    return u.href;
+  }
+
+  function markSystem(name) {
+    var u = new URL(location.href);
+    if (name) u.searchParams.set('system', name); else u.searchParams.delete('system');
+    // Replaces rather than pushes: picking your way along a cluster should
+    // not be twenty presses of Back to get out of.
+    history.replaceState(history.state, '', u);
+  }
+
+  function openNamed(name) {
+    if (!name) return false;
+    var want = String(name).toLowerCase();
+    var list = SYSLIST();
+    for (var i = 0; i < list.length; i++) {
+      if (String(list[i].n).toLowerCase() === want) { gotoSystem(list[i]); return true; }
+    }
+    return false;
+  }
+
+  /* The name a link asked for, until it is found or given up on.
+
+     Read once at startup it would have worked on the small maps and quietly
+     done nothing on the rest, because the systems arrive well after the page
+     does — which is the ordinary case, and on the big maps the only one. A
+     shared link that works or not depending on how fast the dump came back is
+     not a shared link, so the request stands and every batch of data is
+     another chance to answer it. */
+  var wantSystem = '';
+  function tryWanted() { if (wantSystem) openNamed(wantSystem); }
+
   function gotoSystem(rec) {
+    // Whoever gets here first settles it — a late arrival must not yank the
+    // reader back to the system the link named after they moved on.
+    wantSystem = '';
     sel = rec; cardType = null; renderCard();
+    markSystem(rec.n);
     selectInMap(rec);
     if (CFG.templates) showTemplate(catName(rec.s[0][0]));
     if (typeof controls === 'undefined') return;
@@ -1915,6 +1968,13 @@
     var a = new URL(u, location.href);
     if (a.pathname !== location.pathname) return -1;
     var mine = new URLSearchParams(location.search), theirs = new URLSearchParams(a.search);
+    /* Parameters that say what you are looking at rather than which map this
+       is. A catalogue entry carrying no parameters only matches a URL carrying
+       none, so without dropping these a link to a system made the map stop
+       recognising itself and call itself "Canonn map". The list lives in here
+       rather than beside it because MAPNAME runs near the top of the file: a
+       `var` at this depth is hoisted as undefined by the time it is read. */
+    ['system', 'body', 'from'].forEach(function (k) { mine.delete(k); });
     var keys = [];
     theirs.forEach(function (v, k) { keys.push(k); });
     if (!keys.length) return mine.toString() ? -1 : 0;
@@ -2253,6 +2313,9 @@
       }
       frameData(); applySize(); applyDisplay(); syncDisplay();
       syncFilteredVisibility();
+      // A link that names a system opens on it rather than on the whole map.
+      wantSystem = new URLSearchParams(location.search).get('system') || '';
+      tryWanted();
     }, 300);
   })();
 })();

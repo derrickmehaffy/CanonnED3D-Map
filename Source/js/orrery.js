@@ -1367,6 +1367,22 @@ const Orrery = (function () {
   const ORBIT_LABEL = ['all', 'planets only', 'none'];
   let standalone = false;
   let coreNote = '';
+  /* Which map this system was opened from, if any. The console passes it when
+     it opens the orrery over a map, and a link copied out of here carries it,
+     so a system shared from the orrery can be shown back on the map that had
+     it. Without one there is no honest answer to "which map", so nothing is
+     offered rather than a guess. */
+  let fromMap = '';
+
+  /* That map, as a link to this system on it, or '' when there is no honest
+     answer. The header link and the menu entry both ask, so both agree. Over
+     a map it stays empty: the Back button already is the way back. */
+  function backHref() {
+    const where = fromMap || new URLSearchParams(location.search).get('from') || '';
+    if (!model || !standalone || !/^[\w.-]+\.html$/.test(where)) return '';
+    return where + '?system=' + encodeURIComponent(model.name);
+  }
+
   let galaxyWasVisible = null;
   const cache = new Map();
   const tmp = new THREE.Vector3();
@@ -1444,6 +1460,8 @@ const Orrery = (function () {
          Canonn. */
       '  <a class="orr-tb sys" id="orr-signals" target="_blank" rel="noopener"',
       '     title="This system in Signals, which knows every body Canonn has a record of">Signals <span>&#8599;</span></a>',
+      '  <a class="orr-tb sys wide" id="orr-onmap" target="_self"',
+      '     title="This system on the map it came from">On the map</a>',
       '  <button class="orr-tb sys" id="orr-link" title="Copy a link straight to this system">Copy link</button>',
       '  <button class="orr-tb sys wide" id="orr-snap" title="Save this view as a PNG">Save image</button>',
       '  <div class="orr-rail">',
@@ -1826,6 +1844,10 @@ const Orrery = (function () {
          the two things that are about the system on screen fold in here —
          first, because that is what they are for. */
       const here = model ? [
+        /* Folded out of the header at the same width as Save image, so the
+           menu has to hold it from there down or it is simply gone. */
+        backHref() ? '<a role="menuitem" class="only-narrow" href="' + esc(backHref()) +
+          '"><span>Show on the map</span><em>where it came from</em></a>' : '',
         '<a role="menuitem" class="only-phone" target="_blank" rel="noopener" href="' +
           esc('https://signals.canonn.tech/?system=' + encodeURIComponent(model.name)) +
           '"><span>Open in Signals</span><em>every body</em></a>',
@@ -2147,6 +2169,8 @@ const Orrery = (function () {
     if (selected && model && selected !== model.star) {
       u.searchParams.set('body', shortName(selected));
     }
+    const cameFrom = fromMap || new URLSearchParams(location.search).get('from');
+    if (cameFrom && /^[\w.-]+\.html$/.test(cameFrom)) u.searchParams.set('from', cameFrom);
     const btn = panel.querySelector('#orr-link');
     const said = (t) => {
       btn.textContent = t;
@@ -4581,7 +4605,8 @@ const Orrery = (function () {
      had changed, and left the header naming a system the view was not showing. */
   let showing = null;
 
-  async function open(name, id64) {
+  async function open(name, id64, opts) {
+    if (opts && opts.from) fromMap = opts.from;
     showing = name;
     if (!panel) build();
     panel.classList.add('open');
@@ -4668,6 +4693,11 @@ const Orrery = (function () {
     // Everything out of here goes to the system, so it needs the system.
     panel.querySelector('#orr-signals').href =
       'https://signals.canonn.tech/?system=' + encodeURIComponent(model.name);
+
+    // And back to the map, when there is a map to go back to.
+    const back = panel.querySelector('#orr-onmap'), backTo = backHref();
+    if (backTo) back.href = backTo;
+    back.hidden = !backTo;
 
     setBloom(recallNum('bloom', 18));
     setAmbient(recallNum('ambient', 30));

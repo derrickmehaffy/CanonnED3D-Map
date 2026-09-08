@@ -43,6 +43,10 @@ body.orrery-open .app{visibility:hidden}
 /* Signals and Copy link are about the system on screen, so they wait for one. */
 .orr-tb.sys{display:none}
 .orrery.has-system .orr-tb.sys{display:block}
+/* A link the script has switched off stays off. Four classes beat the plain
+   [hidden] rule the browser ships, so "On the map" showed on every system
+   whether or not there was a map to go back to. */
+.orr-tb[hidden]{display:none!important}
 .orr-rail{display:flex;align-items:center;gap:6px;flex:none}
 .orr-page .orr-back{display:none}
 .orr-page .orr-x{display:none}

@@ -1330,6 +1330,47 @@ test('the header carries the same links in the map and on the page', async ({ pa
   await expect(page.locator('#orr-find')).toBeHidden();
 });
 
+/* The way back. A system opened from a map can be shown on that map again,
+   and a link copied out of the orrery carries which map it was, so the round
+   trip survives being sent to somebody else. */
+test('the way back to the map is offered only when there is one',
+  async ({ page }) => {
+  await stubDataHosts(page);
+  await stubApi(page);
+
+  // Arrived cold: there is no map it came from, so nothing is claimed.
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+  await expect(page.locator('#orr-onmap')).toBeHidden();
+
+  // Arrived from one: it says so, and points at that system on that map.
+  await page.goto('/orrery.html?system=Testholm&from=gr-data.html',
+    { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
+  await expect(page.locator('#orr-onmap')).toBeVisible();
+  await expect(page.locator('#orr-onmap'))
+    .toHaveAttribute('href', 'gr-data.html?system=Testholm');
+
+  /* And the copied link carries it, so the next reader gets the same offer.
+     Watching what the page writes rather than reading the real clipboard —
+     reading it needs a permission, and this is the thing under test. */
+  await page.evaluate(() => {
+    window.__copied = [];
+    navigator.clipboard.writeText = (t) => { window.__copied.push(t); return Promise.resolve(); };
+  });
+  await page.locator('#orr-link').click();
+  await expect.poll(() => page.evaluate(() => window.__copied.length)).toBe(1);
+  const copied = await page.evaluate(() => window.__copied[0]);
+  expect(copied).toContain('from=gr-data.html');
+  expect(copied).toContain('system=Testholm');
+
+  /* Over a map it is never offered — Back already is the way back, and two
+     buttons doing one thing is how the header ran out of room. */
+  await openOrrery(page);
+  await expect(page.locator('#orr-onmap')).toBeHidden();
+  await expect(page.locator('#orr-back')).toBeVisible();
+});
+
 /* Dragging the axis taller used to give a taller version of exactly the same
    thing, which is not more detail — it is more empty band. Past the height a
    row of names fits in, it names what is on it. */
