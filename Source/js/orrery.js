@@ -2508,7 +2508,6 @@ const Orrery = (function () {
       if (m.air) { m.air.geometry.dispose(); m.air.material.dispose(); }
       if (m.lens) { scene.remove(m.lens); m.lens.geometry.dispose(); m.lens.material.dispose(); }
       if (m.line) { scene.remove(m.line); m.line.geometry.dispose(); m.line.material.dispose(); }
-      if (m.trail) { scene.remove(m.trail); m.trail.geometry.dispose(); m.trail.material.dispose(); }
       if (m.belts) {
         scene.remove(m.belts);
         m.belts.children.forEach((d) => { d.geometry.dispose(); d.material.dispose(); });
@@ -2687,35 +2686,6 @@ const Orrery = (function () {
           entry.belts.add(disc);
         });
         if (entry.belts.children.length) scene.add(entry.belts); else entry.belts = null;
-      }
-
-      /* A trail: where the body has just been, fading behind it.
-
-         At speed the bodies jump around their orbits with nothing showing
-         the motion, which is what makes the rate control hard to read. A
-         sixth of an orbit, sampled on the body's own clock rather than the
-         frame's so it is the same length at any rate, drawn additively so it
-         fades to nothing rather than to a colour. */
-      if (n.P > 0 && n.drawR > 0) {
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TRAIL_N * 3), 3));
-        const col = new Float32Array(TRAIL_N * 3);
-        const tint = new THREE.Color(n.type === 'Star' ? starColour(n) : tintOf(n.sub));
-        for (let i = 0; i < TRAIL_N; i++) {
-          const f = Math.pow(i / (TRAIL_N - 1), 1.6) * 0.55;
-          col[i * 3] = tint.r * f; col[i * 3 + 1] = tint.g * f; col[i * 3 + 2] = tint.b * f;
-        }
-        geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-        geo.setDrawRange(0, 0);
-        entry.trail = new THREE.Line(geo, new THREE.LineBasicMaterial({
-          vertexColors: true, transparent: true, blending: THREE.AdditiveBlending,
-          depthWrite: false
-        }));
-        entry.trail.frustumCulled = false;
-        entry.trail.raycast = () => {};
-        entry.hist = [];
-        entry.histAt = null;
-        scene.add(entry.trail);
       }
 
       /* The path, sampled once in the body's own plane and then carried
@@ -3067,7 +3037,6 @@ const Orrery = (function () {
       if (!m.line) return;
       const moon = m.node.parent && m.node.parent !== model.star;
       m.line.visible = mode === 0 || (mode === 1 && !moon);
-      if (m.trail) m.trail.visible = m.line.visible;
     });
   }
 
@@ -3417,7 +3386,6 @@ const Orrery = (function () {
         m.rings.children.forEach((d) => d.material.userData.shade.uEclC.value.copy(n._pos));
       }
       if (m.eclipsedBy) m.mat.userData.shade.uEclC.value.copy(m.eclipsedBy._pos);
-      if (m.trail) trailStep(m, n);
       // Real seconds, not simulated ones: a star's surface should not strobe
       // because the orbits were asked to run at a year a second.
       if (m.mat && m.mat.uniforms && m.mat.uniforms.uTime) {
@@ -3577,30 +3545,6 @@ const Orrery = (function () {
     }
     invalidate();
   }
-  const TRAIL_N = 40;
-
-  /* One sample every 1/240th of the body's orbit, so forty of them is a sixth
-     of the way round however fast the clock runs. A jump in the clock — Now,
-     or a change of direction — means the history no longer joins up, and it
-     is dropped rather than drawn across the system. */
-  function trailStep(m, n) {
-    const every = n.P / 240;
-    if (m.histAt !== null && Math.abs(simDays - m.histAt) > every * 6) { m.hist.length = 0; m.histAt = null; }
-    if (m.histAt !== null && Math.abs(simDays - m.histAt) < every) return;
-    m.histAt = simDays;
-    m.hist.push(n._pos.x, n._pos.y, n._pos.z);
-    if (m.hist.length > TRAIL_N * 3) m.hist.splice(0, m.hist.length - TRAIL_N * 3);
-    const pts = m.hist.length / 3;
-    const pos = m.trail.geometry.getAttribute('position');
-    // Oldest first, so the colour ramp fades in toward the body.
-    const start = TRAIL_N - pts;
-    for (let i = 0; i < pts; i++) {
-      pos.setXYZ(start + i, m.hist[i * 3], m.hist[i * 3 + 1], m.hist[i * 3 + 2]);
-    }
-    pos.needsUpdate = true;
-    m.trail.geometry.setDrawRange(start, pts);
-  }
-
   function place(n) {
     if (n._done) return n._pos;
     n._done = true;
@@ -4870,9 +4814,6 @@ const Orrery = (function () {
       })(),
       orbits: model ? model.star.children.filter((k) => k.a > 0)
         .map((k) => ({ name: k.name, a: k.a })) : [],
-      // Where each body has just been: how many points its trail is drawing.
-      trails: meshes.filter((m) => m.trail).map((m) =>
-        ({ name: m.node.name, points: m.trail.geometry.drawRange.count })),
       // The star's own clock, in real seconds — deliberately not the orbit
       // clock, so its surface does not strobe when time is run fast.
       starTime: (() => {

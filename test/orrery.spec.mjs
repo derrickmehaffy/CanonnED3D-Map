@@ -2408,38 +2408,6 @@ test('the view can be saved as a picture', async ({ page }) => {
   expect(readFileSync(path).length).toBeGreaterThan(10_000);
 });
 
-/* At speed the bodies jump around their orbits with nothing showing the
-   motion, which is what made the rate control hard to read. */
-test('a moving body leaves a trail', async ({ page }) => {
-  await stubDataHosts(page);
-  await stubApi(page);
-  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
-
-  /* A sixth of an orbit, sampled on the body's own clock: at a day a second
-     the moon — twenty-seven days round — collects a point every couple of
-     hours of its time, and the planet, a year round, barely one. */
-  // Polled, not timed: under software rendering the first seconds go on
-  // baking the sky and compiling shaders, and a frame is not a fixed thing.
-  const moonPts = () => page.evaluate(() =>
-    window.Orrery.state().trails.find((t) => t.name === 'Testholm 1 a').points);
-  await expect.poll(moonPts, { timeout: 20_000 }).toBeGreaterThan(8);
-  const trails = await page.evaluate(() => window.Orrery.state().trails);
-  const moon = trails.find((t) => t.name === 'Testholm 1 a');
-  const planet = trails.find((t) => t.name === 'Testholm 1');
-  expect(moon.points).toBeLessThanOrEqual(40);
-  expect(planet.points).toBeLessThan(moon.points);
-  // The star does not move and has no trail to leave.
-  expect(trails.find((t) => t.name === 'Testholm')).toBeUndefined();
-
-  // Now is a jump in the clock: a trail drawn across that jump would be a
-  // line across the system to somewhere the body never went.
-  await page.locator('#orr-now').click();
-  await page.waitForTimeout(200);
-  expect((await page.evaluate(() => window.Orrery.state().trails))
-    .find((t) => t.name === 'Testholm 1 a').points).toBeLessThan(3);
-});
-
 /* Sol's Asteroid Belt has real inner and outer radii in the dump and was a
    line of text in the panel and nothing in the model — the one thing in the
    system with a width, drawn with none. */
