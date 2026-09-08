@@ -181,3 +181,59 @@ test('HDR is on by default', async ({ page }) => {
   await page.locator('.rail button[data-p="display"]').click();
   await expect(page.locator('[data-sw="hdr"]')).toHaveClass(/on/);
 });
+
+/* Bloom shipped at zero on every map, because it was calibrated against the
+   worst case: codex.html is thousands of systems in tight clusters, and any
+   glow at all turns that into one sheet of light. That is a fact about
+   density, not about bloom — it left the best thing the HDR pipeline does
+   switched off on every map that could carry it.
+
+   Pushing the systems in gives the density to judge without waiting on a real
+   dump, and it is also the honest test: the map's answer has to survive its
+   data arriving after the console did, which is the normal case. */
+async function withSystems(page, count) {
+  await stubDataHosts(page);
+  await page.goto('/gr-data.html', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.app .top')).toBeVisible({ timeout: 30_000 });
+  await page.waitForFunction(() => window.Ed3d && Ed3d.updateSystems, { timeout: 30_000 });
+  await page.evaluate((n) => new Promise((res) => Ed3d.updateSystems({
+    categories: { 'Site type': { a: { name: 'Alpha', color: 'FF9D00' } } },
+    systems: Array.from({ length: n }, (_, i) => ({
+      name: 'Test System ' + String(i).padStart(5, '0'),
+      coords: { x: (i % 90) * 3, y: 0, z: i }, cat: ['a']
+    }))
+  }, res)), count);
+  await expect(page.locator('#side .layer').first()).toBeVisible({ timeout: 30_000 });
+}
+
+const bloom = (page) => page.evaluate(() => window.PostFX && PostFX.strength);
+
+test('bloom starts at what the map can carry', async ({ page }) => {
+  // A couple of hundred systems can each hold a real halo.
+  await withSystems(page, 300);
+  await expect.poll(() => bloom(page), { timeout: 20_000 }).toBeGreaterThan(0);
+  // And the pass is running, not merely configured.
+  expect(await page.evaluate(() => PostFX.bloom.enabled)).toBe(true);
+});
+
+test('a crowded map still starts clean', async ({ page }) => {
+  await withSystems(page, 2000);
+  await expect.poll(() => bloom(page), { timeout: 20_000 }).toBe(0);
+  expect(await page.evaluate(() => PostFX.bloom.enabled)).toBe(false);
+});
+
+test('a reader who sets bloom is not overruled by the map', async ({ page }) => {
+  await withSystems(page, 300);
+  await expect.poll(() => bloom(page), { timeout: 20_000 }).toBeGreaterThan(0);
+
+  /* Turned off by hand, on a map whose own answer is "on". A stored zero is a
+     decision; it is not the same as never having said. */
+  await page.evaluate(() => localStorage.setItem('canonn.console.bloom', '0'));
+  await withSystems(page, 300);
+  await expect.poll(() => bloom(page), { timeout: 20_000 }).toBe(0);
+
+  // And it follows them to the next map rather than being argued with on each.
+  await page.goto('/voyager.html', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#side .layer').first()).toBeVisible({ timeout: 60_000 });
+  await expect.poll(() => bloom(page), { timeout: 20_000 }).toBe(0);
+});

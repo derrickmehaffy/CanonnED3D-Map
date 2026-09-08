@@ -391,6 +391,9 @@
   CFG.note      = CFG.note || '';
   CFG.panel     = CFG.panel || 'type';
   CFG.templates = !!CFG.templates;
+  /* A page may pin its own bloom; otherwise it is chosen from the data below.
+     A number, 0 to 2, in the same units as the slider. */
+  CFG.bloom     = typeof CFG.bloom === 'number' ? CFG.bloom : null;
   /* A page that is meant to be embedded in someone else's site — dcoh.watch
      iframes one — sets bare:true. It keeps the panels and the card, which are
      the map's own controls, and drops the Canonn top bar and status strip,
@@ -677,6 +680,7 @@
     updateShown();
     if (panel === 'layers' || panel === 'systems') renderPanel();
     feedNow();
+    applyMapBloom();
   }
 
   if (window.Ed3d && Ed3d.on) Ed3d.on('systemsChanged', syncToData);
@@ -832,7 +836,8 @@
       '<div class="note">Keeps dense regions from washing out to white, so ' +
       'crowded clusters stay readable. Exposure sets the overall brightness; ' +
       'bloom adds a glow around the brightest systems — it suits sparse maps ' +
-      'and tends to smear crowded ones, so it starts at zero.</div>';
+      'and smears crowded ones, so a map starts with as much of it as its own ' +
+      'density can carry. Move this and your setting is kept instead.</div>';
   }
 
   function renderPanel() {
@@ -1026,6 +1031,36 @@
   };
   var hideFiltered = recallBool('hideFiltered', true);
   var sysSize = recallNum('sysSize', 20);  // flares got huge on zoom-out at 64
+
+  /* How much bloom a map wants, when nobody has said.
+
+     It shipped at zero for every map because the one it was calibrated
+     against — the landing map, thousands of systems in tight clusters — turns
+     into a single sheet of glow with any of it. That is a fact about density,
+     not about bloom, and on the sparse maps it left the best thing the HDR
+     pipeline does switched off by default. So the rule is the density: a map
+     with a couple of hundred systems can carry a real halo on each of them, a
+     map with thousands cannot, and the slider is still there either way. */
+  function defaultBloom() {
+    if (CFG.bloom !== null) return CFG.bloom;
+    var n = (typeof SYSLIST === 'function' ? SYSLIST() : []).length;
+    if (!n) return 0;
+    return n <= 400 ? 0.45 : n <= 1500 ? 0.22 : 0;
+  }
+
+  /* Which needs the map's data, and that lands long after the console does —
+     codex is readable at 500 systems and still appending at 3,422, and the
+     landing page swaps a cached snapshot for the real dump seconds in. Asked
+     on a timer it would judge the density of an empty map and answer zero for
+     every one of them, which is the bug this set out to fix.
+
+     So the answer follows the data, and stops the moment the reader has one
+     of their own: recall() rather than recallNum(), because a stored zero is
+     a decision and a missing key is not. */
+  function applyMapBloom() {
+    if (!window.PostFX || recall('bloom') !== null) return;
+    if (SYSLIST().length) PostFX.setBloom(defaultBloom());
+  }
 
   function applyDisplay() {
     if (typeof Ed3d === 'undefined' || !Ed3d.grid1H) return;
@@ -2125,7 +2160,9 @@
     setTimeout(function () {
       if (window.PostFX) {
         PostFX.setExposure(recallNum('exposure', PostFX.exposure));
-        PostFX.setBloom(recallNum('bloom', PostFX.strength));
+        // A stored setting applies now; the map's own answer waits for the
+        // map, and arrives through applyMapBloom when the systems do.
+        PostFX.setBloom(recallNum('bloom', defaultBloom()));
         if (disp.hdr) PostFX.enable();
       }
       frameData(); applySize(); applyDisplay(); syncDisplay();
