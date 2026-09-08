@@ -1737,6 +1737,13 @@ test('turning the view is not the same as picking something', async ({ page }) =
   await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
   await page.waitForTimeout(700);
 
+  /* Stop the clock first. Everything below measures where a body is and then
+     aims three mouse events at it, and a body that is still orbiting has
+     moved on by the third — which under a loaded parallel run is a red test
+     about nothing. Picking is not what the clock is for. */
+  await page.locator('#orr-play').click();
+  await expect(page.locator('#orr-play')).toHaveClass(/paused/);
+
   const at = () => page.evaluate(() => window.Orrery.state().selected);
 
   /* Where a body actually is on screen. A label is translated to the body's
