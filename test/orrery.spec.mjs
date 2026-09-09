@@ -218,10 +218,18 @@ test('the clock runs, pauses, and changes rate', async ({ page }) => {
   // A week a second was too quick to read on opening; a day a second still
   // moves — Io comes round in under two seconds.
   await expect(page.locator('.orr-rate')).toHaveText('1 day/s');
-  await page.locator('#orr-faster').click();
+
+  /* One slider over the whole signed ladder rather than a pair of nudge
+     buttons — "gives a lot more control". A step along it is the next rate up. */
+  const speed = page.locator('#orr-speed');
+  const ix = +(await speed.inputValue());
+  await speed.fill(String(ix + 1));
+  await speed.dispatchEvent('input');
   await expect(page.locator('.orr-rate')).toHaveText('1 week/s');
-  // Stepping down past the slowest rate crosses zero and runs backwards.
-  for (let i = 0; i < 11; i++) await page.locator('#orr-slower').click();
+
+  // And it runs on past real time into the reverse half of the ladder.
+  await speed.fill(await speed.getAttribute('min'));
+  await speed.dispatchEvent('input');
   await expect(page.locator('.orr-rate')).toContainText('−');
 });
 
@@ -804,9 +812,10 @@ test('the clock stops at the speed the system can still show', async ({ page }) 
     await page.goto('/orrery.html?system=' + encodeURIComponent(sys.name),
       { waitUntil: 'domcontentloaded' });
     await expect(page.locator('.orr-facts .orr-f-h')).toBeVisible({ timeout: 60_000 });
-    for (let i = 0; i < 25; i++) {
-      await page.locator('#orr-faster').click({ force: true }).catch(() => {});
-    }
+    // All the way to the fast end of the track.
+    const bar = page.locator('#orr-speed');
+    await bar.fill(await bar.getAttribute('max'));
+    await bar.dispatchEvent('input');
     return page.evaluate(() => window.Orrery.state());
   };
 
@@ -815,13 +824,15 @@ test('the clock stops at the speed the system can still show', async ({ page }) 
   // Sol's shape: an 88-day inner planet holds the ceiling down.
   const fast = await capOf(withPeriods('Quick', [88, 365, 4332]));
   expect(fast.fastestRate).toBe('1 year/s');
-  await expect(page.locator('#orr-faster')).toBeDisabled();
+  await expect(page.locator('#orr-speed')).toHaveValue(
+    await page.locator('#orr-speed').getAttribute('max'));
 
   // A system whose innermost body takes eight years can be run far harder
   // without anything skipping, so the ceiling lifts to the top of the ladder.
   const slow = await capOf(withPeriods('Slow', [3000, 60000]));
   expect(slow.fastestRate).toBe('100 yrs/s');
-  await expect(page.locator('#orr-faster')).toBeDisabled();
+  await expect(page.locator('#orr-speed')).toHaveValue(
+    await page.locator('#orr-speed').getAttribute('max'));
 
   // A middling one lands in between rather than at either end — the ceiling
   // tracks the data, it is not a two-way switch.
@@ -830,11 +841,13 @@ test('the clock stops at the speed the system can still show', async ({ page }) 
 
   // Whatever the ceiling, "slower" still reaches the bottom of the ladder and
   // the reverse half of it.
-  for (let i = 0; i < 25; i++) {
-    await page.locator('#orr-slower').click({ force: true }).catch(() => {});
-  }
+  const bar = page.locator('#orr-speed');
+  await bar.fill(await bar.getAttribute('min'));
+  await bar.dispatchEvent('input');
   await expect(page.locator('.orr-rate')).toContainText('−');
-  await expect(page.locator('#orr-slower')).toBeDisabled();
+  // The bottom of the track is the bottom of the ladder, whatever the ceiling.
+  await expect(page.locator('#orr-speed')).toHaveValue(
+    await page.locator('#orr-speed').getAttribute('min'));
 });
 
 /* Ring geometry is in the dump and is real: inner and outer radius, and a

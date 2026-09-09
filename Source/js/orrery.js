@@ -1649,9 +1649,9 @@ const Orrery = (function () {
       '</div>',
       '<div class="orr-foot">',
       '  <div class="orr-time">',
-      '    <button id="orr-slower" title="Slower, then backwards">&#9668;&#9668;</button>',
       '    <button id="orr-play" class="orr-play" title="Pause">&#10074;&#10074;</button>',
-      '    <button id="orr-faster" title="Faster">&#9658;&#9658;</button>',
+      '    <input id="orr-speed" class="orr-speed" type="range" step="1"',
+      '      aria-label="Speed, backwards through real time to forwards">',
       '    <span class="orr-rate" id="orr-rate"></span>',
       '  </div>',
       '  <div class="orr-clock"><span id="orr-date"></span>',
@@ -1727,8 +1727,7 @@ const Orrery = (function () {
     const $ = (id) => panel.querySelector('#' + id);
     $('orr-back').onclick = $('orr-close').onclick = close;
     $('orr-play').onclick = () => setPlaying(!playing);
-    $('orr-slower').onclick = () => setRate(rateIx - 1);
-    $('orr-faster').onclick = () => setRate(rateIx + 1);
+    $('orr-speed').oninput = function () { setRate(+this.value); };
     $('orr-now').onclick = () => { simDays = 0; draw(0); };
     $('orr-3d').onclick = () => setMode(true);
     $('orr-2d').onclick = () => setMode(false);
@@ -3035,13 +3034,20 @@ const Orrery = (function () {
     const r = LADDER[rateIx];
     panel.querySelector('#orr-rate').textContent =
       (r.dir < 0 && r.days > 1 / 86400 ? '− ' : '') + r.label;
-    const slower = panel.querySelector('#orr-slower');
-    const faster = panel.querySelector('#orr-faster');
-    slower.disabled = rateIx === rateLo;
-    faster.disabled = rateIx === rateHi;
-    faster.title = faster.disabled
-      ? 'As fast as this system reads — beyond this its inner bodies skip whole orbits between frames'
-      : 'Faster';
+    /* One slider over the whole signed ladder, rather than a pair of nudge
+       buttons. Asked for: "I much prefer the slider bar idea for time skipping
+       over the buttons — gives a lot more control." Its ends are the ladder's
+       ends for this system, so the ceiling that keeps a system's inner bodies
+       from skipping whole orbits between frames is the end of the track
+       rather than a button that stops responding. */
+    const bar = panel.querySelector('#orr-speed');
+    bar.min = rateLo;
+    bar.max = rateHi;
+    if (+bar.value !== rateIx) bar.value = rateIx;
+    bar.title = 'Backwards ' + LADDER[rateLo].label + ' … forwards ' +
+      LADDER[rateHi].label +
+      ' — as fast as this system reads before its inner bodies skip whole orbits';
+    bar.setAttribute('aria-valuetext', panel.querySelector('#orr-rate').textContent);
   }
 
   function setMode(on3d) {

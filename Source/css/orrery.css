@@ -684,6 +684,14 @@ body.orr-dragging{user-select:none}
 .orr-time button:disabled{opacity:.35;cursor:default}
 .orr-play{color:var(--amber,#FF9D00)!important;font-size:11px!important}
 .orr-play.paused{color:var(--ion,#4DE3E1)!important}
+/* The speed slider. Wider than a pair of nudge buttons because that width is
+   the point — it is what turns "faster" into "how much faster", and the whole
+   signed ladder, backwards through real time to forwards, lives on it. */
+.orr-speed{width:132px;height:24px;margin:0 2px;accent-color:var(--amber,#FF9D00);
+  cursor:pointer;background:transparent}
+.orr-speed:focus-visible{outline:1px solid var(--amber,#FF9D00);outline-offset:2px}
+@media (max-width:520px){.orr-speed{width:88px}}
+
 .orr-rate{margin-left:6px;min-width:78px;font-family:var(--mono,monospace);
   font-size:10.5px;color:var(--dim,#93A3B1)}
 
