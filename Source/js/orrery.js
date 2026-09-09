@@ -2472,6 +2472,14 @@ const Orrery = (function () {
       '</div>';
   }
 
+  /* Is the reader writing rather than driving? A text field, or anything the
+     page has made editable, owns its own keys. Escape is deliberately outside
+     this: it means "get me out of here" wherever the focus is. */
+  function typing() {
+    const on = document.activeElement;
+    return !!on && (/^(INPUT|TEXTAREA|SELECT)$/.test(on.tagName) || on.isContentEditable);
+  }
+
   function onKey(e) {
     if (!isOpen()) return;
     if (e.key === 'Escape') {
@@ -2482,14 +2490,19 @@ const Orrery = (function () {
       else if (lightOpen()) showLight(false);
       else close();
     }
+    /* Space, comma and full stop are characters before they are shortcuts, and
+       these ran off the document with no check on where the focus was — so a
+       system name went to the clock a letter at a time and "HR 17" could only
+       be searched for as "HR-17". Every shortcut that types something is
+       guarded now, not just the brackets below, which had it all along. */
+    else if (typing()) { /* let the field have it */ }
     else if (e.key === ' ') { e.preventDefault(); setPlaying(!playing); }
     else if (e.key === ',') setRate(rateIx - 1);
     else if (e.key === '.') setRate(rateIx + 1);
     /* The model had no way in without a pointer. Square brackets walk the
        bodies in the order the list shows them, from wherever focus happens
        to be — the same idea as the comma and the full stop. */
-    else if ((e.key === '[' || e.key === ']') && model &&
-             !/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) {
+    else if ((e.key === '[' || e.key === ']') && model) {
       e.preventDefault();
       const order = [];
       const walk = (n) => { if (n.drawR > 0) order.push(n);

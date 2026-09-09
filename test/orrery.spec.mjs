@@ -2972,3 +2972,30 @@ test('the planets go round the right way', async ({ page }) => {
   expect(spin.length).toBeGreaterThan(2);
   for (const s of spin) expect(s.ly, `${s.name} orbits backwards`).toBeGreaterThan(0);
 });
+
+test('a system name with a space can be typed into the search box',
+  async ({ page }) => {
+  /* Reported from the field: "it doesn't allow spaces — I had to trick it
+     with a -, HR 17 had to go in as HR-17". Space pauses the clock, and the
+     shortcut ran off the document with no check on where the focus was, so
+     every space went to the clock instead of the box. Comma and full stop are
+     the same shortcut family and the same characters people type. The guard
+     already existed two lines further down, on the bracket keys. */
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+
+  const play = page.locator('#orr-play');
+  const wasPaused = await play.evaluate((el) => el.classList.contains('paused'));
+
+  const q = page.locator('#orr-q');
+  await q.click();
+  await page.keyboard.type('HR 17, Col 285.');
+
+  // The name arrives whole, spaces and punctuation and all.
+  await expect(q).toHaveValue('HR 17, Col 285.');
+  // And none of it reached the clock.
+  expect(await play.evaluate((el) => el.classList.contains('paused'))).toBe(wasPaused);
+  await expect(page.locator('.orr-rate')).toHaveText('1 day/s');
+});
