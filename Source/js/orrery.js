@@ -1139,8 +1139,23 @@ function inPlaneToScene(x, y, b, out) {
   const Y = x * (sO * co + cO * so * ci) - y * (sO * so - cO * co * ci);
   const Z = x * (so * si) + y * (co * si);
 
-  // Ecliptic Z is the scene's up.
-  return out.set(X, Z, Y);
+  /* Ecliptic Z is the scene's up, and ecliptic Y goes to scene -Z.
+
+     That negation is the whole of it. Writing (X, Z, Y) swaps two axes and
+     negates neither, which is a reflection rather than a rotation, so the
+     right-handed ecliptic frame these formulae work in arrived in the scene
+     left-handed and every body in every system ran backwards round its
+     parent. A mirrored orbit traces exactly the same ellipse, which is why it
+     survived this long: the shape is right, only the direction is wrong.
+
+     Frontier's numbers need no correction of their own — Sol's dump carries
+     the real J2000 elements verbatim, Mercury's node at 48.331 degrees and
+     Earth's at -11.261, so the data is already in the standard right-handed
+     astronomical convention. Negating the node and the periapsis instead, as
+     is sometimes suggested, turns the orbit's tilt the right way up while
+     leaving the direction of travel reversed; it is the right compensation
+     for a left-handed renderer, and this is not one. */
+  return out.set(X, Z, -Y);
 }
 
 /* ── the model ──────────────────────────────────────────────────────────── */
@@ -4884,8 +4899,13 @@ const Orrery = (function () {
             { attributes: { position: { count: 0 } } } }).geometry.attributes.position.count
         })) : [];
       })(),
+      /* Where each of the star's children is right now, in scene units, beside
+         the orbit it was placed on. Two samples across a clock step are enough
+         to tell which way a body is going round, which is the only thing that
+         catches a mirrored orbit: a reflection draws the same ellipse. */
       orbits: model ? model.star.children.filter((k) => k.a > 0)
-        .map((k) => ({ name: k.name, a: k.a })) : [],
+        .map((k) => ({ name: k.name, a: k.a,
+          pos: k._pos ? [k._pos.x, k._pos.y, k._pos.z] : null })) : [],
       // The star's own clock, in real seconds — deliberately not the orbit
       // clock, so its surface does not strobe when time is run fast.
       starTime: (() => {

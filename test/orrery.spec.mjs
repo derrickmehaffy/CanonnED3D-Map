@@ -2177,11 +2177,17 @@ test('a moon behind its planet is in the dark', async ({ page }) => {
     /* The planet a quarter-turn round its orbit, so the camera — which sits
        off the +Z side of whatever it looks at — is looking at the moon's lit
        face rather than its night side; with the planet at M=0 both readings
-       were a thin crescent and the rest was night. The moon in the planet's
-       own plane: at the planet's own anomaly it sits beyond the planet on the
-       line from the star, dead in its shadow; a half-turn on, it sits between
-       them in full light. Nothing else moves between the two. */
-    sys.bodies[1].meanAnomaly = 270;
+       were a thin crescent and the rest was night.
+
+       Which quarter-turn is not arbitrary, and it moved when inPlaneToScene
+       stopped mirroring the scene: the eclipse itself is handedness-blind —
+       the moon at the planet's own anomaly sits beyond it on the line from
+       the star either way — but which side of the star the camera ends up on
+       is not, and at M=270 it now reads the night face of a moon in full
+       daylight. The moon in the planet's own plane: at the planet's own
+       anomaly it is in shadow, a half-turn on it is in full light. Nothing
+       else moves between the two. */
+    sys.bodies[1].meanAnomaly = 90;
     Object.assign(sys.bodies[2], { orbitalInclination: 0, argOfPeriapsis: 0,
       ascendingNode: 0, orbitalEccentricity: 0, meanAnomaly, atmosphereType: 'No atmosphere' });
     await stubApi(page, sys);
@@ -2213,8 +2219,8 @@ test('a moon behind its planet is in the dark', async ({ page }) => {
     });
   };
 
-  const lit = await at(90);
-  const dark = await at(270);
+  const lit = await at(270);
+  const dark = await at(90);
   expect(lit, 'a moon in the light is bright').toBeGreaterThan(25);
   // The star's light is gone; what is left is the sky, which is not nothing.
   expect(dark, 'a moon behind its planet is dark — lit ' + lit.toFixed(1)).toBeLessThan(lit * 0.4);
@@ -2921,4 +2927,48 @@ test('the lens and the backdrop are one image', async ({ page }) => {
   } else {
     expect(one.sky.isBackdrop, 'the image is the backdrop').toBe(true);
   }
+});
+
+/* Sol, as Frontier ships it. The dump carries the real J2000 elements verbatim
+   — Mercury's ascending node is 48.331°, Earth's is -11.261°, Uranus's
+   argument of periapsis is 96.999°, all textbook — so the data is in the
+   standard right-handed astronomical convention and needs no sign correction.
+   That makes Sol a ruler: every planet in it goes round the same way. */
+const SOL = JSON.parse(
+  readFileSync(new URL('./fixtures/sol-planets.json', import.meta.url), 'utf8'));
+
+test('the planets go round the right way', async ({ page }) => {
+  /* A mirrored orbit draws exactly the same ellipse, so shape proves nothing
+     and only chirality catches it. inPlaneToScene worked in a right-handed
+     ecliptic frame and then wrote out (X, Z, Y) — two axes swapped with
+     neither negated, which is a reflection, so every planet in the sky ran
+     backwards. Nobody spots that on one body; the whole of Sol going the
+     wrong way is unmistakable once measured. */
+  await stubDataHosts(page);
+  await stubApi(page, SOL);
+  await page.goto('/orrery.html?system=Sol', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(9, { timeout: 60_000 });
+
+  const read = () => page.evaluate(() => window.Orrery.state().orbits
+    .filter((o) => o.pos).map((o) => ({ name: o.name, pos: o.pos })));
+
+  await expect.poll(async () => (await read()).length, { timeout: 30_000 })
+    .toBeGreaterThan(7);
+  const before = await read();
+  // Let the clock carry them along; the default rate moves the inner planets.
+  await page.waitForTimeout(1200);
+  const after = await read();
+
+  // Angular momentum r x v, y component: positive is anticlockwise seen from
+  // ecliptic north, which is prograde — and every planet in Sol is prograde.
+  const spin = [];
+  for (const b of before) {
+    const a = after.find((x) => x.name === b.name);
+    if (!a) continue;
+    const v = [a.pos[0] - b.pos[0], a.pos[1] - b.pos[1], a.pos[2] - b.pos[2]];
+    if (Math.hypot(...v) < 1e-9) continue;          // hasn't moved yet
+    spin.push({ name: b.name, ly: b.pos[2] * v[0] - b.pos[0] * v[2] });
+  }
+  expect(spin.length).toBeGreaterThan(2);
+  for (const s of spin) expect(s.ly, `${s.name} orbits backwards`).toBeGreaterThan(0);
 });

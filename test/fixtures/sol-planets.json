@@ -1,0 +1,207 @@
+{
+ "name": "Sol",
+ "id64": 10477373803,
+ "bodyCount": 9,
+ "date": "2026-09-09 22:51:37+00",
+ "bodies": [
+  {
+   "bodyId": 0,
+   "name": "Sol",
+   "type": "Star",
+   "subType": "G (White-Yellow) Star",
+   "solarRadius": 0.999999953989935,
+   "solarMasses": 1.0,
+   "spectralClass": "G2",
+   "luminosity": "V",
+   "surfaceTemperature": 5778.0,
+   "mainStar": true,
+   "rotationalPeriod": 2.58327451196759,
+   "axialTilt": -0.219615,
+   "distanceToArrival": 0.0
+  },
+  {
+   "bodyId": 1,
+   "name": "Mercury",
+   "type": "Planet",
+   "subType": "Metal-rich body",
+   "parents": [
+    {
+     "Star": 0
+    }
+   ],
+   "radius": 2439.7,
+   "surfaceTemperature": 401.965271,
+   "semiMajorAxis": 0.387098364729585,
+   "orbitalEccentricity": 0.2056,
+   "orbitalInclination": 7.0,
+   "argOfPeriapsis": 29.124,
+   "ascendingNode": 48.331001,
+   "meanAnomaly": 72.14008,
+   "orbitalPeriod": 87.9691003097454,
+   "rotationalPeriod": 58.6460011179282,
+   "axialTilt": 0.036826,
+   "distanceToArrival": 188.910869
+  },
+  {
+   "bodyId": 2,
+   "name": "Venus",
+   "type": "Planet",
+   "subType": "High metal content world",
+   "parents": [
+    {
+     "Star": 0
+    }
+   ],
+   "radius": 6051.8,
+   "surfaceTemperature": 735.0,
+   "semiMajorAxis": 0.723325688208136,
+   "orbitalEccentricity": 0.0067,
+   "orbitalInclination": 3.395,
+   "argOfPeriapsis": 55.186001,
+   "ascendingNode": 76.677999,
+   "meanAnomaly": 101.240553,
+   "orbitalPeriod": 224.700997825023,
+   "rotationalPeriod": 243.018485452627,
+   "axialTilt": 3.094469,
+   "distanceToArrival": 361.429934
+  },
+  {
+   "bodyId": 3,
+   "name": "Earth",
+   "type": "Planet",
+   "subType": "Earth-like world",
+   "parents": [
+    {
+     "Star": 0
+    }
+   ],
+   "radius": 6378.1,
+   "surfaceTemperature": 288.0,
+   "semiMajorAxis": 1.00000072121293,
+   "orbitalEccentricity": 0.0167,
+   "orbitalInclination": 0.0,
+   "argOfPeriapsis": 114.207832,
+   "ascendingNode": -11.260999,
+   "meanAnomaly": 98.3364,
+   "orbitalPeriod": 365.256373253137,
+   "rotationalPeriod": 0.997269752199074,
+   "axialTilt": 0.401426,
+   "distanceToArrival": 500.349082
+  },
+  {
+   "bodyId": 5,
+   "name": "Mars",
+   "type": "Planet",
+   "subType": "Earth-like world",
+   "parents": [
+    {
+     "Star": 0
+    }
+   ],
+   "radius": 3396.2,
+   "surfaceTemperature": 260.81189,
+   "semiMajorAxis": 1.52367856711137,
+   "orbitalEccentricity": 0.0934,
+   "orbitalInclination": 1.85,
+   "argOfPeriapsis": 286.536985,
+   "ascendingNode": 49.562,
+   "meanAnomaly": 124.826385,
+   "orbitalPeriod": 686.971001602986,
+   "rotationalPeriod": 1.02595706322917,
+   "axialTilt": 0.439648,
+   "distanceToArrival": 805.000109
+  },
+  {
+   "bodyId": 7,
+   "name": "Jupiter",
+   "type": "Planet",
+   "subType": "Class I gas giant",
+   "parents": [
+    {
+     "Star": 0
+    }
+   ],
+   "radius": 71492.0,
+   "surfaceTemperature": 147.454529,
+   "semiMajorAxis": 5.20426581400207,
+   "orbitalEccentricity": 0.048775,
+   "orbitalInclination": 1.305,
+   "argOfPeriapsis": 275.066007,
+   "ascendingNode": 100.491996,
+   "meanAnomaly": 262.008336,
+   "orbitalPeriod": 4332.58981340462,
+   "rotationalPeriod": 0.413541675659722,
+   "axialTilt": 0.054629,
+   "distanceToArrival": 2620.552361
+  },
+  {
+   "bodyId": 13,
+   "name": "Saturn",
+   "type": "Planet",
+   "subType": "Class I gas giant",
+   "parents": [
+    {
+     "Star": 0
+    }
+   ],
+   "radius": 59000.0,
+   "surfaceTemperature": 87.99826,
+   "semiMajorAxis": 9.58201532428048,
+   "orbitalEccentricity": 0.055723,
+   "orbitalInclination": 2.48524,
+   "argOfPeriapsis": 336.013854,
+   "ascendingNode": 113.642812,
+   "meanAnomaly": 285.680974,
+   "orbitalPeriod": 10759.2196652183,
+   "rotationalPeriod": 0.440416655659722,
+   "axialTilt": 0.466526,
+   "distanceToArrival": 4723.509689
+  },
+  {
+   "bodyId": 22,
+   "name": "Uranus",
+   "type": "Planet",
+   "subType": "Class I gas giant",
+   "parents": [
+    {
+     "Star": 0
+    }
+   ],
+   "radius": 25559.0,
+   "surfaceTemperature": 56.735195,
+   "semiMajorAxis": 19.2294090293547,
+   "orbitalEccentricity": 0.04722,
+   "orbitalInclination": 0.772556,
+   "argOfPeriapsis": 96.998853,
+   "ascendingNode": 73.999342,
+   "meanAnomaly": 2.813092,
+   "orbitalPeriod": 30687.1498900431,
+   "rotationalPeriod": 0.718330033530093,
+   "axialTilt": 1.706408,
+   "distanceToArrival": 9143.065007
+  },
+  {
+   "bodyId": 28,
+   "name": "Neptune",
+   "type": "Planet",
+   "subType": "Class I gas giant",
+   "parents": [
+    {
+     "Star": 0
+    }
+   ],
+   "radius": 24764.0,
+   "surfaceTemperature": 45.923386,
+   "semiMajorAxis": 29.8099426671085,
+   "orbitalEccentricity": 0.008678,
+   "orbitalInclination": 1.767975,
+   "argOfPeriapsis": 273.219421,
+   "ascendingNode": 131.782971,
+   "meanAnomaly": 109.903482,
+   "orbitalPeriod": 60190.0306840738,
+   "rotationalPeriod": 0.67129999537037,
+   "axialTilt": 0.494277,
+   "distanceToArrival": 14920.236069
+  }
+ ]
+}
