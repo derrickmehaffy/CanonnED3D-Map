@@ -149,6 +149,10 @@ body.bare .top, body.bare .strip{display:none}
 .drop{margin-top:8px;border:1px dashed var(--rule);padding:16px 12px;text-align:center;
   font-family:var(--mono);font-size:10.5px;color:var(--dimmer);cursor:pointer;line-height:1.6}
 .drop:hover,.drop.over{border-color:var(--amber);color:var(--text)}
+/* What was left out of a drop that otherwise worked: a note under the
+   prompt rather than in place of it, because the route did load. */
+.drop .skipped{margin-top:8px;padding-top:8px;border-top:1px solid var(--rule);
+  color:var(--dimmer);font-size:10px}
 
 /* stage — the REAL Ed3d canvas lives here */
 .stage{flex:1;position:relative;min-width:0;background:var(--void)}

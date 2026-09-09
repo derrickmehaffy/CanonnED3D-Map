@@ -107,6 +107,34 @@ Add an entry to `test/pages.json`:
 Set `offlineSkip: true` only if the page genuinely cannot boot without live
 data. A page that just needs a URL parameter should get the parameter instead.
 
+## Journal fixtures
+
+`test/fixtures/*.log` are real Elite Dangerous journals from a real commander's
+machine, reduced to what the parser under test actually reads.
+
+They were produced by a **whitelist**, never a blocklist: only named events
+survive, and only named keys on those events. A blocklist is one new Frontier
+field away from putting a commander's name, FID, ship or balance into a public
+repository, and `handleFiles` reads three keys — `event`, `StarSystem`,
+`StarPos` — so nothing else has to be real. System names and coordinates are
+public game data. After generating, the output was checked for `FID`,
+`Commander`, `ShipName`, `ShipIdent`, `Credits`, `Name_Localised`, `Message`,
+`Factions` and `SystemFaction`, all zero. **Regenerate the same way, and check
+again**, rather than hand-editing a journal and hoping.
+
+The three cover what real journals actually look like:
+
+| Fixture | What it is |
+|---|---|
+| `journal-with-route.log` | 10 jumps across 9 systems — one is passed through twice, because the map plots systems and dedupes by name |
+| `journal-no-jumps.log` | A real evening that never left the system. Three of five real journals look like this; it is not a broken file |
+| `journal-near-empty.log` | A session that opened and closed — one header line |
+
+Spansh exports are a different shape and are **not** parsed yet: a Spansh dump
+is one pretty-printed JSON document, so the line-by-line `FSDJump` scan finds
+nothing in it. The file picker still advertises `.json`, which is why it reads
+as broken rather than unimplemented.
+
 ## What this suite does not do
 
 There is no visual regression testing. Screenshot baselines were tried and

@@ -824,7 +824,7 @@
   function panelRoutes() {
     var h = '<div class="s-t">Routes &amp; journals</div>' +
       '<div class="s-sub">Drop a journal to plot where you have been</div>' +
-      '<div class="drop" id="drop">Drop a <b>Journal*.log</b> here<br>or click to choose a file</div>' +
+      '<div class="drop" id="drop">' + DROP_PROMPT + '</div>' +
       '<input type="file" id="fileinput" accept=".log,.json,.txt" multiple style="display:none">';
     if (extraRoutes.length) {
       h += '<div style="margin-top:12px">';
@@ -1221,6 +1221,8 @@
   }
 
   /* ── routes: parse a journal in-browser and push it onto the live map ─── */
+  var DROP_PROMPT = 'Drop a <b>Journal*.log</b> here<br>or click to choose a file';
+
   function wireDrop() {
     var drop = $('drop'), input = $('fileinput');
     if (!drop) return;
@@ -1234,32 +1236,79 @@
     });
     drop.addEventListener('drop', function (e) { handleFiles(e.dataTransfer.files); });
   }
+  /* What one file turned out to be.
+
+     A journal holding no jump is not a broken file: of five real journals off
+     a commander's machine, three hold none at all — they are evenings spent
+     inside one system. Telling someone "Try a Journal*.log" when they have
+     just given you one blames the file for the wrong thing, so a quiet
+     journal is told apart from something that is not a journal at all, and
+     neither is called a failure. */
+  function readJournal(text, label) {
+    var seen = {}, systems = [];
+    /* One scan of the whole string, before splitting it: the big journals run
+       to 1.7 MB and 5,700 lines, and this only has to answer "was this ever a
+       journal" for the message at the end. */
+    var journal = text.indexOf('"event"') > -1;
+    text.split(/\r?\n/).forEach(function (line) {
+      if (line.indexOf('FSDJump') < 0) return;
+      try {
+        var j = JSON.parse(line);
+        if (j.event !== 'FSDJump' || !j.StarPos || !j.StarSystem) return;
+        if (seen[j.StarSystem]) return;
+        seen[j.StarSystem] = 1;
+        systems.push({ name: j.StarSystem, infos: 'From ' + label,
+          coords: { x: j.StarPos[0], y: j.StarPos[1], z: -j.StarPos[2] } });
+      } catch (err) { /* not a JSON line — journals are line-delimited */ }
+    });
+    return { systems: systems, journal: journal };
+  }
+
   function handleFiles(files) {
     if (!files || !files.length) return;
-    Array.prototype.forEach.call(files, function (f) {
+    var list = Array.prototype.slice.call(files), left = list.length;
+    var plotted = 0, quiet = [], alien = [];
+
+    /* Said once, when every file has been read, rather than once per file.
+
+       Each reader finishes on its own schedule and the message went straight
+       into the drop zone, so dropping an evening's worth of journals — some
+       with jumps, some without — left whichever quiet one finished last
+       complaining on screen while the systems from the others were already on
+       the map. That is what "the upload has stopped working" looked like. */
+    function finish() {
+      if (--left) return;
+      if (plotted) { invalidateSystems(); renderPanel(); }
+
+      var note = '';
+      if (quiet.length) {
+        note = quiet.length === 1
+          ? '<b>' + esc(quiet[0]) + '</b> has no jumps in it — that session never left the system.'
+          : quiet.length + ' of those have no jumps in them — those sessions never left the system.';
+      }
+      if (alien.length) {
+        note += (note ? '<br>' : '') + (alien.length === 1
+          ? '<b>' + esc(alien[0]) + '</b> is not a journal.'
+          : alien.length + ' of those are not journals.');
+      }
+      if (!note) return;
+      $('drop').innerHTML = plotted
+        ? DROP_PROMPT + '<div class="skipped">' + note + '</div>'
+        : note + '<br>Drop a <b>Journal*.log</b> from your game folder.';
+    }
+
+    list.forEach(function (f) {
       var rd = new FileReader();
       rd.onload = function () {
-        var seen = {}, systems = [];
-        String(rd.result).split(/\r?\n/).forEach(function (line) {
-          if (line.indexOf('FSDJump') < 0) return;
-          try {
-            var j = JSON.parse(line);
-            if (j.event !== 'FSDJump' || !j.StarPos || !j.StarSystem) return;
-            if (seen[j.StarSystem]) return;
-            seen[j.StarSystem] = 1;
-            systems.push({ name: j.StarSystem, infos: 'From ' + f.name,
-              coords: { x: j.StarPos[0], y: j.StarPos[1], z: -j.StarPos[2] } });
-          } catch (err) { /* not a JSON line — journals are line-delimited */ }
-        });
-        if (!systems.length) {
-          $('drop').innerHTML = 'No <b>FSDJump</b> entries in ' + esc(f.name) + '.<br>Try a Journal*.log.';
-          return;
-        }
-        Ed3d.addBatch({ systems: systems });
-        invalidateSystems();
-    extraRoutes.push({ name: f.name, count: systems.length });
-        renderPanel();
+        var got = readJournal(String(rd.result), f.name);
+        if (got.systems.length) {
+          Ed3d.addBatch({ systems: got.systems });
+          extraRoutes.push({ name: f.name, count: got.systems.length });
+          plotted++;
+        } else if (got.journal) { quiet.push(f.name); } else { alien.push(f.name); }
+        finish();
       };
+      rd.onerror = function () { alien.push(f.name); finish(); };
       rd.readAsText(f);
     });
   }

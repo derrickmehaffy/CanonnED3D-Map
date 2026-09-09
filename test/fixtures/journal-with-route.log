@@ -1,0 +1,600 @@
+{"timestamp": "2026-08-31T00:32:37Z", "event": "Fileheader", "gameversion": "4.4.0.3"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "StationCoriolis"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "TouristBeacon"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "StationBernalSphere"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "Outpost"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "Outpost"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "NavBeacon"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "SquadronCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "Outpost"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "Installation"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "Installation"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "Megaship"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "Installation"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "FSSSignalDiscovered", "SignalType": "Installation"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "Location", "StarSystem": "Kuk", "StarPos": [-21.28125, 69.09375, -16.3125]}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "Music", "MusicTrack": "NoTrack"}
+{"timestamp": "2026-08-31T00:34:46Z", "event": "Music", "MusicTrack": "Exploration"}
+{"timestamp": "2026-08-31T00:35:08Z", "event": "Music", "MusicTrack": "GalaxyMap"}
+{"timestamp": "2026-08-31T00:35:29Z", "event": "NavRoute"}
+{"timestamp": "2026-08-31T00:35:29Z", "event": "FSDTarget", "Name": "Bodedi", "RemainingJumpsInRoute": 2}
+{"timestamp": "2026-08-31T00:35:32Z", "event": "Music", "MusicTrack": "Exploration"}
+{"timestamp": "2026-08-31T00:35:39Z", "event": "Music", "MusicTrack": "NoTrack"}
+{"timestamp": "2026-08-31T00:35:56Z", "event": "Music", "MusicTrack": "DockingComputer"}
+{"timestamp": "2026-08-31T00:36:01Z", "event": "Music", "MusicTrack": "NoTrack"}
+{"timestamp": "2026-08-31T00:37:27Z", "event": "Music", "MusicTrack": "Exploration"}
+{"timestamp": "2026-08-31T00:37:44Z", "event": "StartJump", "JumpType": "Supercruise"}
+{"timestamp": "2026-08-31T00:37:44Z", "event": "FSDTarget", "Name": "Bodedi", "RemainingJumpsInRoute": 2}
+{"timestamp": "2026-08-31T00:37:49Z", "event": "SupercruiseEntry", "StarSystem": "Kuk"}
+{"timestamp": "2026-08-31T00:37:49Z", "event": "Music", "MusicTrack": "Supercruise"}
+{"timestamp": "2026-08-31T00:38:10Z", "event": "StartJump", "JumpType": "Hyperspace", "StarSystem": "Bodedi"}
+{"timestamp": "2026-08-31T00:38:15Z", "event": "Music", "MusicTrack": "NoTrack"}
+{"timestamp": "2026-08-31T00:38:18Z", "event": "FSDTarget", "Name": "Procyon", "RemainingJumpsInRoute": 1}
+{"timestamp": "2026-08-31T00:38:29Z", "event": "FSDJump", "StarSystem": "Bodedi", "StarPos": [-14.125, 26.40625, -14.53125], "JumpDist": 43.32}
+{"timestamp": "2026-08-31T00:38:29Z", "event": "Music", "MusicTrack": "Supercruise"}
+{"timestamp": "2026-08-31T00:38:44Z", "event": "FSSSignalDiscovered", "SignalType": "Installation"}
+{"timestamp": "2026-08-31T00:38:44Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:38:44Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:38:44Z", "event": "FSSSignalDiscovered", "SignalType": "NavBeacon"}
+{"timestamp": "2026-08-31T00:38:44Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:38:44Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:38:44Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:38:44Z", "event": "FSSSignalDiscovered", "SignalType": "StationCoriolis"}
+{"timestamp": "2026-08-31T00:38:44Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:38:44Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:39:03Z", "event": "StartJump", "JumpType": "Hyperspace", "StarSystem": "Procyon"}
+{"timestamp": "2026-08-31T00:39:08Z", "event": "Music", "MusicTrack": "NoTrack"}
+{"timestamp": "2026-08-31T00:39:10Z", "event": "NavRouteClear"}
+{"timestamp": "2026-08-31T00:39:21Z", "event": "FSDJump", "StarSystem": "Procyon", "StarPos": [6.21875, 2.65625, -9.1875], "JumpDist": 31.725}
+{"timestamp": "2026-08-31T00:39:21Z", "event": "Music", "MusicTrack": "DestinationFromHyperspace"}
+{"timestamp": "2026-08-31T00:39:26Z", "event": "Music", "MusicTrack": "Supercruise"}
+{"timestamp": "2026-08-31T00:39:28Z", "event": "Music", "MusicTrack": "SystemMap"}
+{"timestamp": "2026-08-31T00:40:11Z", "event": "Music", "MusicTrack": "Supercruise"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "Megaship"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "StationONeilOrbis"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "StationONeilCylinder"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "NavBeacon"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "StationONeilOrbis"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "SquadronCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "Generic"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "StationONeilOrbis"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "TouristBeacon"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "Installation"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "Installation"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:32Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:44:47Z", "event": "Music", "MusicTrack": "SystemMap"}
+{"timestamp": "2026-08-31T00:45:17Z", "event": "Music", "MusicTrack": "Supercruise"}
+{"timestamp": "2026-08-31T00:46:48Z", "event": "SupercruiseExit", "StarSystem": "Procyon", "BodyType": "Station"}
+{"timestamp": "2026-08-31T00:46:48Z", "event": "Music", "MusicTrack": "DestinationFromSupercruise"}
+{"timestamp": "2026-08-31T00:46:53Z", "event": "Music", "MusicTrack": "NoTrack"}
+{"timestamp": "2026-08-31T00:47:15Z", "event": "Music", "MusicTrack": "DockingComputer"}
+{"timestamp": "2026-08-31T00:48:15Z", "event": "Music", "MusicTrack": "Starport"}
+{"timestamp": "2026-08-31T00:50:05Z", "event": "Music", "MusicTrack": "GalaxyMap"}
+{"timestamp": "2026-08-31T00:50:12Z", "event": "NavRoute"}
+{"timestamp": "2026-08-31T00:50:12Z", "event": "FSDTarget", "Name": "Lalande 18115", "RemainingJumpsInRoute": 1}
+{"timestamp": "2026-08-31T00:50:14Z", "event": "Music", "MusicTrack": "Starport"}
+{"timestamp": "2026-08-31T00:50:35Z", "event": "Music", "MusicTrack": "DockingComputer"}
+{"timestamp": "2026-08-31T00:51:07Z", "event": "Music", "MusicTrack": "Starport"}
+{"timestamp": "2026-08-31T00:51:12Z", "event": "Music", "MusicTrack": "NoTrack"}
+{"timestamp": "2026-08-31T00:51:46Z", "event": "StartJump", "JumpType": "Hyperspace", "StarSystem": "Lalande 18115"}
+{"timestamp": "2026-08-31T00:51:53Z", "event": "NavRouteClear"}
+{"timestamp": "2026-08-31T00:52:04Z", "event": "FSDJump", "StarSystem": "Lalande 18115", "StarPos": [-3.84375, 14.0, -14.40625], "JumpDist": 16.037}
+{"timestamp": "2026-08-31T00:52:04Z", "event": "Music", "MusicTrack": "DestinationFromHyperspace"}
+{"timestamp": "2026-08-31T00:52:09Z", "event": "Music", "MusicTrack": "Supercruise"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "Installation"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "StationONeilCylinder"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "NavBeacon"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "Installation"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "Megaship"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "Installation"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "Outpost"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "Outpost"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "Outpost"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "Megaship"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "Outpost"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "StationONeilOrbis"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "StationONeilOrbis"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "Outpost"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "StationONeilOrbis"}
+{"timestamp": "2026-08-31T00:52:52Z", "event": "FSSSignalDiscovered", "SignalType": "Installation"}
+{"timestamp": "2026-08-31T00:56:07Z", "event": "SupercruiseExit", "StarSystem": "Lalande 18115", "BodyType": "Planet"}
+{"timestamp": "2026-08-31T00:56:07Z", "event": "Music", "MusicTrack": "Exploration"}
+{"timestamp": "2026-08-31T01:15:25Z", "event": "Music", "MusicTrack": "GalaxyMap"}
+{"timestamp": "2026-08-31T01:15:30Z", "event": "NavRoute"}
+{"timestamp": "2026-08-31T01:15:30Z", "event": "FSDTarget", "Name": "WISE 0410+1502", "RemainingJumpsInRoute": 1}
+{"timestamp": "2026-08-31T01:15:31Z", "event": "Music", "MusicTrack": "Exploration"}
+{"timestamp": "2026-08-31T01:16:02Z", "event": "StartJump", "JumpType": "Supercruise"}
+{"timestamp": "2026-08-31T01:16:02Z", "event": "FSDTarget", "Name": "WISE 0410+1502", "RemainingJumpsInRoute": 1}
+{"timestamp": "2026-08-31T01:16:07Z", "event": "SupercruiseEntry", "StarSystem": "Lalande 18115"}
+{"timestamp": "2026-08-31T01:16:07Z", "event": "Music", "MusicTrack": "Supercruise"}
+{"timestamp": "2026-08-31T01:17:20Z", "event": "StartJump", "JumpType": "Hyperspace", "StarSystem": "WISE 0410+1502"}
+{"timestamp": "2026-08-31T01:17:25Z", "event": "Music", "MusicTrack": "NoTrack"}
+{"timestamp": "2026-08-31T01:17:27Z", "event": "NavRouteClear"}
+{"timestamp": "2026-08-31T01:17:38Z", "event": "FSDJump", "StarSystem": "WISE 0410+1502", "StarPos": [-0.46875, -6.125, -12.59375], "JumpDist": 20.486}
+{"timestamp": "2026-08-31T01:17:38Z", "event": "Music", "MusicTrack": "DestinationFromHyperspace"}
+{"timestamp": "2026-08-31T01:17:43Z", "event": "Music", "MusicTrack": "Supercruise"}
+{"timestamp": "2026-08-31T01:17:45Z", "event": "Scan", "ScanType": "AutoScan", "BodyName": "WISE 0410+1502 A Belt Cluster 3", "StarSystem": "WISE 0410+1502"}
+{"timestamp": "2026-08-31T01:17:45Z", "event": "Scan", "ScanType": "AutoScan", "BodyName": "WISE 0410+1502 1", "StarSystem": "WISE 0410+1502"}
+{"timestamp": "2026-08-31T01:17:45Z", "event": "Scan", "ScanType": "AutoScan", "BodyName": "WISE 0410+1502", "StarSystem": "WISE 0410+1502"}
+{"timestamp": "2026-08-31T01:17:45Z", "event": "Scan", "ScanType": "AutoScan", "BodyName": "WISE 0410+1502 2", "StarSystem": "WISE 0410+1502"}
+{"timestamp": "2026-08-31T01:17:45Z", "event": "Scan", "ScanType": "AutoScan", "BodyName": "WISE 0410+1502 A Belt Cluster 2", "StarSystem": "WISE 0410+1502"}
+{"timestamp": "2026-08-31T01:17:45Z", "event": "Scan", "ScanType": "AutoScan", "BodyName": "WISE 0410+1502 A Belt Cluster 1", "StarSystem": "WISE 0410+1502"}
+{"timestamp": "2026-08-31T01:17:45Z", "event": "Scan", "ScanType": "AutoScan", "BodyName": "WISE 0410+1502 A Belt Cluster 4", "StarSystem": "WISE 0410+1502"}
+{"timestamp": "2026-08-31T01:18:17Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:18:17Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:18:17Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:18:17Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:18:17Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:18:17Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:18:17Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:18:17Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:18:17Z", "event": "FSSSignalDiscovered", "SignalType": "NavBeacon"}
+{"timestamp": "2026-08-31T01:18:17Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:18:17Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:18:17Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:18:17Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:18:17Z", "event": "FSSSignalDiscovered", "SignalType": "Outpost"}
+{"timestamp": "2026-08-31T01:18:17Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:18:17Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:18:17Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T01:18:17Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:18:17Z", "event": "FSSSignalDiscovered", "SignalType": "Outpost"}
+{"timestamp": "2026-08-31T01:18:17Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T01:19:32Z", "event": "Scan", "ScanType": "AutoScan", "BodyName": "WISE 0410+1502 9 c", "StarSystem": "WISE 0410+1502"}
+{"timestamp": "2026-08-31T01:19:33Z", "event": "Scan", "ScanType": "AutoScan", "BodyName": "WISE 0410+1502 9 b", "StarSystem": "WISE 0410+1502"}
+{"timestamp": "2026-08-31T01:19:33Z", "event": "Scan", "ScanType": "AutoScan", "BodyName": "WISE 0410+1502 9 a", "StarSystem": "WISE 0410+1502"}
+{"timestamp": "2026-08-31T01:19:34Z", "event": "Scan", "ScanType": "AutoScan", "BodyName": "WISE 0410+1502 9", "StarSystem": "WISE 0410+1502"}
+{"timestamp": "2026-08-31T01:19:34Z", "event": "Scan", "ScanType": "AutoScan", "BodyName": "WISE 0410+1502 9 d", "StarSystem": "WISE 0410+1502"}
+{"timestamp": "2026-08-31T01:19:34Z", "event": "Scan", "ScanType": "AutoScan", "BodyName": "WISE 0410+1502 9 f", "StarSystem": "WISE 0410+1502"}
+{"timestamp": "2026-08-31T01:19:35Z", "event": "Scan", "ScanType": "AutoScan", "BodyName": "WISE 0410+1502 9 e", "StarSystem": "WISE 0410+1502"}
+{"timestamp": "2026-08-31T01:19:49Z", "event": "FSSSignalDiscovered", "SignalType": "Outpost"}
+{"timestamp": "2026-08-31T01:19:49Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T01:19:49Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T01:19:49Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T01:20:56Z", "event": "SupercruiseExit", "StarSystem": "WISE 0410+1502", "BodyType": "Planet"}
+{"timestamp": "2026-08-31T01:20:56Z", "event": "Music", "MusicTrack": "Exploration"}
+{"timestamp": "2026-08-31T01:21:22Z", "event": "Music", "MusicTrack": "Combat_Dogfight"}
+{"timestamp": "2026-08-31T01:22:02Z", "event": "Music", "MusicTrack": "Exploration"}
+{"timestamp": "2026-08-31T01:25:46Z", "event": "Music", "MusicTrack": "GalaxyMap"}
+{"timestamp": "2026-08-31T01:26:00Z", "event": "NavRoute"}
+{"timestamp": "2026-08-31T01:26:00Z", "event": "FSDTarget", "Name": "Luyten 674-15", "RemainingJumpsInRoute": 1}
+{"timestamp": "2026-08-31T01:26:22Z", "event": "Music", "MusicTrack": "Exploration"}
+{"timestamp": "2026-08-31T01:26:58Z", "event": "StartJump", "JumpType": "Hyperspace", "StarSystem": "Luyten 674-15"}
+{"timestamp": "2026-08-31T01:27:03Z", "event": "Music", "MusicTrack": "NoTrack"}
+{"timestamp": "2026-08-31T01:27:05Z", "event": "NavRouteClear"}
+{"timestamp": "2026-08-31T01:27:16Z", "event": "FSDJump", "StarSystem": "Luyten 674-15", "StarPos": [16.71875, 2.28125, -9.125], "JumpDist": 19.445}
+{"timestamp": "2026-08-31T01:27:16Z", "event": "Music", "MusicTrack": "DestinationFromHyperspace"}
+{"timestamp": "2026-08-31T01:27:21Z", "event": "Music", "MusicTrack": "Supercruise"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "StationCoriolis"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "NavBeacon"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "Installation"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "Outpost"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "Installation"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "Megaship"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "StationONeilCylinder"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:28:41Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:30:21Z", "event": "SupercruiseExit", "StarSystem": "Luyten 674-15", "BodyType": "Planet"}
+{"timestamp": "2026-08-31T01:30:21Z", "event": "Music", "MusicTrack": "Exploration"}
+{"timestamp": "2026-08-31T01:37:37Z", "event": "Music", "MusicTrack": "Combat_SRV"}
+{"timestamp": "2026-08-31T01:40:58Z", "event": "Music", "MusicTrack": "Combat_Dogfight"}
+{"timestamp": "2026-08-31T01:41:46Z", "event": "StartJump", "JumpType": "Supercruise"}
+{"timestamp": "2026-08-31T01:41:51Z", "event": "SupercruiseEntry", "StarSystem": "Luyten 674-15"}
+{"timestamp": "2026-08-31T01:41:51Z", "event": "Music", "MusicTrack": "Supercruise"}
+{"timestamp": "2026-08-31T01:42:18Z", "event": "Music", "MusicTrack": "GalaxyMap"}
+{"timestamp": "2026-08-31T01:42:24Z", "event": "NavRoute"}
+{"timestamp": "2026-08-31T01:42:24Z", "event": "FSDTarget", "Name": "Ross 986", "RemainingJumpsInRoute": 1}
+{"timestamp": "2026-08-31T01:42:27Z", "event": "Music", "MusicTrack": "Supercruise"}
+{"timestamp": "2026-08-31T01:42:54Z", "event": "StartJump", "JumpType": "Hyperspace", "StarSystem": "Ross 986"}
+{"timestamp": "2026-08-31T01:42:59Z", "event": "Music", "MusicTrack": "NoTrack"}
+{"timestamp": "2026-08-31T01:43:02Z", "event": "NavRouteClear"}
+{"timestamp": "2026-08-31T01:43:13Z", "event": "FSDJump", "StarSystem": "Ross 986", "StarPos": [-0.25, 7.1875, -19.25], "JumpDist": 20.36}
+{"timestamp": "2026-08-31T01:43:13Z", "event": "Music", "MusicTrack": "DestinationFromHyperspace"}
+{"timestamp": "2026-08-31T01:43:18Z", "event": "Music", "MusicTrack": "Supercruise"}
+{"timestamp": "2026-08-31T01:44:41Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:44:41Z", "event": "FSSSignalDiscovered", "SignalType": "StationONeilCylinder"}
+{"timestamp": "2026-08-31T01:44:41Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:44:41Z", "event": "FSSSignalDiscovered", "SignalType": "StationCoriolis"}
+{"timestamp": "2026-08-31T01:44:41Z", "event": "FSSSignalDiscovered", "SignalType": "Installation"}
+{"timestamp": "2026-08-31T01:44:41Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:44:41Z", "event": "FSSSignalDiscovered", "SignalType": "Installation"}
+{"timestamp": "2026-08-31T01:44:41Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:44:41Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:44:41Z", "event": "FSSSignalDiscovered", "SignalType": "NavBeacon"}
+{"timestamp": "2026-08-31T01:44:41Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:44:41Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:44:41Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:44:41Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:44:41Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:44:41Z", "event": "FSSSignalDiscovered", "SignalType": "StationONeilCylinder"}
+{"timestamp": "2026-08-31T01:44:41Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:44:41Z", "event": "SupercruiseExit", "StarSystem": "Ross 986", "BodyType": "Star"}
+{"timestamp": "2026-08-31T01:44:41Z", "event": "Music", "MusicTrack": "Exploration"}
+{"timestamp": "2026-08-31T01:45:11Z", "event": "Music", "MusicTrack": "Combat_Dogfight"}
+{"timestamp": "2026-08-31T01:45:31Z", "event": "Music", "MusicTrack": "Exploration"}
+{"timestamp": "2026-08-31T01:48:31Z", "event": "Music", "MusicTrack": "GalaxyMap"}
+{"timestamp": "2026-08-31T01:48:39Z", "event": "NavRoute"}
+{"timestamp": "2026-08-31T01:48:39Z", "event": "FSDTarget", "Name": "Gendalla", "RemainingJumpsInRoute": 1}
+{"timestamp": "2026-08-31T01:48:40Z", "event": "Music", "MusicTrack": "Exploration"}
+{"timestamp": "2026-08-31T01:49:03Z", "event": "StartJump", "JumpType": "Hyperspace", "StarSystem": "Gendalla"}
+{"timestamp": "2026-08-31T01:49:08Z", "event": "Music", "MusicTrack": "NoTrack"}
+{"timestamp": "2026-08-31T01:49:11Z", "event": "NavRouteClear"}
+{"timestamp": "2026-08-31T01:49:21Z", "event": "FSDJump", "StarSystem": "Gendalla", "StarPos": [12.0, 9.96875, -5.53125], "JumpDist": 18.601}
+{"timestamp": "2026-08-31T01:49:21Z", "event": "Music", "MusicTrack": "DestinationFromHyperspace"}
+{"timestamp": "2026-08-31T01:49:26Z", "event": "Music", "MusicTrack": "Supercruise"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "StationCoriolis"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "NavBeacon"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "Outpost"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "SupercruiseExit", "StarSystem": "Gendalla", "BodyType": "Planet"}
+{"timestamp": "2026-08-31T01:52:22Z", "event": "Music", "MusicTrack": "Exploration"}
+{"timestamp": "2026-08-31T02:00:20Z", "event": "StartJump", "JumpType": "Supercruise"}
+{"timestamp": "2026-08-31T02:00:25Z", "event": "SupercruiseEntry", "StarSystem": "Gendalla"}
+{"timestamp": "2026-08-31T02:00:25Z", "event": "Music", "MusicTrack": "Supercruise"}
+{"timestamp": "2026-08-31T02:00:40Z", "event": "Music", "MusicTrack": "GalaxyMap"}
+{"timestamp": "2026-08-31T02:00:46Z", "event": "NavRoute"}
+{"timestamp": "2026-08-31T02:00:46Z", "event": "FSDTarget", "Name": "Ross 104", "RemainingJumpsInRoute": 1}
+{"timestamp": "2026-08-31T02:00:48Z", "event": "Music", "MusicTrack": "Supercruise"}
+{"timestamp": "2026-08-31T02:01:08Z", "event": "StartJump", "JumpType": "Hyperspace", "StarSystem": "Ross 104"}
+{"timestamp": "2026-08-31T02:01:13Z", "event": "Music", "MusicTrack": "NoTrack"}
+{"timestamp": "2026-08-31T02:01:15Z", "event": "NavRouteClear"}
+{"timestamp": "2026-08-31T02:01:26Z", "event": "FSDJump", "StarSystem": "Ross 104", "StarPos": [5.5625, 19.6875, -7.3125], "JumpDist": 11.793}
+{"timestamp": "2026-08-31T02:01:26Z", "event": "Music", "MusicTrack": "DestinationFromHyperspace"}
+{"timestamp": "2026-08-31T02:01:31Z", "event": "Music", "MusicTrack": "Supercruise"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "Outpost"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "StationCoriolis"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "NavBeacon"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "Outpost"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "ResourceExtraction"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "ResourceExtraction"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "ResourceExtraction"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "Installation"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "ResourceExtraction"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "ResourceExtraction"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "ResourceExtraction"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "ResourceExtraction"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "ResourceExtraction"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "ResourceExtraction"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "Megaship"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "ResourceExtraction"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "ResourceExtraction"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "ResourceExtraction"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "ResourceExtraction"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "ResourceExtraction"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "ResourceExtraction"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "ResourceExtraction"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "Megaship"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "ResourceExtraction"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "ResourceExtraction"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "ResourceExtraction"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "ResourceExtraction"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "ResourceExtraction"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "Installation"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "Installation"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "FSSSignalDiscovered", "SignalType": "Installation"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "SupercruiseExit", "StarSystem": "Ross 104", "BodyType": "Planet"}
+{"timestamp": "2026-08-31T02:07:00Z", "event": "Music", "MusicTrack": "Exploration"}
+{"timestamp": "2026-08-31T02:10:42Z", "event": "Music", "MusicTrack": "Combat_SRV"}
+{"timestamp": "2026-08-31T02:11:48Z", "event": "Music", "MusicTrack": "Exploration"}
+{"timestamp": "2026-08-31T02:13:28Z", "event": "Music", "MusicTrack": "Combat_Dogfight"}
+{"timestamp": "2026-08-31T02:14:00Z", "event": "StartJump", "JumpType": "Supercruise"}
+{"timestamp": "2026-08-31T02:14:05Z", "event": "SupercruiseEntry", "StarSystem": "Ross 104"}
+{"timestamp": "2026-08-31T02:14:05Z", "event": "Music", "MusicTrack": "Supercruise"}
+{"timestamp": "2026-08-31T02:14:11Z", "event": "Music", "MusicTrack": "GalaxyMap"}
+{"timestamp": "2026-08-31T02:14:16Z", "event": "NavRoute"}
+{"timestamp": "2026-08-31T02:14:16Z", "event": "FSDTarget", "Name": "Luyten 674-15", "RemainingJumpsInRoute": 1}
+{"timestamp": "2026-08-31T02:14:18Z", "event": "Music", "MusicTrack": "Supercruise"}
+{"timestamp": "2026-08-31T02:14:45Z", "event": "StartJump", "JumpType": "Hyperspace", "StarSystem": "Luyten 674-15"}
+{"timestamp": "2026-08-31T02:14:50Z", "event": "Music", "MusicTrack": "NoTrack"}
+{"timestamp": "2026-08-31T02:14:52Z", "event": "NavRouteClear"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "NavBeacon"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "StationCoriolis"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "Installation"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "Outpost"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "Installation"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "StationONeilCylinder"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "Megaship"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "FSDJump", "StarSystem": "Luyten 674-15", "StarPos": [16.71875, 2.28125, -9.125], "JumpDist": 20.754}
+{"timestamp": "2026-08-31T02:15:03Z", "event": "Music", "MusicTrack": "Supercruise"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "NavBeacon"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "StationCoriolis"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "Installation"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "Outpost"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "Installation"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "StationONeilCylinder"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "Megaship"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "FSSSignalDiscovered", "SignalType": "FleetCarrier"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "SupercruiseExit", "StarSystem": "Luyten 674-15", "BodyType": "Star"}
+{"timestamp": "2026-08-31T02:17:27Z", "event": "Music", "MusicTrack": "Exploration"}
+{"timestamp": "2026-08-31T02:17:40Z", "event": "Music", "MusicTrack": "Combat_Dogfight"}
+{"timestamp": "2026-08-31T02:17:55Z", "event": "Music", "MusicTrack": "GalaxyMap"}
+{"timestamp": "2026-08-31T02:17:58Z", "event": "NavRoute"}
+{"timestamp": "2026-08-31T02:17:58Z", "event": "FSDTarget", "Name": "Kapteyn's Star", "RemainingJumpsInRoute": 1}
+{"timestamp": "2026-08-31T02:17:59Z", "event": "Music", "MusicTrack": "Combat_Dogfight"}
+{"timestamp": "2026-08-31T02:18:05Z", "event": "Music", "MusicTrack": "Exploration"}
+{"timestamp": "2026-08-31T02:18:20Z", "event": "StartJump", "JumpType": "Hyperspace", "StarSystem": "Kapteyn's Star"}
+{"timestamp": "2026-08-31T02:18:25Z", "event": "Music", "MusicTrack": "NoTrack"}
+{"timestamp": "2026-08-31T02:18:27Z", "event": "NavRouteClear"}
+{"timestamp": "2026-08-31T02:18:38Z", "event": "FSDJump", "StarSystem": "Kapteyn's Star", "StarPos": [9.75, -7.46875, -3.46875], "JumpDist": 13.252}
+{"timestamp": "2026-08-31T02:18:38Z", "event": "Music", "MusicTrack": "DestinationFromHyperspace"}
+{"timestamp": "2026-08-31T02:18:43Z", "event": "Music", "MusicTrack": "Supercruise"}
+{"timestamp": "2026-08-31T02:19:21Z", "event": "FSSSignalDiscovered", "SignalType": "Combat"}

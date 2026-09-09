@@ -330,3 +330,65 @@ test('picking from the list renames the cursor, not just moves it',
   expect(after.sys).not.toBe(before.sys);
   expect(after.coords).not.toBe(before.coords);
 });
+
+/* ── the journal drop, on real journals ─────────────────────────────────── */
+
+/* Fixtures are real Journals from a real commander, reduced to the events and
+   keys the parser actually reads (see the sanitiser note in test/README.md).
+   System names and coordinates are public game data; nothing identifying a
+   commander, a ship or a balance survives into the repository. */
+const FIXTURES = new URL('./fixtures/', import.meta.url);
+async function journal(name) {
+  const { readFileSync } = await import('node:fs');
+  return { name, mimeType: 'text/plain',
+           buffer: readFileSync(new URL(name, FIXTURES)) };
+}
+
+test('a session that never left the system is not called a bad journal',
+  async ({ page }) => {
+  /* Three of five real journals hold no FSDJump at all — they are perfectly
+     good files from evenings spent in one system. Telling the reader "Try a
+     Journal*.log" when they just gave you one blames the file for the wrong
+     thing, and is the reading that made the upload look broken. */
+  await onMap(page);
+  await page.locator(rail('routes')).click();
+  await page.locator('#fileinput').setInputFiles([await journal('journal-no-jumps.log')]);
+
+  const drop = page.locator('#drop');
+  await expect(drop).toContainText(/jump/i, { timeout: 20_000 });
+  await expect(drop).not.toContainText(/Try a Journal/i);
+});
+
+test('one jumpless file does not bury the route that did load', async ({ page }) => {
+  /* The message was written per file, straight into the drop zone, and
+     returned. Hand it a real evening's worth of journals — some with jumps,
+     some without — and whichever jumpless one finished last left its
+     complaint on screen while the systems from the others were already on the
+     map. That is "the upload has stopped working". */
+  await onMap(page);
+  await page.locator(rail('routes')).click();
+  await page.locator('#fileinput').setInputFiles([
+    await journal('journal-with-route.log'),
+    await journal('journal-no-jumps.log'),
+    await journal('journal-near-empty.log')
+  ]);
+
+  /* The route lands, counted by the systems it found — nine, not the ten
+     jumps in the file: Luyten 674-15 was passed through twice and the map
+     plots systems rather than jumps. Worth remembering if the drop ever grows
+     a "join the dots in order" mode, because that needs the repeats. */
+  const added = page.locator('#side .layer', { hasText: 'journal-with-route' });
+  await expect(added).toBeVisible({ timeout: 20_000 });
+  await expect(added.locator('.ct')).toHaveText('9');
+
+  /* And the drop zone still reads as a drop zone, with what was left out
+     noted under it rather than replacing it.
+
+     Asserted as one summary of both skipped files, because that is the only
+     thing that tells aggregated reporting from per-file reporting: writing
+     the message as each reader finishes also leaves a message on screen, just
+     the last one to land, naming one file and forgetting the rest. */
+  const drop = page.locator('#drop');
+  await expect(drop).toContainText('Drop a');
+  await expect(drop).toContainText('2 of those have no jumps');
+});
