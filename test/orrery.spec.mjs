@@ -62,6 +62,21 @@ async function stubApi(page, system = SYSTEM) {
   });
 }
 
+/* Wait until the camera has stopped moving.
+
+   Choosing a body flies over to it rather than putting the camera there, so
+   anything that measures the view has to wait for the view to settle. Two
+   identical readings a frame apart, not a fixed sleep: a sleep is a guess
+   about a loaded machine and is how these tests flake. */
+async function settled(page) {
+  await expect.poll(async () => {
+    const a = await page.evaluate(() => window.Orrery.state().camera);
+    await new Promise((r) => setTimeout(r, 90));
+    const b = await page.evaluate(() => window.Orrery.state().camera);
+    return a && b && a.every((v, i) => Math.abs(v - b[i]) < 1e-6);
+  }, { timeout: 15_000 }).toBe(true);
+}
+
 /** Load the module in the page and hand back a handle to it. */
 async function mechanics(page) {
   await stubDataHosts(page);
@@ -684,9 +699,16 @@ test('you can get right up to a body at true scale', async ({ page }) => {
   await page.locator('#orr-true').click();
   await expect(page.locator('#orr-true')).toHaveClass(/on/);
   await page.locator('.orr-row[data-id="1"]').click();
-  await page.waitForTimeout(600);
 
+  /* Polled rather than timed: choosing a body flies the camera over instead
+     of putting it there, so the framing distance is what it settles at, not
+     what it reads a fixed moment after the click. */
   const at = () => page.evaluate(() => window.Orrery.state());
+  await expect.poll(async () => {
+    const now = await at();
+    return now.toSelected < now.selectedRadius * 30;
+  }, { timeout: 15_000 }).toBe(true);
+
   const s = await at();
   expect(s.trueScale).toBe(true);
   expect(s.selected).toBe('Testholm 1');
@@ -2661,6 +2683,7 @@ test('a black hole is a shadow with a ring, not a glowing ball', async ({ page }
     await page.waitForTimeout(120);
   }
   expect(await wide(), 'a shadow that fits the measurement').toBeLessThan(room);
+  await settled(page);
   await page.waitForTimeout(1200);
 
   const profile = await page.evaluate(() => {
@@ -2998,4 +3021,43 @@ test('a system name with a space can be typed into the search box',
   // And none of it reached the clock.
   expect(await play.evaluate((el) => el.classList.contains('paused'))).toBe(wasPaused);
   await expect(page.locator('.orr-rate')).toHaveText('1 day/s');
+});
+
+test('choosing a body swoops over to it rather than jumping', async ({ page }) => {
+  /* Asked for directly: "when I click on a body to recentre it, I want the
+     camera to swoop over there rather than jumping to the new view."
+
+     Sampled per frame, not by the clock: what separates a flight from a cut is
+     not where the camera is at any instant but how many places it was on the
+     way, and a wall-clock reading under load is how the picking test flaked. */
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+  // Stop the clock so the only thing moving is the camera.
+  await page.locator('#orr-play').click();
+  await expect(page.locator('#orr-play')).toHaveClass(/paused/);
+  await page.waitForTimeout(400);
+
+  await page.evaluate(() => {
+    window.__fly = [];
+    const tick = () => {
+      const c = window.Orrery.state().camera;
+      if (c) window.__fly.push(c);
+      if (window.__fly.length < 240) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+
+  await page.locator('.orr-row[data-id]').last().click();
+  await page.waitForTimeout(1500);
+
+  const between = await page.evaluate(() => {
+    const f = window.__fly;
+    const d = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+    const a = f[0], b = f[f.length - 1], total = d(a, b);
+    return f.filter((p) => { const t = d(a, p) / (total || 1);
+      return t > 0.05 && t < 0.95; }).length;
+  });
+  expect(between, 'the camera was seen part of the way there').toBeGreaterThan(3);
 });

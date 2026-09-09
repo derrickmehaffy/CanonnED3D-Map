@@ -1781,6 +1781,7 @@ const Orrery = (function () {
       .forEach((t) => panel.addEventListener(t, invalidate, true));
     window.addEventListener('resize', () => { resize(); drawSpine(); invalidate(); });
     canvas.addEventListener('pointerdown', onDown);
+    canvas.addEventListener('wheel', cancelFlight, { passive: true });
     canvas.addEventListener('pointerup', onUp);
     canvas.addEventListener('pointercancel', () => { downAt = null; });
     initGL();
@@ -3464,6 +3465,8 @@ const Orrery = (function () {
     // Parents before children, so a moon can read its planet's fresh position.
     meshes.forEach((m) => { m.node._done = false; });
     meshes.forEach((m) => place(m.node));
+    // After placement: a flight aims at where its body is now.
+    stepFlight(dtSeconds);
 
     meshes.forEach((m) => {
       const n = m.node;
@@ -3694,6 +3697,8 @@ const Orrery = (function () {
   let downAt = null;
 
   function onDown(e) {
+    // Taking hold of the view overrules a flight: the reader is steering now.
+    cancelFlight();
     downAt = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId };
   }
 
@@ -3785,15 +3790,63 @@ const Orrery = (function () {
         ? fitDistance(ORBIT_OUT, dir ? dir.clone().normalize() : EYE)
       : n.children.some((c) => c.a > 0) ? Math.max(...n.children.map((c) => c.a || 0)) * 4.5
       : n.drawR * 12;
-    if (mode3d) {
-      cam.position.copy(n._pos).add(dir.setLength(want));
-    } else {
-      cam.zoom = Math.max(0.35, (ORBIT_OUT * 1.12) / want);
+    const zoom = Math.max(0.35, (ORBIT_OUT * 1.12) / want);
+    const arrive = () => {
+      if (mode3d) cam.position.copy(n._pos).add(dir.setLength(want));
+      else { cam.zoom = zoom; cam.updateProjectionMatrix(); }
+      controls.target.copy(n._pos);
+      controls.update();
+    };
+    /* Asked for directly: recentring should swoop over rather than jump. A cut
+       tells the reader nothing — you arrive somewhere with no sense of which
+       way you came, or how much of the system you crossed to get there.
+
+       The target is lerped toward the body's live position rather than the one
+       it held when the flight began, because the clock does not stop for the
+       camera: aim at where a moon was and it has moved on by the time you get
+       there. The view direction is left alone throughout — that is the
+       reader's, as it always was. */
+    if (reducedMotion() || !flightWanted) return arrive();
+    flight = {
+      node: n, t: 0, arrive,
+      from: controls.target.clone(),
+      dir: mode3d ? dir.clone().normalize() : null,
+      len0: mode3d ? cam.position.distanceTo(controls.target) : 0,
+      len1: want, zoom0: cam.zoom, zoom1: zoom
+    };
+    invalidate();
+  }
+
+  /* One step of a flight, run from draw() after every body has been placed so
+     the target can read where its body is now rather than where it was. */
+  const FLY_MS = 700;
+  let flight = null, flightWanted = true;
+  const reducedMotion = () =>
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function stepFlight(dt) {
+    if (!flight) return;
+    const cam = mode3d ? cam3 : cam2;
+    flight.t = Math.min(1, flight.t + Math.max(dt || 0, 1 / 120) * 1000 / FLY_MS);
+    // Ease in and out: a flight that starts and stops abruptly reads as a jump
+    // with extra steps.
+    const t = flight.t;
+    const k = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    if (!flight.node._pos) place(flight.node);
+    controls.target.lerpVectors(flight.from, flight.node._pos, k);
+    if (mode3d && flight.dir) {
+      cam.position.copy(controls.target)
+        .add(flight.dir.clone().setLength(flight.len0 + (flight.len1 - flight.len0) * k));
+    } else if (!mode3d) {
+      cam.zoom = flight.zoom0 + (flight.zoom1 - flight.zoom0) * k;
       cam.updateProjectionMatrix();
     }
-    controls.target.copy(n._pos);
     controls.update();
+    invalidate();
+    if (flight.t >= 1) { const a = flight.arrive; flight = null; a(); }
   }
+
+  /* A reader who takes hold of the view has overruled it. */
+  function cancelFlight() { flight = null; }
 
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -4757,7 +4810,12 @@ const Orrery = (function () {
        should open on it rather than on the star. */
     const wanted = standalone
       ? bodyNamed(new URLSearchParams(location.search).get('body')) : null;
+    /* Opening a link arrives; it does not swoop. There is nowhere to swoop
+       from — the reader has not been anywhere yet — and watching the camera
+       travel before you have seen the system is just a delay. */
+    flightWanted = false;
     select(wanted || model.star);
+    flightWanted = true;
     invalidate();
     cancelAnimationFrame(loop);
     loop = requestAnimationFrame(animate);
@@ -4825,6 +4883,9 @@ const Orrery = (function () {
       system: model ? model.name : null,
       trueScale: trueDistance,
       selected: sel ? sel.name : null,
+      // Where the eye is. Sampled per frame, a flight is a run of these and a
+      // cut is two, which is the only honest way to tell them apart.
+      camera: [cam.position.x, cam.position.y, cam.position.z],
       // How far the camera is from what it is looking at, and from the body
       // itself — the two numbers that were wrong.
       toTarget: cam.position.distanceTo(controls.target),

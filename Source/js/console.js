@@ -1041,6 +1041,7 @@
     );
   }
   function place(x, y, z) {
+    stopFly();
     // Set the camera outright rather than tweening. HUD.moveCamera's tween is
     // driven by TWEEN.update() inside animate(), and while it runs it rewrites
     // camera.position every frame — which fought OrbitControls and made the
@@ -1222,6 +1223,15 @@
 
   /* ── routes: parse a journal in-browser and push it onto the live map ─── */
   var DROP_PROMPT = 'Drop a <b>Journal*.log</b> here<br>or click to choose a file';
+
+  /* Taking hold of the map overrules a flight in progress — the same rule the
+     orrery follows when a pointer lands on its canvas. */
+  (function () {
+    var stage = $('edmap') || document;
+    ['pointerdown', 'wheel'].forEach(function (t) {
+      stage.addEventListener(t, stopFly, { capture: true, passive: true });
+    });
+  })();
 
   function wireDrop() {
     var drop = $('drop'), input = $('fileinput');
@@ -1701,6 +1711,11 @@
   }
 
   function openOrrery(btn, name, id64) {
+    /* The map stops drawing while the orrery is over it, which also stops
+       TWEEN.update — so a flight still in the air freezes there and resumes
+       when the orrery closes, overwriting the position the map was restored
+       to. Land it before leaving. */
+    stopFly();
     var label = btn.innerHTML;
     btn.disabled = true;
     btn.textContent = 'Opening\u2026';
@@ -1852,7 +1867,21 @@
      both ends moved together on one tween, controls.update() once at the end.
      TWEEN.update() is already driven from Ed3d's animate loop. */
   var FLY_MS = 800;
+  var flyTween = null;
+
+  /* Anything else that moves the camera wins.
+
+     A tween rewrites camera.position every frame for as long as it runs, so
+     one still in flight will quietly undo a camera preset, a reader's drag, or
+     the position the map was restored to after the orrery closed over it. That
+     is the same trap doCamera() documents about HUD.moveCamera; this is the
+     lever that keeps it shut. */
+  function stopFly() {
+    if (flyTween) { try { flyTween.stop(); } catch (e) {} flyTween = null; }
+  }
+
   function flyTo(x, y, z) {
+    stopFly();
     var want = { x: x - 120, y: y + 90, z: z + 120 };
     var cut = function () {
       controls.target.set(x, y, z);
@@ -1870,7 +1899,7 @@
       x: camera.position.x, y: camera.position.y, z: camera.position.z,
       mx: controls.target.x, my: controls.target.y, mz: controls.target.z
     };
-    Ed3d.tween = new TWEEN.Tween(from, { override: true })
+    flyTween = Ed3d.tween = new TWEEN.Tween(from, { override: true })
       .to({ x: want.x, y: want.y, z: want.z, mx: x, my: y, mz: z }, FLY_MS)
       .start()
       .onUpdate(function () {
@@ -1878,7 +1907,7 @@
         controls.target.set(from.mx, from.my, from.mz);
         syncCamera();
       })
-      .onComplete(function () { controls.update(); syncCamera(); });
+      .onComplete(function () { flyTween = null; controls.update(); syncCamera(); });
   }
 
   /* A link to a system on this map.
