@@ -392,3 +392,52 @@ test('one jumpless file does not bury the route that did load', async ({ page })
   await expect(drop).toContainText('Drop a');
   await expect(drop).toContainText('2 of those have no jumps');
 });
+
+test('picking a system flies there rather than cutting', async ({ page }) => {
+  /* Clicking a star in the map has always eased across — Action.moveToObj
+     tweens position and target together over 800ms. Picking the same system
+     out of the list set camera.position outright, so the two ways of choosing
+     a system felt like two different maps, and a cut gives the reader nothing
+     to follow: you arrive somewhere with no idea which way you came.
+
+     Not HUD.moveCamera's tween, which rewrites camera.position every frame and
+     fought OrbitControls — the camera presets set position outright for
+     exactly that reason. This is moveToObj's shape: both ends moved together,
+     controls.update() once at the end. */
+  await onMap(page);
+  await page.locator(rail('systems')).click();
+
+  /* Sampled per frame rather than by the clock. A wall-clock reading a fixed
+     number of milliseconds after the click says nothing under a loaded
+     machine — the flight may not have started or may already be over — and
+     that is precisely how the orrery's picking test used to flake. What
+     separates a flight from a cut is not where the camera is at any moment,
+     it is how many places it was on the way: a cut has none. */
+  await page.evaluate(() => {
+    window.__fly = [];
+    const tick = () => {
+      window.__fly.push([camera.position.x, camera.position.y, camera.position.z]);
+      if (window.__fly.length < 240) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+
+  await page.locator('.sysrow[data-sys]').nth(3).click();
+  await page.waitForTimeout(1500);
+
+  const { steps, between } = await page.evaluate(() => {
+    const f = window.__fly;
+    const a = f[0], b = f[f.length - 1];
+    const d = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+    const total = d(a, b);
+    // Places it was that are neither where it started nor where it ended.
+    const between = f.filter((p) => {
+      const t = d(a, p) / (total || 1);
+      return t > 0.05 && t < 0.95;
+    }).length;
+    return { steps: total, between };
+  });
+
+  expect(steps, 'the camera went somewhere').toBeGreaterThan(1);
+  expect(between, 'it was seen part of the way there').toBeGreaterThan(3);
+});

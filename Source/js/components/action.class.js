@@ -544,8 +544,20 @@ var Action = {
 
     //-- 3D Cursor on selected object
 
-    obj.material = Ed3d.material.selected;
+    /* There used to be an `obj.material = Ed3d.material.selected` here. It did
+       nothing and never had: obj is an entry in System.points, a plain object
+       of coordinates and metadata, not a Mesh. Every system is a vertex in one
+       BufferGeometry point cloud — System.create's withSolid argument, which
+       would build a real sphere, is never passed by anything — so the drawn
+       colour comes from the geometry's colour attribute by way of
+       System.setColor, and an assignment to a `material` property on the
+       metadata is read by nobody. Measured before removing it: the colour
+       attribute is unchanged either side of a selection.
 
+       What marks the selection is the cursor below, and the name hung off it.
+       If a colour highlight is ever wanted it has to go through
+       System.setColor, and it will have to agree with hud.class.js, which
+       already drives that same colour to dim filtered-out categories. */
     this.addCursorOnSelect(goX, goY, goZ);
 
     //-- Add text

@@ -1837,6 +1837,50 @@
 
   /* Select a system and fly the camera to it. Shared by the palette and the
      systems list so they behave identically. */
+  /* Ease across to a system rather than appearing at it.
+
+     Clicking a star in the map has always eased — Action.moveToObj tweens the
+     camera and the target together over 800ms — while picking the same system
+     out of the list set camera.position outright, so the two ways of choosing
+     the same thing felt like two different maps. A cut also tells the reader
+     nothing: you arrive somewhere with no sense of which way you came or how
+     far it was.
+
+     Deliberately not HUD.moveCamera, whose tween rewrites camera.position
+     every frame and fights OrbitControls — that is why the camera presets in
+     doCamera() set position outright and say so. This is moveToObj's shape:
+     both ends moved together on one tween, controls.update() once at the end.
+     TWEEN.update() is already driven from Ed3d's animate loop. */
+  var FLY_MS = 800;
+  function flyTo(x, y, z) {
+    var want = { x: x - 120, y: y + 90, z: z + 120 };
+    var cut = function () {
+      controls.target.set(x, y, z);
+      camera.position.set(want.x, want.y, want.z);
+      camera.lookAt(controls.target);
+      controls.update();
+      syncCamera();
+    };
+    // No tween library, or a reader who has asked for less movement: arrive.
+    if (typeof TWEEN === 'undefined' ||
+        (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+      return cut();
+    }
+    var from = {
+      x: camera.position.x, y: camera.position.y, z: camera.position.z,
+      mx: controls.target.x, my: controls.target.y, mz: controls.target.z
+    };
+    Ed3d.tween = new TWEEN.Tween(from, { override: true })
+      .to({ x: want.x, y: want.y, z: want.z, mx: x, my: y, mz: z }, FLY_MS)
+      .start()
+      .onUpdate(function () {
+        camera.position.set(from.x, from.y, from.z);
+        controls.target.set(from.mx, from.my, from.mz);
+        syncCamera();
+      })
+      .onComplete(function () { controls.update(); syncCamera(); });
+  }
+
   /* A link to a system on this map.
 
      The card could open the orrery and copy a name, and there was no way at
@@ -1887,10 +1931,7 @@
     selectInMap(rec);
     if (CFG.templates) showTemplate(catName(rec.s[0][0]));
     if (typeof controls === 'undefined') return;
-    controls.target.set(rec.x, rec.y, -rec.z);
-    camera.position.set(rec.x - 120, rec.y + 90, -rec.z + 120);
-    camera.lookAt(controls.target);
-    controls.update();
+    flyTo(rec.x, rec.y, -rec.z);
     if (panel === 'systems') renderPanel();
   }
 
