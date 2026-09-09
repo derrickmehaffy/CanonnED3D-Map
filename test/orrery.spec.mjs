@@ -3074,3 +3074,80 @@ test('choosing a body swoops over to it rather than jumping', async ({ page }) =
   });
   expect(between, 'the camera was seen part of the way there').toBeGreaterThan(3);
 });
+
+test('zooming in on a planet names the moons around it', async ({ page }) => {
+  /* Reported as the body text disappearing when you zoom in. Labels existed
+     for the star, for what orbits the star directly, and for whatever was
+     selected — so going in on a planet put you among moons with nothing named
+     but the planet itself, and the closer you got the emptier it read. What is
+     selected is what is being looked at, so what orbits it is named too. */
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+
+  const named = () => page.evaluate(() =>
+    [...document.querySelectorAll('.orr-label')].map((e) => e.textContent.trim()));
+
+  // The star is selected on opening; its moon is two levels down and unnamed.
+  expect(await named()).not.toContain('1 a');
+
+  // Pick the planet the moon goes round.
+  await page.locator('.orr-row[data-id="1"]').click();
+  await expect.poll(async () => (await named()).includes('1 a'),
+    { timeout: 15_000 }).toBe(true);
+
+  // The planet itself keeps its name, and so does the star.
+  const all = await named();
+  expect(all).toContain('Testholm');
+  expect(all).toContain('1');
+});
+
+test('an orbit built from missing elements says so', async ({ page }) => {
+  /* Warned about on the way in: "system data can be incomplete and some of
+     the parameters may not have been available when the system was last
+     updated". The model reads every element with `|| 0`, which turns "not
+     scanned" into "exactly zero" — a specific, confident, wrong orbit drawn
+     with nothing to say it was invented. The orbit is still drawn, because a
+     body that vanishes is worse than a body in roughly the right place, but
+     the panel now says which parts of it were not in the scan. */
+  const sys = JSON.parse(JSON.stringify(SYSTEM));
+  delete sys.bodies[1].argOfPeriapsis;
+  delete sys.bodies[1].ascendingNode;
+  delete sys.bodies[1].meanAnomaly;
+  await stubDataHosts(page);
+  await stubApi(page, sys);
+  await page.goto('/orrery.html?system=Testholm&body=1', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+  await expect.poll(() => page.evaluate(() => window.Orrery.state().selected),
+    { timeout: 20_000 }).toBe('Testholm 1');
+
+  const facts = page.locator('.orr-facts');
+  await expect(facts).toContainText(/not in the scan/i);
+  await expect(facts).toContainText(/periapsis/i);
+
+  // The moon's elements are all present, so it is not accused of anything.
+  await page.locator('.orr-row[data-id="2"]').click();
+  await expect.poll(() => page.evaluate(() => window.Orrery.state().selected),
+    { timeout: 20_000 }).toBe('Testholm 1 a');
+  await expect(facts).not.toContainText(/not in the scan/i);
+});
+
+test('a body with no period is not stacked on top of its parent', async ({ page }) => {
+  /* positionAt gives up and returns the origin when there is no period, which
+     puts the body at its parent's exact centre — the one place it certainly
+     is not. With a semi-major axis to go on it is parked out on that orbit
+     instead, standing still because nothing says how fast it goes round. */
+  const sys = JSON.parse(JSON.stringify(SYSTEM));
+  delete sys.bodies[1].orbitalPeriod;
+  await stubDataHosts(page);
+  await stubApi(page, sys);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+
+  const away = await page.evaluate(() => {
+    const o = window.Orrery.state().orbits.find((x) => x.name === 'Testholm 1');
+    return o && o.pos ? Math.hypot(o.pos[0], o.pos[1], o.pos[2]) : -1;
+  });
+  expect(away, 'parked out on its orbit, not at the star').toBeGreaterThan(0.5);
+});

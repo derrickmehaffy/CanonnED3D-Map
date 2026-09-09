@@ -1117,7 +1117,11 @@ function eccentricAnomaly(M, e) {
  * rather than the true one — `a` here is already through the layout pass.
  */
 function positionAt(b, days, out) {
-  if (!b.P) return out.set(0, 0, 0);
+  /* No period: nothing says how fast it goes round, so it stands still — but
+     out on its orbit rather than at the origin, which is its parent's exact
+     centre and the one place it certainly is not. With no semi-major axis
+     either there is nothing to draw and the parent's position is all there is. */
+  if (!b.P) return b.a ? inPlaneToScene(b.a, 0, b, out) : out.set(0, 0, 0);
 
   const M = b.M0 + 2 * Math.PI * (days / b.P);
   const E = eccentricAnomaly(M, b.e);
@@ -3747,8 +3751,10 @@ const Orrery = (function () {
     if (selected && selected !== node) lastPick = selected;
     selected = node;
     markBody(node);
-    // A selected moon is named over the view like anything else selected.
-    if (labels.length && !labels.some((l) => l.node === node)) buildLabels();
+    /* A selected body is named over the view, and so is whatever orbits it —
+       so the set has to be rebuilt whenever the selection moves, not only
+       when the newly selected body happens to be missing from it. */
+    if (labels.length) buildLabels();
     // The tree says which row is chosen, and the tab stop moves to it.
     if (panel) {
       panel.querySelectorAll('#orr-list .orr-row[data-id]').forEach((r) =>
@@ -3853,6 +3859,10 @@ const Orrery = (function () {
 
   /* A reader who takes hold of the view has overruled it. */
   function cancelFlight() { flight = null; }
+
+  /* "a", "a and b", "a, b and c" — a list a person would say out loud. */
+  const list = (a) => a.length < 2 ? (a[0] || '')
+    : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
 
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -4437,7 +4447,13 @@ const Orrery = (function () {
       ['Inclination', b.orbitalInclination ? num(b.orbitalInclination, 2) + '°' : ''],
       ['Arg. of periapsis', b.argOfPeriapsis ? num(b.argOfPeriapsis, 2) + '°' : ''],
       ['Ascending node', b.ascendingNode ? num(b.ascendingNode, 2) + '°' : '']
-    ]));
+    ]) + (() => {
+      const gaps = missingElements(n);
+      if (!gaps.length) return '';
+      return '<div class="orr-note-i">Drawn without ' + esc(list(gaps)) +
+        ' — not in the scan. The shape here is a guess where those are ' +
+        'concerned, and moves when the system is scanned again.</div>';
+    })());
 
     h += sect('Atmosphere',
       (b.atmosphereType ? table([['Type', b.atmosphereType]]) : '') +
@@ -4496,15 +4512,44 @@ const Orrery = (function () {
   let labels = [];
   const proj = new THREE.Vector3();
 
+  /* Which parts of an orbit were not in the dump.
+
+     Every element is read with `|| 0`, because a body that vanishes for want
+     of one number is worse than a body in roughly the right place — but zero
+     is a real value, not a blank, so an unscanned orbit is drawn as specific
+     and confident as a scanned one. This is what lets the panel say otherwise.
+     Only for bodies actually on an orbit: a main star orbits nothing and is
+     missing all of them quite correctly. */
+  const ELEMENTS = [
+    ['orbitalInclination', 'inclination'],
+    ['argOfPeriapsis', 'argument of periapsis'],
+    ['ascendingNode', 'ascending node'],
+    ['meanAnomaly', 'mean anomaly'],
+    ['orbitalPeriod', 'orbital period'],
+    ['semiMajorAxis', 'semi-major axis']
+  ];
+  function missingElements(n) {
+    if (!n.parent) return [];
+    const b = n.raw || {};
+    return ELEMENTS.filter(([k]) => b[k] === undefined || b[k] === null).map((e) => e[1]);
+  }
+
   function buildLabels() {
     const host = panel.querySelector('#orr-labels');
     host.innerHTML = '';
-    /* The star, what orbits it directly — and whatever is selected, which
-       the comment always promised and the filter never delivered: pick a
-       moon and it had no name over it. */
+    /* The star, what orbits it directly, whatever is selected — and what
+       orbits that.
+
+       The last of those is why zooming in read as the names disappearing:
+       going in on a planet put you among its moons with nothing named but the
+       planet, and the closer you got the emptier it looked. What is selected
+       is what is being looked at, so its own children are named with it. The
+       rest of the system stays quiet, which is the point of not labelling
+       everything at once. */
     labels = model.all
       .filter((n) => n.drawR > 0 &&
-        (n === model.star || n.parent === model.star || n === selected))
+        (n === model.star || n.parent === model.star ||
+         n === selected || n.parent === selected))
       .map((n) => {
         const el = document.createElement('span');
         el.className = 'orr-label' + (n === model.star ? ' star' : '');
