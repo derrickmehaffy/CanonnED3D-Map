@@ -8,7 +8,7 @@ This document maps each navigation menu option to its underlying data source(s).
 
 | Short Name | Base URL |
 |---|---|
-| **Canonn API** | `https://api.canonn.tech` |
+| **Canonn API** *(retired)* | `https://api.canonn.tech` — does not resolve; no code calls it any more |
 | **Canonn Cloud Functions** | `https://us-central1-canonn-api-236217.cloudfunctions.net` |
 | **Canonn Google Storage** | `https://storage.googleapis.com/canonn-downloads` |
 | **EliteBGS API** | `https://elitebgs.app/api/ebgs/v5` |
@@ -358,7 +358,11 @@ Some combo pages use bulk CSV dumps from Google Cloud Storage instead of the liv
 
 ## Notes
 
-- Most Canonn API (`api.canonn.tech`) requests are paginated with `_limit=1000&_start=N`, iterating until fewer than 1000 records are returned.
+- **The Canonn API (`api.canonn.tech`) is retired and no longer resolves.** Its
+  requests were paginated with `_limit=1000&_start=N`, iterating until fewer than
+  1000 records came back; that loop is described here only because the pattern
+  recurs elsewhere. Nothing in the tree calls that host now — the last two dead
+  loaders were removed rather than left to look live.
 - The Canonn Cloud Functions (`us-central1-canonn-api-236217.cloudfunctions.net`) serve as a middleware/aggregation layer, often combining data from multiple internal sources.
 - Google Storage CSV dumps are used as a performance optimisation for bulk combo maps to avoid thousands of individual API requests.
 - The `MapData-Codex.js` / `codex.html` page is reused across many menu entries by varying query parameters (`hud_category`, `sub_class`, `english_name`).

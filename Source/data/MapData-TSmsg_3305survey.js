@@ -1,26 +1,4 @@
-const API_ENDPOINT = `https://api.canonn.tech`;
 const EDSM_ENDPOINT = `https://www.edsm.net/api-v1`;
-const API_LIMIT = 1000;
-
-const capi = async function ({ url, method }) {
-    /* Was an axios instance. fetch keeps the two things that one did for us:
-       a base URL to join onto, and rejecting rather than resolving when the
-       server answers with a 4xx or a 5xx — fetch resolves on both, so an
-       error page would otherwise arrive here as if it were data.
-    
-       The shape of the call and of the reply are unchanged, so every caller
-       below still passes { url, method } and still reads .data. */
-    const res = await fetch(API_ENDPOINT + url, {
-    	method: (method || 'get').toUpperCase(),
-    	headers: { 'Accept': 'application/json' }
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status + ' from ' + url);
-    return { data: await res.json() };
-};
-
-let sites = {
-    tssites: [],
-};
 
 const edsmapi = async function ({ url, method }) {
     /* Was an axios instance. fetch keeps the two things that one did for us:
@@ -36,49 +14,6 @@ const edsmapi = async function ({ url, method }) {
     });
     if (!res.ok) throw new Error('HTTP ' + res.status + ' from ' + url);
     return { data: await res.json() };
-};const go = async types => {
-    const keys = Object.keys(types);
-    return (await Promise.all(
-        keys.map(type => getSites(type))
-    )).reduce((acc, res, i) => {
-        acc[keys[i]] = res;
-        return acc;
-    }, {});
-};
-
-const getSites = async type => {
-    let records = [];
-    let keepGoing = true;
-    let API_START = 0;
-    while (keepGoing) {
-        let response = await reqSites(API_START, type);
-        await records.push.apply(records, response.data);
-        API_START += API_LIMIT;
-        if (response.data.length < API_LIMIT) {
-            keepGoing = false;
-            return records;
-        }
-    }
-};
-
-const reqSites = async (API_START, type) => {
-
-    let payload = await capi({
-        url: `/${type}?_limit=${API_LIMIT}&_start=${API_START}`,
-        method: 'get'
-    });
-
-    return payload;
-};
-
-const reqSystemName = async (name) => {
-
-    let payload = await capi({
-        url: `/systems?systemName=${name}`,
-        method: 'get'
-    });
-
-    return payload;
 };
 
 const getSystemsEDSM = async (systemNames) => {

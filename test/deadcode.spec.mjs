@@ -224,3 +224,18 @@ test('the shared formatters load before whatever uses them', () => {
   }
   expect(bad).toEqual([]);
 });
+
+test('nothing calls the retired Canonn API', async () => {
+  /* api.canonn.tech does not resolve. Two loaders still named it — both by
+     code nothing could reach, one of them in a file no page loads — and both
+     are gone. A pageful of paging loops against a dead host is worse than no
+     code at all: it reads as a feature. */
+  const named = [];
+  for (const dir of ['js', 'data']) {
+    for (const f of readdirSync(join(SRC, dir)).filter((n) => n.endsWith('.js'))) {
+      if (read(dir + '/' + f).includes('api.canonn.tech')) named.push(dir + '/' + f);
+    }
+  }
+  for (const p of pages) if (read(p).includes('api.canonn.tech')) named.push(p);
+  expect(named).toEqual([]);
+});

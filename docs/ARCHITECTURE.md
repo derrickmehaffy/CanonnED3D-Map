@@ -79,11 +79,9 @@ bare identifiers. This is a compatibility posture, not a design to copy.
   card fetches on a click and never on hover or on load.
 - **Spansh** — the factions dump behind the landing page, and system dumps.
 - **A page's own `MapData-*.js`** — some maps declare their systems outright.
-- **`api.canonn.tech`** — retired, and it does not resolve at all. One live
-  page still depends on it: `ts-msg_3305survey.html`, whose loader fetches
-  from that host, so its map cannot fill. Every other loader goes through
-  `CanonnAPI` to the cloud functions, which are live.
-  `MapData-All.js` names it too, but no page loads that file — see below.
+- **`api.canonn.tech`** — retired, does not resolve, and **nothing calls it**.
+  Two loaders still named it, both by unreachable code, and both were removed.
+  If you find it again, it came back by accident.
 
 ## Orphans worth knowing about
 
@@ -93,8 +91,11 @@ bare identifiers. This is a compatibility posture, not a design to copy.
   was removed rather than a file that was abandoned. Left in place because
   restoring the page is a decision about what Canonn offers; delete it or wire
   it up, but do not leave it to rot silently.
-- **`ts-msg_3305survey.html`** — loads, and then cannot fill: its data comes
-  from `api.canonn.tech`.
+- **`route_uia.html`** — calls `getSystemsEDSM(...)` in the middle of building
+  its routes, and never declares it. The only declaration in the tree is in
+  `MapData-TSmsg_3305survey.js`, which that page does not load. Classic
+  scripts share one scope, so this is the sort of dependency that works right
+  up until the two files stop being loaded together.
 
 ## Tests
 
