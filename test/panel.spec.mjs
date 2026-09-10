@@ -274,3 +274,45 @@ test('a reader who sets a size is not overruled by the map', async ({ page }) =>
   await page.locator('.rail button[data-p="display"]').click();
   expect(await size(page)).toBe(44);
 });
+
+/* ── the real stars on the galaxy map ───────────────────────────────────── */
+
+test('the real named stars can be shown on the map, where they are',
+  async ({ page }) => {
+  /* The same 230 stars the orrery puts on its sky, but here at their actual
+     positions — the galaxy map is real space, so a star belongs where it is
+     rather than projected onto a sphere. An orientation aid: the map knows
+     Canonn's sites and nothing else, so nothing on it says "that way is
+     Betelgeuse". Off by default, because it is 230 more things on a map that
+     already has thousands. */
+  await stubDataHosts(page);
+  await page.goto('/gr-data.html', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.app .top')).toBeVisible({ timeout: 30_000 });
+  await page.locator('.rail button[data-p="display"]').click();
+
+  const sw = page.locator('[data-sw="named"]');
+  await expect(sw).toBeVisible();
+  await expect(sw).not.toHaveClass(/on/);
+  expect(await page.evaluate(() => window.CanonnConsole.namedStars())).toBe(0);
+
+  await sw.click();
+  await expect(sw).toHaveClass(/on/);
+  await expect.poll(() => page.evaluate(() => window.CanonnConsole.namedStars()),
+    { timeout: 30_000 }).toBeGreaterThan(200);
+
+  /* At real positions, so the z convention is the map's own: minus the game z,
+     the same as every system in the point cloud. Spansh puts Rigel at
+     z -682.53125. */
+  const rigel = await page.evaluate(() => window.CanonnConsole.namedStarAt('Rigel'));
+  expect(rigel[2]).toBeCloseTo(682.53125, 3);
+
+  // Named, and not all at once.
+  await expect.poll(() => page.locator('.far-lbl:not(.off)').count(),
+    { timeout: 10_000 }).toBeLessThanOrEqual(24);
+
+  // And it goes away again, and is remembered.
+  await sw.click();
+  await expect(sw).not.toHaveClass(/on/);
+  await expect.poll(() => page.evaluate(() => window.CanonnConsole.namedStars()),
+    { timeout: 10_000 }).toBe(0);
+});

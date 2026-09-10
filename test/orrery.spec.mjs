@@ -3355,3 +3355,44 @@ test('crossing the system is a flight, not a jump', async ({ page }) => {
   expect(seen.total, 'it crossed the system').toBeGreaterThan(1);
   expect(seen.share, 'no one frame crossed it').toBeLessThan(0.4);
 });
+
+test('the rails keep the width they were given across window resizes',
+  async ({ page }) => {
+  /* Reported bluntly, and fairly: the two rails had collapsed to a strip, with
+     the facts wrapping one word to a line.
+
+     A ratchet. clampSide measured its ceiling against the middle column's
+     current width — room * 0.34 — and the window-resize handler read each
+     rail's rendered width back and saved it as if the reader had chosen it. So
+     every resize clamped against a middle that the last clamp had just made
+     wider, and the rails walked down to the 160px floor and stayed there,
+     because the floor was written to localStorage on the way past. */
+  await stubDataHosts(page);
+  await stubApi(page, SOL);
+  await page.goto('/orrery.html?system=Sol', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(9, { timeout: 60_000 });
+
+  const rails = () => page.evaluate(() => ({
+    left: Math.round(document.querySelector('#orr-left').getBoundingClientRect().width),
+    right: Math.round(document.querySelector('#orr-right').getBoundingClientRect().width),
+    keptL: localStorage.getItem('canonn.orrery.leftWidth'),
+    keptR: localStorage.getItem('canonn.orrery.rightWidth')
+  }));
+
+  const first = await rails();
+  expect(first.left, 'a rail wide enough to read a fact in').toBeGreaterThan(200);
+  expect(first.right).toBeGreaterThan(200);
+
+  // A few window changes, the way a reader moves a window about.
+  for (const [w, h] of [[1600, 900], [1100, 800], [1900, 1000], [1280, 800]]) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.waitForTimeout(250);
+  }
+
+  const after = await rails();
+  expect(after.left, 'the left rail did not walk down').toBeGreaterThan(200);
+  expect(after.right, 'the right rail did not walk down').toBeGreaterThan(200);
+  // And nothing was written over the reader's own choice.
+  expect(after.keptL).toBe(first.keptL);
+  expect(after.keptR).toBe(first.keptR);
+});

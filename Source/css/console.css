@@ -160,6 +160,14 @@ body.bare .top, body.bare .strip{display:none}
 .drop .skipped{margin-top:8px;padding-top:8px;border-top:1px solid var(--rule);
   color:var(--dimmer);font-size:10px}
 
+/* The real named stars, labelled over the map. The host is inert; only the
+   two dozen nearest the middle of the view are ever shown. */
+.far-lbls{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:6}
+.far-lbl{position:absolute;top:0;left:0;margin:5px 0 0 6px;white-space:nowrap;
+  font-family:var(--mono);font-size:9px;letter-spacing:.06em;color:#7C8A99;
+  text-shadow:0 0 5px var(--void),0 0 5px var(--void);opacity:.85}
+.far-lbl.off{display:none}
+
 /* stage — the REAL Ed3d canvas lives here */
 .stage{flex:1;position:relative;min-width:0;background:var(--void)}
 #edmap{position:absolute;inset:0}

@@ -864,6 +864,7 @@
       sw('grid', 'Grid', true) +
       sw('galaxy', 'Galaxy labels', true) +
       sw('stars', 'Starfield', true) +
+      sw('named', 'Named stars', disp.named) +
       '<div class="row" style="margin-top:10px"><span class="lb">System size</span>' +
       '<span class="vv" id="szval">—</span></div>' +
       '<input type="range" id="sizerange" min="6" max="70" step="2" style="width:100%">' +
@@ -1122,6 +1123,106 @@
     }
   });
 
+  /* ── the real stars, where they actually are ─────────────────────────────
+     The same list the orrery hangs on its sky, but this is real space, so a
+     star belongs at its own coordinates rather than projected onto a sphere
+     around anything. An orientation aid: the map knows Canonn's sites and
+     nothing else, so until now nothing on it said "that way is Betelgeuse".
+
+     Its own frame loop, because the console's tick runs four times a second
+     and labels that lag a quarter second behind a drag look broken. Only
+     while it is on. */
+  var NAMED_MAX = 24;
+  var named = { pts: null, list: [], host: null, loop: 0, data: null };
+
+  function namedData() {
+    if (named.data) return named.data;
+    named.data = fetch('data/named-stars.json')
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .catch(function () { return []; });
+    return named.data;
+  }
+
+  function clearNamed() {
+    if (named.loop) { cancelAnimationFrame(named.loop); named.loop = 0; }
+    if (named.pts && typeof scene !== 'undefined') {
+      scene.remove(named.pts);
+      named.pts.geometry.dispose();
+      named.pts.material.dispose();
+    }
+    named.pts = null;
+    named.list = [];
+    if (named.host) named.host.innerHTML = '';
+  }
+
+  function buildNamed(rows) {
+    clearNamed();
+    if (!rows.length || typeof scene === 'undefined' || !window.THREE) return;
+    if (!named.host) {
+      named.host = document.createElement('div');
+      named.host.className = 'far-lbls';
+      var stage = document.querySelector('.stage');
+      if (!stage) return;
+      stage.appendChild(named.host);
+    }
+    var pos = [];
+    named.list = rows.map(function (st) {
+      // Minus the game z, which is what every point in the cloud stores.
+      var v = new THREE.Vector3(st.x, st.y, -st.z);
+      pos.push(v.x, v.y, v.z);
+      var el = document.createElement('span');
+      el.className = 'far-lbl off';
+      el.textContent = st.n;
+      named.host.appendChild(el);
+      return { at: v, el: el };
+    });
+    var geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+    named.pts = new THREE.Points(geo, new THREE.PointsMaterial({
+      color: 0xBFD4E4, size: 2.4, sizeAttenuation: false,
+      transparent: true, opacity: 0.8, depthWrite: false
+    }));
+    named.pts.frustumCulled = false;
+    named.pts.raycast = function () {};
+    scene.add(named.pts);
+    paintNamed();
+  }
+
+  /* Labels for the two dozen nearest the middle of the view, which is where
+     the reader is looking — 230 at once is a wall of text, as the orrery's
+     first cut of this proved. */
+  function paintNamed() {
+    named.loop = requestAnimationFrame(paintNamed);
+    if (!named.list.length || typeof camera === 'undefined') return;
+    var box = named.host.getBoundingClientRect();
+    var w = box.width, h = box.height, v = new THREE.Vector3(), near = [];
+    named.list.forEach(function (l) {
+      v.copy(l.at).project(camera);
+      if (v.z >= 1 || Math.abs(v.x) > 1 || Math.abs(v.y) > 1) {
+        l.el.className = 'far-lbl off';
+        return;
+      }
+      near.push({ l: l, d: v.x * v.x + v.y * v.y,
+        x: Math.round((v.x * 0.5 + 0.5) * w), y: Math.round((-v.y * 0.5 + 0.5) * h) });
+    });
+    near.sort(function (a, b) { return a.d - b.d; });
+    near.forEach(function (n, i) {
+      if (i < NAMED_MAX) {
+        n.l.el.className = 'far-lbl';
+        n.l.el.style.transform = 'translate(' + n.x + 'px,' + n.y + 'px)';
+      } else {
+        n.l.el.className = 'far-lbl off';
+      }
+    });
+  }
+
+  function setNamed(on) {
+    disp.named = on;
+    remember('disp.named', on ? '1' : '0');
+    if (!on) { clearNamed(); return; }
+    namedData().then(function (rows) { if (disp.named) buildNamed(rows); });
+  }
+
   /* ── display ──────────────────────────────────────────────────────────
      These three fight the engine's own far-view logic: crossing the far-view
      threshold calls enableFarView/disableFarView, which reach in and set grid
@@ -1131,7 +1232,10 @@
     grid:   recallBool('disp.grid', true),
     galaxy: recallBool('disp.galaxy', true),
     stars:  recallBool('disp.stars', true),
-    hdr:    recallBool('disp.hdr', true)
+    hdr:    recallBool('disp.hdr', true),
+    // Off unless asked for: 230 more things on a map that already has
+    // thousands, and an orientation aid rather than data.
+    named:  recallBool('disp.named', false)
   };
   var hideFiltered = recallBool('hideFiltered', true);
   var sysSize = recallNum('sysSize', 20);  // flares got huge on zoom-out at 64
@@ -1260,6 +1364,7 @@
     disp[k] = state;
     remember('disp.' + k, state ? '1' : '0');
     if (k === 'hdr' && window.PostFX) PostFX.toggle(state);
+    if (k === 'named') setNamed(state);
     applyDisplay(); syncDisplay();
   }
 
@@ -1918,6 +2023,17 @@
      here rather than fetching it a second time. */
   window.CanonnConsole = window.CanonnConsole || {};
   window.CanonnConsole.starColour = function (cls) { return Star.colour(cls); };
+  /* For the suite: how many real stars are on the map, and where one of them
+     was put, so the coordinate convention can be checked from outside. */
+  window.CanonnConsole.namedStars = function () { return named.list.length; };
+  window.CanonnConsole.namedStarAt = function (n) {
+    for (var i = 0; i < named.list.length; i++) {
+      if (named.list[i].el.textContent === n) {
+        return [named.list[i].at.x, named.list[i].at.y, named.list[i].at.z];
+      }
+    }
+    return null;
+  };
   // One fetch, two readers: the card has already pulled this system's dump to
   // find its star, and the orrery wants the same bytes.
   window.CanonnConsole.systemDump = function (name) { return Star.dump(name); };
@@ -2645,6 +2761,7 @@
       // A link that names a system opens on it rather than on the whole map.
       wantSystem = new URLSearchParams(location.search).get('system') || '';
       tryWanted();
+      if (disp.named) setNamed(true);
     }, 300);
   })();
 })();
