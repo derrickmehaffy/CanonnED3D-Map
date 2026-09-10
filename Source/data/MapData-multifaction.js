@@ -785,7 +785,9 @@ var canonnEd3d_multifaction = {
 				if (point.infos) factionHtml = '<div style="margin-top:8px;">' + point.infos + '</div>';
 			}
 
-			$('#systemDetails').html(
+			var details = document.getElementById('systemDetails');
+			if (!details) return;
+			details.innerHTML =
 				'<h2><a href="https://inara.cz/elite/starsystem/?search=' +
 				encodeURIComponent(point.name) + '" target="_blank" style="color:inherit;text-decoration:none;border-bottom:1px dotted #ff8c00;">' +
 				point.name + '</a></h2>' +
@@ -795,13 +797,19 @@ var canonnEd3d_multifaction = {
 				'<p id="infos"></p>' +
 				factionHtml +
 				'<div class="hover-distance"></div>' +
-				'<div id="nav"></div>'
-			);
+				'<div id="nav"></div>';
 
 			// Nav buttons
-			$('<a/>', { html: '&lt;' }).click(function () { Action.moveNextPrev(index - 1, -1); }).appendTo('#nav');
-			$('<a/>', { html: 'X' }).click(function () { HUD.closeHudDetails(); }).appendTo('#nav');
-			$('<a/>', { html: '&gt;' }).click(function () { Action.moveNextPrev(index + 1,  1); }).appendTo('#nav');
+			var nav = details.querySelector('#nav');
+			[['<', function () { Action.moveNextPrev(index - 1, -1); }],
+			 ['X', function () { HUD.closeHudDetails(); }],
+			 ['>', function () { Action.moveNextPrev(index + 1,  1); }]
+			].forEach(function (pair) {
+				var a = document.createElement('a');
+				a.textContent = pair[0];
+				a.addEventListener('click', pair[1]);
+				nav.appendChild(a);
+			});
 		};
 		var puls = canonnEd3d_multifaction.permitSpheres.puls;
 		var pls  = canonnEd3d_multifaction.permitSpheres.pls;

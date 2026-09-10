@@ -1387,7 +1387,6 @@ var canonnEd3d_challenge = {
 			canonnEd3d_challenge.createSphere(canonnEd3d_challenge.systemsData.g_soi[i], gmaterial)
 		}
 
-		//$("#search").html("<p>Current positions are rough estimates.</p>").css("display", "block").css("color", "#FF4F4F")
 
 		document.getElementById("loading").style.display = "none";
 	},

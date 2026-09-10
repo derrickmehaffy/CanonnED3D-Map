@@ -322,11 +322,13 @@ All Odyssey biology entries use `codex.html` filtered by genus name and are serv
 
 ---
 
-## Bulk / All-Data Maps
+## Bulk CSV dumps
 
-Some combo pages use bulk CSV dumps from Google Cloud Storage instead of the live REST API. These are pre-generated exports refreshed periodically.
+Most combo maps read bulk CSV dumps from Google Cloud Storage rather than the
+live REST API — pre-generated exports, refreshed periodically, so a map showing
+thousands of sites costs one request instead of thousands. Sixteen loaders read
+them.
 
-- **MapData:** `MapData-All.js`
 - **Base URL:** `https://storage.googleapis.com/canonn-downloads/dumpr/`
 
 ### Category Codes Used in CSV Dumps

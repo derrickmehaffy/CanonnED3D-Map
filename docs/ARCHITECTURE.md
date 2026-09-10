@@ -92,20 +92,12 @@ bare identifiers. This is a compatibility posture, not a design to copy.
 
 ## Orphans worth knowing about
 
-- **`data/MapData-All.js`** — 380 lines, referenced by no page. Its own data
-  source (bulk CSV dumps on Google Cloud Storage) is live and
-  `DATA_SOURCES.md` documents it as a real map, so it looks like a page that
-  was removed rather than a file that was abandoned. Left in place because
-  restoring the page is a decision about what Canonn offers; delete it or wire
-  it up, but do not leave it to rot silently.
-- **`data/csvCache/UIA Vector Survey (Responses) - Responses.csv`** —
-  referenced by nothing. It fed a `formatMeasurements` layer in
-  `MapData-UIA.js` that drew a route between each observer's current and
-  targeted system; the call was commented out before December 2022, and the
-  method has now gone with the EDSM lookup it depended on. The cached CSV is
-  still here, so reviving the layer means re-reading it and asking Canonn's
-  typeahead for the coordinates EDSM used to supply — a decision about what the
-  map shows, not a cleanup.
+- **`prototype/`** — a working mockup of the proposed console UI from September
+  2026, driving the real engine through the same import map and `main.js` as the
+  live pages. No page links it and the smoke suite's `Source/*.html` glob does
+  not reach it. Its design has since shipped into `js/console.js`, so its
+  `console.js` is now a 49KB fork of a file that moved on. It is a snapshot of a
+  decision already made, and it will only drift further.
 
 ## Tests
 

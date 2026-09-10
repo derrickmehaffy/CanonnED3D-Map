@@ -49,7 +49,7 @@ var Heatmap = {
     var grounpSize = 5;
 
 
-    $.each(values, function(i, prop) {
+    values.forEach(function(prop) {
 
 
 

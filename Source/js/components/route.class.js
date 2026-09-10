@@ -25,7 +25,7 @@ var Route = {
 
     Route.active = true;
 
-    $.each(route.points, function(key, val) {
+    route.points.forEach(function(val) {
       Route.systems[val.s] = false;
       if(val.coords != undefined) {
         val.name = val.s;
@@ -41,10 +41,10 @@ var Route = {
 
   'remove' : function() {
 
-    $(Ed3d.catObjsRoutes).each(function(indexCat, listGrpRoutes) {
+    Ed3d.catObjsRoutes.forEach(function(listGrpRoutes) {
       if(listGrpRoutes != undefined)
 
-      $(listGrpRoutes).each(function(key, indexRoute) {
+      listGrpRoutes.forEach(function(indexRoute) {
         scene.remove(scene.getObjectByName( indexRoute ));
         if(scene.getObjectByName( indexRoute+'-first' ) != undefined)
           scene.remove(scene.getObjectByName( indexRoute+'-first' ));
@@ -91,7 +91,7 @@ var Route = {
     }
     if (colorLine === null) colorLine = Route.lineMaterial(Ed3d.material.line.color);
 
-    $.each(route.points, function(key2, val) {
+    route.points.forEach(function(val) {
 
       if(Route.systems[val.s] !== false) {
 
@@ -147,7 +147,7 @@ var Route = {
 
 
    if(route.cat !== undefined) {
-     $.each(route.cat, function(keyArr, idCat) {
+     route.cat.forEach(function(idCat) {
        if(Ed3d.catObjsRoutes[idCat] == undefined)
          Ed3d.catObjsRoutes[idCat] = [];
        Ed3d.catObjsRoutes[idCat].push(routes[idRoute].name);

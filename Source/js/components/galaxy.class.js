@@ -106,7 +106,9 @@ var Galaxy = {
     this.infos = new THREE.Object3D();
     var obj = this;
 
-    $.getJSON(Ed3d.basePath + "data/milkyway-ed.json", function(data) {
+    fetch(Ed3d.basePath + "data/milkyway-ed.json").then(function(res) {
+      return res.json();
+    }).then(function(data) {
 
       // addText() no-ops if Ed3d.font hasn't finished loading yet (see the
       // guard inside it). Everywhere else that matters (grid coordinate
@@ -116,7 +118,7 @@ var Galaxy = {
       // quadrant/arm/gap/other labels below are only ever populated once,
       // from this single AJAX success callback. On a real page load the
       // ~63KB font (fetched via FontLoader) and this ~6KB local JSON file
-      // (fetched via jQuery) are kicked off within a statement of each other
+      // are kicked off within a statement of each other
       // in Ed3d.init()/launchMap(), and the smaller file's fetch can win the
       // race — which would otherwise mean every addText() call below no-ops
       // and these labels never appear for the rest of the page's life.
@@ -134,43 +136,31 @@ var Galaxy = {
           return;
         }
 
-        $.each(data.quadrants, function(key, val) {
-
+        Object.keys(data.quadrants).forEach(function(key) {
+          var val = data.quadrants[key];
           obj.addText(key,val.x,-100,val.z,val.rotate);
-
         });
 
-        $.each(data.arms, function(key, val) {
-
-          $.each(val, function(keyCh, valCh) {
-            obj.addText(key,valCh.x,0,valCh.z,valCh.rotate,300,true);
+        // arms, gaps and others are all { name: [ {x,z,rotate}, ... ] } and
+        // differ only in the label size they ask for.
+        function regions(group, size) {
+          Object.keys(group).forEach(function(key) {
+            group[key].forEach(function(valCh) {
+              obj.addText(key,valCh.x,0,valCh.z,valCh.rotate,size,true);
+            });
           });
+        }
 
-        });
-
-        $.each(data.gaps, function(key, val) {
-
-          $.each(val, function(keyCh, valCh) {
-            obj.addText(key,valCh.x,0,valCh.z,valCh.rotate,160,true);
-          });
-
-        });
-
-        $.each(data.others, function(key, val) {
-
-          $.each(val, function(keyCh, valCh) {
-            obj.addText(key,valCh.x,0,valCh.z,valCh.rotate,160,true);
-          });
-
-        });
+        regions(data.arms,   300);
+        regions(data.gaps,   160);
+        regions(data.others, 160);
       }
 
       populate();
-
-    }).done(function() {
-
       scene.add(obj.infos);
 
+    }).catch(function(err) {
+      console.warn('galaxy: could not load milkyway-ed.json', err);
     });
 
   },

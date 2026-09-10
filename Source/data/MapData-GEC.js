@@ -129,7 +129,8 @@ var canonnEd3d_gec = {
         var html = '<h2>' + row.name + ' (' + row.galMapSearch + ')</h2>';
         html += '<div>' + (row.descriptionHtml || row.description || '') + '</div>';
         html += '<hr><i>' + (row.summary || '') + '</i>';
-        $('#systemDetails').html(html);
+        var details = document.getElementById('systemDetails');
+        if (details) details.innerHTML = html;
     }
 };
 

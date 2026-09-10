@@ -162,7 +162,11 @@ var Action = {
 
     //-- Remove old selection
 
-    $.each(obj.pointsHighlight, function(key, item) {
+    //-- Splices as it walks. The length is read once and the index only ever
+    //-- goes forward, which is what $.each did here; changing that changes
+    //-- which entries a splice makes it skip.
+    for (var hlKey = 0, hlLen = obj.pointsHighlight.length; hlKey < hlLen; hlKey++) {
+      var key = hlKey, item = obj.pointsHighlight[hlKey];
       if(newSel[item] == undefined) {
         var object = Ed3d.textSel[item];
         if(object != undefined) {
@@ -171,7 +175,7 @@ var Action = {
           obj.pointsHighlight.splice(key, 1);
         }
       }
-    });
+    }
 
   },
 
@@ -203,13 +207,34 @@ var Action = {
     });
   },
 
+  /**
+   * The map canvas in viewport coordinates, which is the frame e.clientX/Y are
+   * already in. This was `$('#ed3dmap').offset()` minus `$(window).scrollTop()`
+   * in two places; a bounding rect is that subtraction, and its left is
+   * viewport-relative too — offset().left was not, so the two disagreed
+   * whenever the page was scrolled sideways.
+   */
+  'mapRect' : function() {
+    var el = document.getElementById('ed3dmap');
+    if (!el) return { top: 0, left: 0 };
+    var r = el.getBoundingClientRect();
+    return { top: r.top, left: r.left };
+  },
+
+  /**
+   * `.hover-distance` is a class, and the HUD and the console card can both
+   * carry one, so every match is written rather than just the first.
+   */
+  'setHoverDistance' : function(html) {
+    var nodes = document.querySelectorAll('.hover-distance');
+    for (var i = 0; i < nodes.length; i++) nodes[i].innerHTML = html;
+  },
+
   'doMouseHover' : function (e, obj) {
 
     e.preventDefault();
 
-    var position = $('#ed3dmap').offset();
-    var scrollPos = $(window).scrollTop();
-    position.top -= scrollPos;
+    var position = Action.mapRect();
 
     obj.mouseVector = new THREE.Vector3(
       ( ( e.clientX - position.left ) / renderer.domElement.width ) * 2 - 1,
@@ -267,7 +292,7 @@ var Action = {
       var dy = sel.y - this.selectedPoint.y;
       var dz = sel.z - this.selectedPoint.z;
       var dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
-      $('.hover-distance').html('<hr>' + sel.name + '<br>' + dist.toFixed(2) + ' ly');
+      Action.setHoverDistance('<hr>' + sel.name + '<br>' + dist.toFixed(2) + ' ly');
     }
 
   },
@@ -279,7 +304,7 @@ var Action = {
 
     this.objHover = null;
     this.cursor.hover.visible = false;
-    $('.hover-distance').text('');
+    Action.setHoverDistance('');
 
   },
 
@@ -313,9 +338,7 @@ var Action = {
 
     //-- Raycast object
 
-    var position = $('#ed3dmap').offset();
-    var scrollPos = $(window).scrollTop();
-    position.top -= scrollPos;
+    var position = Action.mapRect();
 
     obj.mouseVector = new THREE.Vector3(
       ( ( e.clientX - position.left ) / renderer.domElement.width ) * 2 - 1,
@@ -345,9 +368,8 @@ var Action = {
           var selPoint = System.points[indexPoint];
 
           if(selPoint.visible) {
-            $('#hud #infos').html(
-              "<h2>"+selPoint.name+"</h2>"
-            );
+            var infosEl = document.querySelector('#hud #infos');
+            if (infosEl) infosEl.innerHTML = "<h2>"+selPoint.name+"</h2>";
 
             var isMove = obj.moveToObj(indexPoint, selPoint);
 
@@ -356,7 +378,9 @@ var Action = {
             var optInfos = (selPoint.infos != undefined) ? selPoint.infos : null;
             var optUrl   = (selPoint.url != undefined) ? selPoint.url : null;
 
-            $(document).trigger( "systemClick", [ selPoint.name, optInfos, optUrl ] );
+            document.dispatchEvent(new CustomEvent('systemClick', {
+              detail: { name: selPoint.name, infos: optInfos, url: optUrl }
+            }));
 
             if(isMove) return;
           }
@@ -365,7 +389,8 @@ var Action = {
 
         if(intersection.object.showCoord) {
 
-          $('#debug').html(Math.round(intersection.point.x)+' , '+Math.round(-intersection.point.z));
+          var dbg = document.getElementById('debug');
+          if (dbg) dbg.textContent = Math.round(intersection.point.x)+' , '+Math.round(-intersection.point.z);
 
           //Route.addPointToRoute(Math.round(intersection.point.x),0,Math.round(-intersection.point.z));
 
@@ -418,7 +443,8 @@ var Action = {
     this.oldSel = null;
     this.cursor.selection.visible = false;
 
-    $('#hud #infos').html('');
+    var infosEl = document.querySelector('#hud #infos');
+    if (infosEl) infosEl.innerHTML = '';
 
   },
 
@@ -664,7 +690,8 @@ var Action = {
 
     var obj = this;
 
-    $.each(this.cursor, function(key, cur) {
+    Object.keys(this.cursor).forEach(function(key) {
+      var cur = obj.cursor[key];
       if(cur != null) {
         cur.scale.set(scale, scale, scale);
       }
