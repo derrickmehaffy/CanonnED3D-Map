@@ -1972,11 +1972,17 @@ const Orrery = (function () {
      well as on the way out: a size chosen on a wide screen must not be able to
      leave a narrow one with no room for the model itself. */
 
-  function clampSide(px, which) {
-    const room = panel.querySelector('.orr-mid').getBoundingClientRect().width || 1200;
-    // Always leave the stage at least half the width between the two rails.
-    const max = Math.max(180, room * 0.34);
-    return Math.round(Math.max(160, Math.min(max, px)));
+  /* Measured against the window, not against the middle column.
+
+     The middle column's width is a consequence of the rails' width, so
+     clamping one against the other made the ceiling move every time it was
+     asked — and since the answer was then written back to storage, the pair
+     of them walked downhill. The floor is what a fact can be read in: below
+     about 220px the right rail sets "19 — all of them" one word to a line. */
+  function clampSide(px) {
+    const room = panel.getBoundingClientRect().width || window.innerWidth || 1200;
+    const max = Math.max(220, room * 0.3);
+    return Math.round(Math.max(220, Math.min(max, px)));
   }
 
   /* The width goes into a custom property rather than onto the element.
@@ -1988,11 +1994,18 @@ const Orrery = (function () {
      the last word about layouts where a dragged width means nothing. */
   const stacked = () => window.matchMedia('(max-width: 820px)').matches;
 
-  function setSide(which, px) {
-    const w = clampSide(px, which);
+  /* Put a width on, without claiming the reader asked for it. */
+  function applySide(which, px) {
+    const w = clampSide(px);
     panel.style.setProperty('--' + which + '-w', w + 'px');
-    keep(which + 'Width', w);
     resize();
+    return w;
+  }
+
+  /* And this one is a preference, because a drag is a decision. */
+  function setSide(which, px) {
+    const w = applySide(which, px);
+    keep(which + 'Width', w);
     return w;
   }
 
@@ -2051,16 +2064,20 @@ const Orrery = (function () {
       drawSpine();
     });
 
-    setSide('left', recallNum('leftWidth', 290));
-    setSide('right', recallNum('rightWidth', 276));
+    applySide('left', recallNum('leftWidth', 290));
+    applySide('right', recallNum('rightWidth', 276));
     setSpine(recallNum('spineHeight', COMPACT));
     window.addEventListener('resize', () => {
-      /* Only where a dragged width is still what the rail is wearing. Stacked
-         under the model they are full-width by stylesheet, and reading that
-         back would record the whole screen as the reader's chosen size. */
+      /* Re-fit what the reader chose. Deliberately not read back off the
+         element: the stylesheet has opinions about small windows — narrower
+         defaults below 1100px, and a hard cap at 22vw and 24vw when the window
+         is short and landscape — and those are its opinions, not a decision
+         anybody made. Reading the rendered width back recorded the cap as a
+         preference, so one pass through a small window replaced a dragged
+         width for good and left the rails a strip on a wide monitor. */
       if (stacked()) return resize();
-      setSide('left', left.getBoundingClientRect().width);
-      setSide('right', right.getBoundingClientRect().width);
+      applySide('left', recallNum('leftWidth', 290));
+      applySide('right', recallNum('rightWidth', 276));
     });
   }
 

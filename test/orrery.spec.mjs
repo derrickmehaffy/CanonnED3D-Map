@@ -3383,11 +3383,21 @@ test('the rails keep the width they were given across window resizes',
   expect(first.left, 'a rail wide enough to read a fact in').toBeGreaterThan(200);
   expect(first.right).toBeGreaterThan(200);
 
-  // A few window changes, the way a reader moves a window about.
-  for (const [w, h] of [[1600, 900], [1100, 800], [1900, 1000], [1280, 800]]) {
+  /* Through a window the stylesheet has opinions about, and out again.
+
+     Below 1100px the rails get narrower defaults, and a short landscape window
+     caps them at 22vw and 24vw outright. Those caps are right — two 290px
+     rails leave nothing of the model on a 900px screen — but they are the
+     stylesheet's doing, not the reader's, and the resize handler read the
+     capped width straight back off the element and kept it. One pass through a
+     small window and a dragged preference was gone for good, which is what
+     left the two rails as a strip on a very wide monitor. */
+  for (const [w, h] of [[1600, 900], [900, 520], [1000, 500], [1900, 1000]]) {
     await page.setViewportSize({ width: w, height: h });
     await page.waitForTimeout(250);
   }
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.waitForTimeout(300);
 
   const after = await rails();
   expect(after.left, 'the left rail did not walk down').toBeGreaterThan(200);
@@ -3395,4 +3405,26 @@ test('the rails keep the width they were given across window resizes',
   // And nothing was written over the reader's own choice.
   expect(after.keptL).toBe(first.keptL);
   expect(after.keptR).toBe(first.keptR);
+});
+
+test('a rail width recorded by the old bug heals itself', async ({ page }) => {
+  /* Anyone who ran the orrery before this was fixed has a narrow width sitting
+     in localStorage, and clearing it by hand is not a thing to ask of a
+     reader. The floor is applied on the way out of storage as well as on the
+     way in, so a width nobody could read a fact in comes back usable. */
+  await page.addInitScript(() => {
+    localStorage.setItem('canonn.orrery.leftWidth', '132');
+    localStorage.setItem('canonn.orrery.rightWidth', '118');
+  });
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+
+  const w = await page.evaluate(() => ({
+    left: Math.round(document.querySelector('#orr-left').getBoundingClientRect().width),
+    right: Math.round(document.querySelector('#orr-right').getBoundingClientRect().width)
+  }));
+  expect(w.left, 'wide enough to read').toBeGreaterThanOrEqual(220);
+  expect(w.right, 'wide enough to read').toBeGreaterThanOrEqual(220);
 });
