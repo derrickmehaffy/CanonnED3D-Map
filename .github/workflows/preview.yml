@@ -20,7 +20,7 @@ name: Preview build
 on:
   push:
     branches:
-      - phase0-safety-net-and-quick-wins
+      - modernization
   workflow_dispatch:
     inputs:
       ref:
