@@ -3250,3 +3250,50 @@ test('"right now" means now, and keeps up as the bodies move', async ({ page }) 
   // And the light-time follows it, being the same distance in other units.
   await expect(page.locator('#orr-from-t')).toHaveText(/\d/);
 });
+
+test('the real stars can be put on the sky, by direction', async ({ page }) => {
+  /* Asked for: "the ability to import a simple CSV of star names and x,y,z
+     values, and have them plotted on a sphere around the system."
+
+     Which is the same thing the bundled list of real named stars wants doing
+     to it — 230 of them, with galactic coordinates, from the same author's
+     own orrery. Not constellation figures: that file carries names and
+     positions and no line topology, so there is nothing to join up. What it
+     gives is a sky you can recognise, placed by direction from wherever you
+     happen to be standing. */
+  await stubDataHosts(page);
+  await stubApi(page, { ...SYSTEM, coords: { x: 0, y: 0, z: 0 } });
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+
+  const far = page.locator('#orr-far');
+  await expect(far).toBeVisible();
+  await expect(far).not.toHaveClass(/on/);
+  expect(await page.evaluate(() => window.Orrery.state().farStars)).toBe(0);
+
+  await far.click();
+  await expect(far).toHaveClass(/on/);
+  await expect.poll(() => page.evaluate(() => window.Orrery.state().farStars),
+    { timeout: 30_000 }).toBeGreaterThan(200);
+
+  /* Placed by direction, so every one of them sits on one sphere however far
+     away it really is — Rigel is nine hundred light years off and Sirius is
+     nine, and both belong on the sky rather than one of them being outside
+     the room. */
+  const radii = await page.evaluate(() => window.Orrery.state().farStarRadii);
+  expect(Math.max(...radii) - Math.min(...radii)).toBeLessThan(1);
+
+  /* Named, so a recognisable sky is recognisable — but only a few at a time.
+     All 230 at once is a wall of text over a system of eight bodies, which is
+     what the first cut of this did. The points all stay; the names are an aid
+     to them and are given to whatever is nearest the middle of the view. */
+  await expect(page.locator('.orr-label.far').first()).toBeAttached();
+  await expect.poll(async () => page.locator('.orr-label.far:not(.off)').count(),
+    { timeout: 10_000 }).toBeLessThanOrEqual(24);
+  expect(await page.locator('.orr-label.far:not(.off)').count()).toBeGreaterThan(0);
+
+  // And it goes away again.
+  await far.click();
+  await expect(far).not.toHaveClass(/on/);
+  expect(await page.evaluate(() => window.Orrery.state().farStars)).toBe(0);
+});

@@ -1619,6 +1619,9 @@ const Orrery = (function () {
       '      <button class="orr-opt on" id="orr-labl"><span>Names</span><b>on</b></button>',
       '      <button class="orr-opt on" id="orr-follow"><span>Follow</span><b>on</b></button>',
       '      <button class="orr-opt" id="orr-sky"><span>Sky</span><b></b></button>',
+      '      <button class="orr-opt" id="orr-far"' +
+      '              title="The real stars, placed by direction from this system">' +
+      '<span>Far stars</span><b>off</b></button>',
       '      <span class="orr-hud-r"></span>',
 
       /* Not everything belongs on the bar. How bright the ambient light is
@@ -1745,6 +1748,7 @@ const Orrery = (function () {
     $('orr-glow').addEventListener('input', (e) => setGlow(+e.target.value));
     $('orr-bloom').addEventListener('input', (e) => setBloom(+e.target.value));
     $('orr-follow').onclick = () => setFollow(!following);
+    $('orr-far').onclick = () => setFar(!farOn);
     $('orr-reset').onclick = () => { if (model) { frame(); select(model.star, false); } };
     $('orr-orbits').onclick = () => setOrbits((orbitMode + 1) % 3);
     $('orr-link').onclick = copyLink;
@@ -3171,6 +3175,132 @@ const Orrery = (function () {
   /* Three skies, in the order the button steps through them. Deep space is
      first because it is the default and the one most systems are read
      against. */
+  /* ── the real stars ──────────────────────────────────────────────────────
+     Asked for as "the ability to import a simple CSV of star names and x,y,z
+     values, and have them plotted on a sphere around the system", and answered
+     with the list of real named stars that ships with the same author's own
+     orrery: 230 of them, with galactic coordinates.
+
+     Deliberately not called constellations. That file carries names and
+     positions and no line topology, so there is nothing to join up and no
+     figures to draw — what it gives is a sky you can recognise. Which is the
+     more useful half anyway: every one of them is placed by direction from
+     wherever you are standing, so the sky over a system three thousand light
+     years out is that system's sky and not a copy of Earth's.
+
+     One sphere, whatever the true distances. Rigel is nine hundred light years
+     away and Sirius is nine; putting them at true range would leave one of
+     them outside the room and the other in the middle of the orbits. Direction
+     is the whole of what a sky is. */
+  let farOn = false, farStars = null, farLabels = [], farLoading = null;
+
+  function farData() {
+    if (farLoading) return farLoading;
+    farLoading = fetch('data/named-stars.json')
+      .then((r) => (r.ok ? r.json() : []))
+      .catch(() => []);
+    return farLoading;
+  }
+
+  function clearFar() {
+    if (farStars) {
+      scene.remove(farStars);
+      farStars.geometry.dispose();
+      farStars.material.dispose();
+      farStars = null;
+    }
+    farLabels.forEach((l) => l.el.remove());
+    farLabels = [];
+  }
+
+  /* Far enough out to read as sky and inside the far plane, which is what the
+     backdrop is scaled against too. */
+  function farRadius() { return ORBIT_OUT * 8; }
+
+  function buildFar(list) {
+    clearFar();
+    if (!model || !list.length) return;
+    const here = (model.sys && model.sys.coords) || { x: 0, y: 0, z: 0 };
+    const r = farRadius();
+    const host = panel.querySelector('#orr-labels');
+    // Not `keep`: that is the module's localStorage writer, and shadowing a
+    // function with an array is a trap for whoever edits this next.
+    const pos = [], names = [];
+    list.forEach((st) => {
+      // Galactic z runs the other way from the scene's, the same conversion
+      // the bodies get in inPlaneToScene.
+      const dx = st.x - here.x, dy = st.y - here.y, dz = -(st.z - (-here.z));
+      const len = Math.hypot(dx, dy, dz);
+      if (!len || st.n === model.name) return;      // this system is not its own sky
+      const k = r / len;
+      pos.push(dx * k, dy * k, dz * k);
+      names.push(st.n);
+    });
+    if (!names.length) return;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+    farStars = new THREE.Points(geo, new THREE.PointsMaterial({
+      color: 0xBFD4E4, size: 2.2, sizeAttenuation: false,
+      transparent: true, opacity: 0.85, depthWrite: false
+    }));
+    farStars.frustumCulled = false;
+    farStars.raycast = () => {};
+    scene.add(farStars);
+
+    farLabels = names.map((name, i) => {
+      const el = document.createElement('span');
+      el.className = 'orr-label far';
+      el.textContent = name;
+      host.appendChild(el);
+      return { el, at: new THREE.Vector3(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]) };
+    });
+    invalidate();
+  }
+
+  function setFar(on) {
+    farOn = on;
+    keep('far', on ? '1' : '0');
+    const b = panel.querySelector('#orr-far');
+    b.classList.toggle('on', on);
+    b.querySelector('b').textContent = on ? 'on' : 'off';
+    if (!on) { clearFar(); invalidate(); return; }
+    farData().then((list) => { if (farOn) buildFar(list); });
+  }
+
+  /* Their labels ride with them, but only a few of them at a time.
+
+     All 230 at once is a wall of text over a system of eight bodies — I know,
+     because that is what the first version did. The ones kept are those
+     nearest the middle of the view, which is both where a reader is looking
+     and the cheapest honest way to choose without magnitudes to rank them by.
+     The points stay whatever happens: it is the sky that makes the sky, and
+     the names are an aid to it. */
+  const FAR_LABELS = 24;
+
+  function drawFarLabels() {
+    if (!farLabels.length) return;
+    const cam = mode3d ? cam3 : cam2;
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    const near = [];
+    farLabels.forEach((l) => {
+      proj.copy(l.at).project(cam);
+      if (proj.z >= 1 || Math.abs(proj.x) > 1 || Math.abs(proj.y) > 1) {
+        l.el.classList.add('off');
+        return;
+      }
+      near.push({ l: l,
+        d: proj.x * proj.x + proj.y * proj.y,
+        x: Math.round((proj.x * 0.5 + 0.5) * w),
+        y: Math.round((-proj.y * 0.5 + 0.5) * h) });
+    });
+    near.sort((a, b) => a.d - b.d);
+    near.forEach((n, i) => {
+      const show = i < FAR_LABELS;
+      n.l.el.classList.toggle('off', !show);
+      if (show) n.l.el.style.transform = 'translate(' + n.x + 'px,' + n.y + 'px)';
+    });
+  }
+
   const SKIES = [
     ['stars', 'Deep space'],
     ['galaxy', 'Galactic'],
@@ -3521,6 +3651,7 @@ const Orrery = (function () {
     }
 
     drawLabels();
+    drawFarLabels();
     panel.querySelector('#orr-date').textContent = gameDate();
 
     /* The sky is direction only, so it rides with the camera and is scaled to
@@ -4899,6 +5030,7 @@ const Orrery = (function () {
     flightWanted = false;
     select(wanted || model.star);
     flightWanted = true;
+    setFar(recallStr('far', '0') === '1');
     invalidate();
     cancelAnimationFrame(loop);
     loop = requestAnimationFrame(animate);
@@ -4966,6 +5098,10 @@ const Orrery = (function () {
       system: model ? model.name : null,
       trueScale: trueDistance,
       flying: !!flight,
+      // How many real stars are on the sky, and how far out each one sits —
+      // they belong on one sphere however far away they really are.
+      farStars: farLabels.length,
+      farStarRadii: farLabels.map((l) => l.at.length()),
       following: following,
       selected: sel ? sel.name : null,
       // Where the eye is. Sampled per frame, a flight is a run of these and a

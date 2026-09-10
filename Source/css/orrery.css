@@ -283,6 +283,10 @@ body.orrery-open .app{visibility:hidden}
 .orr-label.star{color:var(--amber,#FF9D00);font-size:10.5px}
 .orr-label.on{color:var(--ion,#4DE3E1)}
 .orr-label.off{display:none}
+/* The real stars behind the system: dimmer and smaller than the bodies in
+   it, because they are the room rather than the thing being looked at. */
+.orr-label.far{color:#7C8A99;font-size:9px;letter-spacing:.06em;
+  margin:6px 0 0 7px;opacity:.8}
 
 /* ── resizing ───────────────────────────────────────────────────────────────
    The list, the detail and the distance axis all take a drag, because how much
