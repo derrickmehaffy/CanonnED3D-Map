@@ -2,8 +2,16 @@
 
 `js/ed3dmap.js` plus `js/components/*.js`. It draws the galaxy map: a point
 cloud of systems, a grid, route lines, and a HUD of category filters. It
-predates the rest of the project and reads like it — jQuery, classic scripts,
-module-scope globals referenced as bare identifiers.
+predates the rest of the project and reads like it — classic scripts,
+module-scope globals referenced as bare identifiers, `var` everywhere.
+
+It was written on jQuery and is off it now, so no page loads the library.
+`no page loads jQuery, and nothing reaches for the global` keeps it that way,
+and checks the global as well as the tag: a `$(...)` added to a file that no
+longer loads jQuery is a ReferenceError where it runs, which on a data loader
+is a blank map. Two local `$` helpers are not jQuery and the check knows it —
+`console.js` defines one as `getElementById`, `orrery.js` one as a
+panel-scoped `querySelector`.
 
 It works. The patterns below are the ones that will bite you if you do not know
 them, in the order they usually do.

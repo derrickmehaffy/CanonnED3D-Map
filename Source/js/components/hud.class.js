@@ -1,5 +1,48 @@
 ﻿import * as THREE from 'three';
 
+/**
+ * Three things jQuery did that plain DOM calls do not, kept because the file
+ * leans on them in a dozen places each.
+ *
+ * `show` is the fiddly one. jQuery's .show() clears the inline display and, if
+ * the element is still hidden by a stylesheet, writes the default display for
+ * its tag. Both halves matter here: #system-search-results is hidden by
+ * `display:none` in styles.css, so clearing the inline value alone would leave
+ * the typeahead permanently invisible; while #hud and #systemDetails are hidden
+ * by `display:none !important` in console.css, which an inline value cannot
+ * beat either way, so those calls stay as inert as they already were.
+ */
+function hudShow(el) {
+  if (!el) return;
+  el.style.display = '';
+  if (getComputedStyle(el).display === 'none') el.style.display = 'block';
+}
+
+function hudHide(el) {
+  if (el) el.style.display = 'none';
+}
+
+/**
+ * jQuery's delegated .on(type, selector, fn): listen on a container, act when
+ * the event came from something matching the selector, with `this` set to that
+ * match — which every handler here reads.
+ */
+function hudDelegate(root, types, selector, handler) {
+  if (!root) return;
+  types.split(' ').forEach(function (type) {
+    root.addEventListener(type, function (e) {
+      var match = e.target.closest ? e.target.closest(selector) : null;
+      if (match && root.contains(match)) handler.call(match, e);
+    });
+  });
+}
+
+/** Bind one handler to several event types, the way .on('a b c', fn) did. */
+function hudOn(el, types, handler) {
+  if (!el) return;
+  types.split(' ').forEach(function (type) { el.addEventListener(type, handler); });
+}
+
 var HUD = {
 
   'container': null,
@@ -29,12 +72,12 @@ var HUD = {
    * Safe to call repeatedly â€” replaces any existing count span.
    */
   'updateFilterCounts': function () {
-    $('.map_filter').each(function () {
-      var idCat = $(this).data('filter');
+    document.querySelectorAll('.map_filter').forEach(function (el) {
+      var idCat = el.dataset.filter;
       var count = (Ed3d.catObjs[idCat] && Ed3d.catObjs[idCat].length) || 0;
-      $(this).find('.filter-count').remove();
+      el.querySelectorAll('.filter-count').forEach(function (n) { n.remove(); });
       if (count > 1) {
-        $(this).append('<span class="filter-count"> (' + count + ')</span>');
+        el.insertAdjacentHTML('beforeend', '<span class="filter-count"> (' + count + ')</span>');
       }
     });
   },
@@ -46,9 +89,11 @@ var HUD = {
 
     this.container = container;
 
-    if (!$('#' + this.container + ' #controls').length && Ed3d.withOptionsPanel == true) {
+    var root = document.getElementById(this.container);
 
-      $('#' + this.container).append(
+    if (root && !root.querySelector('#controls') && Ed3d.withOptionsPanel == true) {
+
+      root.insertAdjacentHTML('beforeend',
         '  <div id="controls">' +
         '    <a data-view="3d" class="view selected">3D</a>' +
         '    <a data-view="top" class="view">2D</a>' +
@@ -63,22 +108,24 @@ var HUD = {
       //-- Optionnal button to go fuulscreen
 
       if (Ed3d.withFullscreenToggle) {
-        $("<a></a>")
-          .attr("id", "tog-fullscreen")
-          .html('Fullscreen')
-          .click(function () {
-            $('#' + container).toggleClass('map-fullscreen');
-            refresh3dMapSize();
-          })
-          .prependTo("#controls");
+        var full = document.createElement('a');
+        full.id = 'tog-fullscreen';
+        full.innerHTML = 'Fullscreen';
+        full.addEventListener('click', function () {
+          var box = document.getElementById(container);
+          if (box) box.classList.toggle('map-fullscreen');
+          refresh3dMapSize();
+        });
+        var controls = document.getElementById('controls');
+        if (controls) controls.insertBefore(full, controls.firstChild);
       }
 
 
     }
 
     // --- 3D Navigation Controls (Zoom + Pan) ---
-    if (!$('#' + this.container + ' #nav-controls').length) {
-      $('#' + this.container).append(
+    if (root && !root.querySelector('#nav-controls')) {
+      root.insertAdjacentHTML('beforeend',
         '<div id="nav-controls">' +
         '  <div class="nav-zoom">' +
         '    <a id="nav-zoom-in" class="nav-btn" title="Zoom In"><i class="fa fa-plus"></i></a>' +
@@ -97,10 +144,10 @@ var HUD = {
       );
     }
 
-    if (!Ed3d.withHudPanel) return;
+    if (!Ed3d.withHudPanel || !root) return;
 
-    $('#' + this.container).append('<div id="hud"></div>');
-    $('#hud').append(
+    root.insertAdjacentHTML('beforeend', '<div id="hud"></div>');
+    document.getElementById('hud').insertAdjacentHTML('beforeend',
       '<div>' +
       '    <h2>Infos</h2>' +
       '     Dist. Sol <span id="distsol"></span>' +
@@ -121,14 +168,14 @@ var HUD = {
     );
 
     // Append HUD toggle button as a sibling to #hud inside the container
-    $('#' + this.container).append(
+    root.insertAdjacentHTML('beforeend',
       '<button id="hud-toggle" title="Collapse panel" aria-label="Collapse panel" aria-expanded="true">' +
       '<i class="fa fa-chevron-left"></i>' +
       '</button>'
     );
 
     var addClass = (Ed3d.popupDetail ? 'class="popup-detail"' : '');
-    $('#' + this.container).append('<div id="systemDetails" style="display:none;"' + addClass + '></div>');
+    root.insertAdjacentHTML('beforeend', '<div id="systemDetails" style="display:none;"' + addClass + '></div>');
 
   },
 
@@ -137,30 +184,34 @@ var HUD = {
    */
   'createSubOptions': function () {
 
+    var options = document.getElementById('options');
+    if (!options) return;
+
+    function subOption(label, onClick) {
+      var a = document.createElement('a');
+      a.className = 'sub-opt active';
+      a.innerHTML = label;
+      a.addEventListener('click', function () {
+        onClick();
+        a.classList.toggle('active');
+      });
+      options.appendChild(a);
+    }
+
     //-- Toggle milky way
-    $("<a></a>")
-      .addClass("sub-opt active")
-      .html('Toggle Milky Way')
-      .click(function () {
-        var state = Galaxy.milkyway[0].visible;
-        Galaxy.milkyway[0].visible = !state;
-        Galaxy.milkyway[1].visible = !state;
-        Galaxy.milkyway2D.visible = !state;
-        $(this).toggleClass('active');
-      })
-      .appendTo("#options");
+    subOption('Toggle Milky Way', function () {
+      var state = Galaxy.milkyway[0].visible;
+      Galaxy.milkyway[0].visible = !state;
+      Galaxy.milkyway[1].visible = !state;
+      Galaxy.milkyway2D.visible = !state;
+    });
 
     //-- Toggle Grid
-    $("<a></a>")
-      .addClass("sub-opt active")
-      .html('Toggle grid')
-      .click(function () {
-        Ed3d.grid1H.toggleGrid();
-        Ed3d.grid1K.toggleGrid();
-        Ed3d.grid1XL.toggleGrid();
-        $(this).toggleClass('active');
-      })
-      .appendTo("#options");
+    subOption('Toggle grid', function () {
+      Ed3d.grid1H.toggleGrid();
+      Ed3d.grid1K.toggleGrid();
+      Ed3d.grid1XL.toggleGrid();
+    });
 
   },
 
@@ -169,14 +220,17 @@ var HUD = {
    */
   'initControls': function () {
 
-    $('#controls a').click(function (e) {
+    document.querySelectorAll('#controls a').forEach(function (link) {
+      link.addEventListener('click', function (e) {
 
-      if ($(this).hasClass('view')) {
-        $('#controls a.view').removeClass('selected')
-        $(this).addClass('selected');
+      if (link.classList.contains('view')) {
+        document.querySelectorAll('#controls a.view').forEach(function (v) {
+          v.classList.remove('selected');
+        });
+        link.classList.add('selected');
       }
 
-      var view = $(this).data('view');
+      var view = link.dataset.view;
 
 
       switch (view) {
@@ -203,18 +257,20 @@ var HUD = {
             Ed3d.showGalaxyInfos = false;
             Galaxy.infosHide();
           }
-          $(this).toggleClass('selected');
+          link.classList.toggle('selected');
           break;
 
         case 'options':
-          $('#options').toggle();
+          var opts = document.getElementById('options');
+          if (opts) {
+            if (getComputedStyle(opts).display === 'none') hudShow(opts);
+            else hudHide(opts);
+          }
           break;
 
       }
 
-
-
-
+      });
     });
 
   },
@@ -242,21 +298,31 @@ var HUD = {
 
     //-- HUD panel toggle button
     (function () {
-      var $toggle = $('#hud-toggle');
+      var toggle = document.getElementById('hud-toggle');
 
       function getActivePanel() {
-        return $('#systemDetails').is(':visible') ? $('#systemDetails') : $('#hud');
+        // jQuery's :visible was "has a box" — offsetWidth/Height or a client
+        // rect — not a display check, so keep it that way.
+        var details = document.getElementById('systemDetails');
+        var visible = details &&
+          (details.offsetWidth > 0 || details.offsetHeight > 0 ||
+           details.getClientRects().length > 0);
+        return visible ? details : document.getElementById('hud');
       }
 
       function syncTogglePosition(animate) {
-        var $panel = getActivePanel();
-        var collapsed = $panel.hasClass('hud-collapsed');
-        var targetLeft = collapsed ? 0 : $panel.outerWidth();
+        if (!toggle) return;
+        var panel = getActivePanel();
+        if (!panel) return;
+        var collapsed = panel.classList.contains('hud-collapsed');
+        // .outerWidth() is the border box, which is what offsetWidth reports.
+        var targetLeft = collapsed ? 0 : panel.offsetWidth;
         if (animate) {
-          $toggle.css('left', targetLeft + 'px');
+          toggle.style.left = targetLeft + 'px';
         } else {
-          $toggle.css({ transition: 'none', left: targetLeft + 'px' });
-          setTimeout(function () { $toggle.css('transition', ''); }, 50);
+          toggle.style.transition = 'none';
+          toggle.style.left = targetLeft + 'px';
+          setTimeout(function () { toggle.style.transition = ''; }, 50);
         }
       }
 
@@ -268,48 +334,45 @@ var HUD = {
       // Set initial position without animation
       syncTogglePosition(false);
 
-      $toggle.on('click touchend', function (e) {
+      hudOn(toggle, 'click touchend', function (e) {
         e.preventDefault();
-        var $panel = getActivePanel();
-        var collapsed = $panel.toggleClass('hud-collapsed').hasClass('hud-collapsed');
-        $toggle.attr('aria-expanded', collapsed ? 'false' : 'true');
-        $toggle.attr('title', collapsed ? 'Expand panel' : 'Collapse panel');
-        $toggle.attr('aria-label', collapsed ? 'Expand panel' : 'Collapse panel');
-        $toggle.find('i')
-          .toggleClass('fa-chevron-left', !collapsed)
-          .toggleClass('fa-chevron-right', collapsed);
+        var panel = getActivePanel();
+        if (!panel) return;
+        var collapsed = panel.classList.toggle('hud-collapsed');
+        toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        toggle.setAttribute('title', collapsed ? 'Expand panel' : 'Collapse panel');
+        toggle.setAttribute('aria-label', collapsed ? 'Expand panel' : 'Collapse panel');
+        toggle.querySelectorAll('i').forEach(function (icon) {
+          icon.classList.toggle('fa-chevron-left', !collapsed);
+          icon.classList.toggle('fa-chevron-right', collapsed);
+        });
         syncTogglePosition(true);
       });
     })();
 
     //-- Disable 3D controls when mouse hover the Hud
-    $("canvas").hover(
-      function () {
-        controls.enabled = true;
-      }, function () {
-        controls.enabled = false;
-      }
-    );
+    //   .hover(over, out) was mouseenter/mouseleave, which do not bubble.
+    document.querySelectorAll('canvas').forEach(function (cv) {
+      cv.addEventListener('mouseenter', function () { controls.enabled = true; });
+      cv.addEventListener('mouseleave', function () { controls.enabled = false; });
+    });
 
     //-- Disable 3D controls when mouse is over either HUD panel
-    $("#hud, #systemDetails").hover(
-      function () {
-        controls.enabled = false;
-      }, function () {
-        controls.enabled = true;
-      }
-    );
+    document.querySelectorAll('#hud, #systemDetails').forEach(function (panel) {
+      panel.addEventListener('mouseenter', function () { controls.enabled = false; });
+      panel.addEventListener('mouseleave', function () { controls.enabled = true; });
+    });
 
     //-- Prevent ALL pointer/scroll/click events from leaking through the HUD
     //   panels into OrbitControls.  Must be a DIRECT binding (not delegated)
     //   so stopPropagation fires before the event bubbles to #ed3dmap where
     //   OrbitControls is registered.
-    $('#hud, #systemDetails').on(
-      'mousedown pointerdown touchstart touchmove touchend wheel click contextmenu',
-      function (e) { e.stopPropagation(); }
-    );
+    document.querySelectorAll('#hud, #systemDetails').forEach(function (panel) {
+      hudOn(panel, 'mousedown pointerdown touchstart touchmove touchend wheel click contextmenu',
+        function (e) { e.stopPropagation(); });
+    });
 
-    $("#systemDetails").hide();
+    hudHide(document.getElementById('systemDetails'));
 
     // -----------------------------------------------------------------------
     // File Upload Dialog
@@ -335,75 +398,88 @@ var HUD = {
         document.getElementById('ed3dmap').appendChild(overlay);
       }
 
-      var $overlay = $('#file-upload-overlay');
-      var $drop = $('#file-upload-drop');
-      var $input = $('#file-upload-input');
-      var $messages = $('#file-upload-messages');
+      var overlay = document.getElementById('file-upload-overlay');
+      var drop = document.getElementById('file-upload-drop');
+      var input = document.getElementById('file-upload-input');
+      var messages = document.getElementById('file-upload-messages');
       var routeCounter = 0;
 
       function openDialog() {
-        $overlay.addClass('active');
+        overlay.classList.add('active');
       }
       function closeDialog() {
-        $overlay.removeClass('active');
+        overlay.classList.remove('active');
       }
 
-      $('#file-upload-btn').on('click', function (e) {
+      var openBtn = document.getElementById('file-upload-btn');
+      if (openBtn) openBtn.addEventListener('click', function (e) {
         e.stopPropagation();
         openDialog();
       });
-      $('#file-upload-close').on('click', function (e) {
+      var closeBtn = document.getElementById('file-upload-close');
+      if (closeBtn) closeBtn.addEventListener('click', function (e) {
         e.stopPropagation();
         closeDialog();
       });
-      $overlay.on('click', function (e) {
-        if (e.target === this) closeDialog();
+      overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeDialog();
       });
 
       // Prevent overlay pointer events leaking to the map
-      $overlay.on('mousedown pointerdown touchstart wheel click contextmenu', function (e) {
+      hudOn(overlay, 'mousedown pointerdown touchstart wheel click contextmenu', function (e) {
         e.stopPropagation();
       });
 
       // Drag & drop styling
-      $drop.on('dragover dragenter', function (e) {
+      hudOn(drop, 'dragover dragenter', function (e) {
         e.preventDefault();
         e.stopPropagation();
-        $(this).addClass('drag-over');
+        drop.classList.add('drag-over');
       });
-      $drop.on('dragleave dragend drop', function (e) {
+      hudOn(drop, 'dragleave dragend drop', function (e) {
         e.preventDefault();
         e.stopPropagation();
-        $(this).removeClass('drag-over');
+        drop.classList.remove('drag-over');
       });
-      $drop.on('drop', function (e) {
-        var files = e.originalEvent.dataTransfer.files;
+      drop.addEventListener('drop', function (e) {
+        // jQuery wrapped the event; dataTransfer is on the native one, which
+        // is what a plain listener already receives.
+        var files = e.dataTransfer.files;
         processFiles(files);
       });
       // No manual click handler needed â€” the <label for> wires the input natively.
-      $input.on('change', function () {
-        processFiles(this.files);
-        this.value = '';
+      input.addEventListener('change', function () {
+        processFiles(input.files);
+        input.value = '';
       });
 
+      /** Keep the newest line in view. Was $messages.scrollTop(scrollHeight). */
+      function scrollMessages() {
+        messages.scrollTop = messages.scrollHeight;
+      }
+
+      /** Append a message line and return it, so callers can keep updating it. */
       function addMessage(text, type) {
-        var $m = $('<div class="fu-msg ' + (type || 'info') + '"></div>').text(text);
-        $messages.append($m);
-        $messages.scrollTop($messages[0].scrollHeight);
+        var m = document.createElement('div');
+        m.className = 'fu-msg ' + (type || 'info');
+        m.textContent = text;
+        messages.appendChild(m);
+        scrollMessages();
+        return m;
       }
 
       function setDropLoading(on) {
         if (on) {
-          $drop.addClass('loading');
-          $drop.find('.fa').hide();
-          if (!$drop.find('.fu-spinner').length) {
-            $drop.prepend('<span class="fu-spinner"></span><br>');
+          drop.classList.add('loading');
+          drop.querySelectorAll('.fa').forEach(hudHide);
+          if (!drop.querySelector('.fu-spinner')) {
+            drop.insertAdjacentHTML('afterbegin', '<span class="fu-spinner"></span><br>');
           }
-          $drop.find('.fu-spinner').show();
+          drop.querySelectorAll('.fu-spinner').forEach(hudShow);
         } else {
-          $drop.removeClass('loading');
-          $drop.find('.fu-spinner').remove();
-          $drop.find('.fa').show();
+          drop.classList.remove('loading');
+          drop.querySelectorAll('.fu-spinner').forEach(function (n) { n.remove(); });
+          drop.querySelectorAll('.fa').forEach(hudShow);
         }
       }
 
@@ -429,10 +505,12 @@ var HUD = {
             function fileDone() {
               if (--pendingFiles === 0) {
                 setDropLoading(false);
-                var $btn = $('<button class="fu-done-btn">\u2713 Done - click here to close<\/button>');
-                $btn.on('click', closeDialog);
-                $messages.append($btn);
-                $messages.scrollTop($messages[0].scrollHeight);
+                var btn = document.createElement('button');
+                btn.className = 'fu-done-btn';
+                btn.textContent = '\u2713 Done - click here to close';
+                btn.addEventListener('click', closeDialog);
+                messages.appendChild(btn);
+                scrollMessages();
               }
             }
           })(files[i]);
@@ -624,23 +702,21 @@ var HUD = {
 
       function displayCsvSystems(filename, systems, done) {
         if (!System.particleGeo) System.initParticleSystem();
-        var $status = $('<div class="fu-msg info"></div>').text('Adding systems\u2026');
-        $messages.append($status);
-        $messages.scrollTop($messages[0].scrollHeight);
+        var status = addMessage('Adding systems\u2026', 'info');
 
         var i = 0;
         function addNext() {
           if (i < systems.length) {
             var s = systems[i++];
             System.create({ name: s.system, coords: { x: s.x, y: s.y, z: s.z } });
-            $status.text('[' + i + '/' + systems.length + '] ' + s.system);
-            $messages.scrollTop($messages[0].scrollHeight);
+            status.textContent = '[' + i + '/' + systems.length + '] ' + s.system;
+            scrollMessages();
             setTimeout(addNext, 0);
           } else {
             System.endParticleSystem();
-            $status.removeClass('info').addClass('success')
-              .text(filename + ': Loaded \u2014 ' + systems.length + ' system(s) from CSV.');
-            $messages.scrollTop($messages[0].scrollHeight);
+            status.classList.replace('info', 'success');
+            status.textContent = filename + ': Loaded \u2014 ' + systems.length + ' system(s) from CSV.';
+            scrollMessages();
             done();
           }
         }
@@ -770,17 +846,15 @@ var HUD = {
 
         if (!System.particleGeo) System.initParticleSystem();
 
-        var $status = $('<div class="fu-msg info"></div>').text('Adding ' + cmdrName + '\u2026');
-        $messages.append($status);
-        $messages.scrollTop($messages[0].scrollHeight);
+        var status = addMessage('Adding ' + cmdrName + '\u2026', 'info');
 
         var i = 0;
         function addNext() {
           if (i < systems.length) {
             var s = systems[i++];
             System.create({ name: s.system, coords: { x: s.x, y: s.y, z: s.z } });
-            $status.text('[' + i + '/' + systems.length + '] ' + cmdrName + ': ' + s.system);
-            $messages.scrollTop($messages[0].scrollHeight);
+            status.textContent = '[' + i + '/' + systems.length + '] ' + cmdrName + ': ' + s.system;
+            scrollMessages();
             setTimeout(addNext, 0);
           } else {
             finishJournalRoute();
@@ -803,9 +877,9 @@ var HUD = {
             scene.add(line);
           }
 
-          $status.removeClass('info').addClass('success')
-            .text(cmdrName + ': ' + systems.length + ' systems plotted.');
-          $messages.scrollTop($messages[0].scrollHeight);
+          status.classList.replace('info', 'success');
+          status.textContent = cmdrName + ': ' + systems.length + ' systems plotted.';
+          scrollMessages();
           done();
         }
 
@@ -837,26 +911,24 @@ var HUD = {
         if (!System.particleGeo) System.initParticleSystem();
 
         var ref = data.reference ? data.reference.name : '';
-        var $status = $('<div class="fu-msg info"></div>').text('Adding systems\u2026');
-        $messages.append($status);
-        $messages.scrollTop($messages[0].scrollHeight);
+        var status = addMessage('Adding systems\u2026', 'info');
 
         var i = 0;
         function addNext() {
           if (i < systems.length) {
             var s = systems[i++];
             System.create({ name: s.system, coords: { x: s.x, y: s.y, z: s.z } });
-            $status.text('[' + i + '/' + systems.length + '] ' + s.system);
-            $messages.scrollTop($messages[0].scrollHeight);
+            status.textContent = '[' + i + '/' + systems.length + '] ' + s.system;
+            scrollMessages();
             setTimeout(addNext, 0);
           } else {
             System.endParticleSystem();
-            $status.removeClass('info').addClass('success')
-              .text(filename + ': Loaded \u2014 ' + systems.length + ' system(s)' +
-                (ref ? ' near ' + ref : '') + ' (results ' +
-                data.from + '\u2013' + (data.from + systems.length - 1) +
-                ' of ' + data.count + ').');
-            $messages.scrollTop($messages[0].scrollHeight);
+            status.classList.replace('info', 'success');
+            status.textContent = filename + ': Loaded \u2014 ' + systems.length + ' system(s)' +
+              (ref ? ' near ' + ref : '') + ' (results ' +
+              data.from + '\u2013' + (data.from + systems.length - 1) +
+              ' of ' + data.count + ').';
+            scrollMessages();
             done();
           }
         }
@@ -871,9 +943,7 @@ var HUD = {
         if (!System.particleGeo) System.initParticleSystem();
 
         // Live status line that updates with each system name
-        var $status = $('<div class="fu-msg info"></div>').text('Adding systems\u2026');
-        $messages.append($status);
-        $messages.scrollTop($messages[0].scrollHeight);
+        var status = addMessage('Adding systems\u2026', 'info');
 
         // Add systems one at a time yielding to the browser between each so
         // the status line and spinner actually repaint.
@@ -885,8 +955,8 @@ var HUD = {
               name: jump.system,
               coords: { x: jump.x, y: jump.y, z: jump.z }
             });
-            $status.text('[' + i + '/' + jumps.length + '] ' + jump.system);
-            $messages.scrollTop($messages[0].scrollHeight);
+            status.textContent = '[' + i + '/' + jumps.length + '] ' + jump.system;
+            scrollMessages();
             setTimeout(addNext, 0);
           } else {
             // All systems added â€” flush particles and draw the route line
@@ -913,9 +983,9 @@ var HUD = {
           scene.add(line);
 
           // Replace the live status line with a final success message
-          $status.removeClass('info').addClass('success')
-            .text(filename + ': Loaded \u2014 ' + jumps.length + ' jumps from \u201c' + from + '\u201d to \u201c' + to + '\u201d.');
-          $messages.scrollTop($messages[0].scrollHeight);
+          status.classList.replace('info', 'success');
+          status.textContent = filename + ': Loaded \u2014 ' + jumps.length + ' jumps from \u201c' + from + '\u201d to \u201c' + to + '\u201d.';
+          scrollMessages();
           done();
         }
 
@@ -928,10 +998,13 @@ var HUD = {
     HUD.updateFilterCounts();
 
     //-- Add map filters (delegated so dynamically-added filters also respond)
-    $('#filters').on('click', '.map_filter', function (e) {
+    hudDelegate(document.getElementById('filters'), 'click', '.map_filter', function (e) {
       e.preventDefault();
-      var idCat = $(this).data('filter');
-      var active = $(this).data('active');
+      var idCat = this.dataset.filter;
+      // data-active starts as "1" in the markup addFilter writes. jQuery's
+      // .data() handed back a number and stored one; dataset keeps strings, and
+      // the arithmetic below coerces either the same way.
+      var active = this.dataset.active;
       active = (Math.abs(active - 1));
 
       //------------------------------------------------------------------------
@@ -939,7 +1012,9 @@ var HUD = {
 
       if (!Ed3d.hudMultipleSelect) {
 
-        $('.map_filter').addClass('disabled');
+        document.querySelectorAll('.map_filter').forEach(function (f) {
+          f.classList.add('disabled');
+        });
 
         //-- Toggle systems particles
         System.points.forEach(function (point, index) {
@@ -952,9 +1027,9 @@ var HUD = {
 
         //-- Toggle routes
         if (Ed3d.catObjsRoutes.length > 0)
-          $(Ed3d.catObjsRoutes).each(function (indexCat, listGrpRoutes) {
+          Ed3d.catObjsRoutes.forEach(function (listGrpRoutes) {
             if (listGrpRoutes != undefined)
-              $(listGrpRoutes).each(function (key, indexRoute) {
+              listGrpRoutes.forEach(function (indexRoute) {
                 scene.getObjectByName(indexRoute).visible = false;
                 if (scene.getObjectByName(indexRoute + '-first') != undefined)
                   scene.getObjectByName(indexRoute + '-first').visible = false;
@@ -974,8 +1049,8 @@ var HUD = {
 
       //-- Toggle routes
 
-      if (Ed3d.catObjsRoutes.length > 0)
-        $(Ed3d.catObjsRoutes[idCat]).each(function (key, indexRoute) {
+      if (Ed3d.catObjsRoutes.length > 0 && Ed3d.catObjsRoutes[idCat])
+        Ed3d.catObjsRoutes[idCat].forEach(function (indexRoute) {
           var isVisible = scene.getObjectByName(indexRoute).visible;
           if (isVisible == undefined) isVisible = true;
           isVisible = (isVisible ? false : true);
@@ -988,7 +1063,7 @@ var HUD = {
 
       //-- Toggle systems particles
 
-      $(Ed3d.catObjs[idCat]).each(function (key, indexPoint) {
+      (Ed3d.catObjs[idCat] || []).forEach(function (indexPoint) {
 
         var obj = System.points[indexPoint];
 
@@ -1032,8 +1107,8 @@ var HUD = {
         -Math.round(center.z / nbPoint)
       );
 
-      $(this).data('active', active);
-      $(this).toggleClass('disabled');
+      this.dataset.active = active;
+      this.classList.toggle('disabled');
 
       //-- If current selection is no more visible, disable active selection
       if (Action.oldSel != null && !Action.oldSel.visible) Action.disableSelection();
@@ -1052,22 +1127,6 @@ var HUD = {
       //Action.moveInitalPosition();
     });
 
-
-    //-- Add map link (delegated)
-    $('#hud').on('click', '.map_link', function (e) {
-
-      e.preventDefault();
-      var elId = $(this).data('route');
-      Action.moveToObj(routes[elId]);
-    });
-
-    $('#hud').on('click', '.map_link span', function (e) {
-
-      e.preventDefault();
-
-      var elId = $(this).parent().data('route');
-      routes[elId].visible = !routes[elId].visible;
-    });
 
     HUD.initSystemSearch();
 
@@ -1088,7 +1147,8 @@ var HUD = {
     if (!HUD.filterGroupIds) HUD.filterGroupIds = {};
     var grpNb = Object.keys(HUD.filterGroupIds).length + 1;
 
-    $.each(categories, function (typeFilter, values) {
+    Object.keys(categories).forEach(function (typeFilter) {
+      var values = categories[typeFilter];
 
       if (typeof values === "object") {
 
@@ -1099,19 +1159,23 @@ var HUD = {
           // Create the group header and container
           groupId = 'group_' + grpNb;
           HUD.filterGroupIds[typeFilter] = groupId;
-          $('#filters').append('<h2>' + typeFilter + '</h2>');
-          $('#filters').append('<div id="' + groupId + '"></div>');
+          var filtersEl = document.getElementById('filters');
+          if (filtersEl) {
+            filtersEl.insertAdjacentHTML('beforeend', '<h2>' + typeFilter + '</h2>');
+            filtersEl.insertAdjacentHTML('beforeend', '<div id="' + groupId + '"></div>');
+          }
           grpNb++;
         } else {
           groupId = HUD.filterGroupIds[typeFilter];
         }
 
         var nbFilters = values.length;
-        var count = isNewGroup ? 0 : $('#' + groupId + ' .filter').length;
+        var count = isNewGroup ? 0 : document.querySelectorAll('#' + groupId + ' .filter').length;
         var visible = true;
         var addedAny = false;
 
-        $.each(values, function (key, val) {
+        Object.keys(values).forEach(function (key) {
+          var val = values[key];
 
           // Skip items already registered
           if (Ed3d.catObjs[key] !== undefined) return;
@@ -1132,14 +1196,22 @@ var HUD = {
         });
 
         // Add/update the "See more" toggle if needed
-        if (addedAny && visible == false && $('#' + groupId + ' .show_childs').length === 0) {
-          $('#' + groupId).append(
-            '<a class="show_childs">' +
-            '+ See more' +
-            '</a>'
-          ).click(function () {
-            HUD.expandFilters(groupId);
-          });
+        if (addedAny && visible == false && document.querySelectorAll('#' + groupId + ' .show_childs').length === 0) {
+          var group = document.getElementById(groupId);
+          if (group) {
+            group.insertAdjacentHTML('beforeend',
+              '<a class="show_childs">' +
+              '+ See more' +
+              '</a>'
+            );
+            // Bound to the group, not to the link just added: .append() returned
+            // the original selection, so .click() landed here. Kept as it was —
+            // any click inside the group expands it — because moving it to the
+            // link changes what the panel does, which is not this change's job.
+            group.addEventListener('click', function () {
+              HUD.expandFilters(groupId);
+            });
+          }
         }
       }
 
@@ -1162,13 +1234,25 @@ var HUD = {
     var activeIndex = -1;
 
     function getApiUrl(q) {
-      var encoded = encodeURIComponent(q);
       return window.CanonnAPI.query('typeahead', { q: q });
     }
 
+    function results() {
+      return document.getElementById('system-search-results');
+    }
+
     function closeResults() {
-      $('#system-search-results').hide().empty();
+      var ul = results();
+      if (ul) {
+        hudHide(ul);
+        ul.innerHTML = '';
+      }
       activeIndex = -1;
+    }
+
+    function items() {
+      var ul = results();
+      return ul ? Array.prototype.slice.call(ul.querySelectorAll('li')) : [];
     }
 
     function selectSystem(name) {
@@ -1183,7 +1267,8 @@ var HUD = {
       }
       if (!found) return;
 
-      $('#system-search-input').val(found.name);
+      var box = document.getElementById('system-search-input');
+      if (box) box.value = found.name;
       closeResults();
 
       // Check if system already exists on the map (case-insensitive)
@@ -1220,59 +1305,74 @@ var HUD = {
       }
     }
 
-    $(document).on('input', '#system-search-input', function () {
+    hudDelegate(document, 'input', '#system-search-input', function () {
       clearTimeout(debounceTimer);
-      var q = $(this).val().trim();
+      var q = this.value.trim();
       if (q.length < 2) {
         closeResults();
         return;
       }
       debounceTimer = setTimeout(function () {
-        $.getJSON(getApiUrl(q), function (data) {
-          currentSuggestions = (data && data.min_max) ? data.min_max : [];
-          var values = (data && data.values) ? data.values : [];
-          var $ul = $('#system-search-results');
-          $ul.empty();
-          if (values.length === 0) {
-            $ul.hide();
-            return;
-          }
-          $.each(values, function (i, name) {
-            $('<li/>').text(name).on('click', function () {
-              selectSystem($(this).text());
-            }).appendTo($ul);
+        fetch(getApiUrl(q))
+          .then(function (res) { return res.json(); })
+          .then(function (data) {
+            currentSuggestions = (data && data.min_max) ? data.min_max : [];
+            var values = (data && data.values) ? data.values : [];
+            var ul = results();
+            if (!ul) return;
+            ul.innerHTML = '';
+            if (values.length === 0) {
+              hudHide(ul);
+              return;
+            }
+            values.forEach(function (name) {
+              var li = document.createElement('li');
+              li.textContent = name;
+              li.addEventListener('click', function () { selectSystem(li.textContent); });
+              ul.appendChild(li);
+            });
+            activeIndex = -1;
+            // styles.css hides this list outright, so it needs a real display
+            // value rather than an empty one — see hudShow.
+            hudShow(ul);
+          })
+          .catch(function (err) {
+            console.warn('system search failed', err);
           });
-          activeIndex = -1;
-          $ul.show();
-        });
       }, 300);
     });
 
-    $(document).on('keydown', '#system-search-input', function (e) {
-      var $items = $('#system-search-results li');
-      if (!$items.length) return;
+    hudDelegate(document, 'keydown', '#system-search-input', function (e) {
+      var list = items();
+      if (!list.length) return;
+
+      function highlight(index) {
+        list.forEach(function (li) { li.classList.remove('active'); });
+        if (list[index]) list[index].classList.add('active');
+      }
+
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        activeIndex = Math.min(activeIndex + 1, $items.length - 1);
-        $items.removeClass('active').eq(activeIndex).addClass('active');
+        activeIndex = Math.min(activeIndex + 1, list.length - 1);
+        highlight(activeIndex);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         activeIndex = Math.max(activeIndex - 1, 0);
-        $items.removeClass('active').eq(activeIndex).addClass('active');
+        highlight(activeIndex);
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        if (activeIndex >= 0) {
-          selectSystem($items.eq(activeIndex).text());
-        } else if ($items.length > 0) {
-          selectSystem($items.first().text());
+        if (activeIndex >= 0 && list[activeIndex]) {
+          selectSystem(list[activeIndex].textContent);
+        } else if (list.length > 0) {
+          selectSystem(list[0].textContent);
         }
       } else if (e.key === 'Escape') {
         closeResults();
       }
     });
 
-    $(document).on('click', function (e) {
-      if (!$(e.target).closest('#system-search-wrap').length) {
+    document.addEventListener('click', function (e) {
+      if (!(e.target.closest && e.target.closest('#system-search-wrap'))) {
         closeResults();
       }
     });
@@ -1281,10 +1381,11 @@ var HUD = {
 
   'expandFilters': function (groupId) {
 
-    $('#' + groupId)
-      .addClass('open');
+    var group = document.getElementById(groupId);
+    if (group) group.classList.add('open');
 
-    $('#hud').addClass('enlarge');
+    var hud = document.getElementById('hud');
+    if (hud) hud.classList.add('enlarge');
 
 
   },
@@ -1294,7 +1395,8 @@ var HUD = {
    */
   'initNavControls': function () {
 
-    if (!$('#nav-controls').length) return;
+    var navControls = document.getElementById('nav-controls');
+    if (!navControls) return;
 
     var _navTimer = null;
 
@@ -1344,14 +1446,14 @@ var HUD = {
     }
 
     function bindNavBtn(id, fn) {
-      $('#' + id).on('mousedown touchstart', function (e) {
+      hudOn(document.getElementById(id), 'mousedown touchstart', function (e) {
         e.preventDefault();
         e.stopPropagation();
         startRepeat(fn);
       });
     }
 
-    $(document).on('mouseup touchend touchcancel', stopRepeat);
+    hudOn(document, 'mouseup touchend touchcancel', stopRepeat);
 
     bindNavBtn('nav-zoom-in', zoomIn);
     bindNavBtn('nav-zoom-out', zoomOut);
@@ -1360,14 +1462,14 @@ var HUD = {
     bindNavBtn('nav-pan-left', function () { panCamera(-1, 0); });
     bindNavBtn('nav-pan-right', function () { panCamera(1, 0); });
 
-    $('#nav-pan-reset').on('mousedown touchstart', function (e) {
+    hudOn(document.getElementById('nav-pan-reset'), 'mousedown touchstart', function (e) {
       e.preventDefault();
       e.stopPropagation();
       Action.moveInitalPosition();
     });
 
     // Block all pointer events from leaking through to OrbitControls
-    $('#nav-controls').on('mousedown pointerdown touchstart wheel click contextmenu', function (e) {
+    hudOn(navControls, 'mousedown pointerdown touchstart wheel click contextmenu', function (e) {
       e.stopPropagation();
     });
 
@@ -1379,7 +1481,8 @@ var HUD = {
 
   'removeFilters': function () {
 
-    $('#hud #filters').html('');
+    var filtersEl = document.querySelector('#hud #filters');
+    if (filtersEl) filtersEl.innerHTML = '';
 
   },
 
@@ -1403,7 +1506,8 @@ var HUD = {
     }
 
     //-- Add html link
-    $('#' + groupId).append(
+    var group = document.getElementById(groupId);
+    if (group) group.insertAdjacentHTML('beforeend',
       '<a class="map_filter' + addClass + '" data-active="1" data-filter="' + idCat + '">' +
       '<span class="check" style="background:' + back + '"> </span>' + val.name +
       '</a>'
@@ -1414,45 +1518,50 @@ var HUD = {
    *
    */
   'openHudDetails': function () {
-    $('#hud').hide();
-    $('#systemDetails').removeClass('hud-collapsed').show().hover(
-      function () {
-        controls.enabled = false;
-      }, function () {
-        controls.enabled = true;
-      }
-    );
+    hudHide(document.getElementById('hud'));
+    var details = document.getElementById('systemDetails');
+    if (details) {
+      details.classList.remove('hud-collapsed');
+      hudShow(details);
+      // The .hover() that used to be chained on here bound the same pair of
+      // handlers initHudAction already binds on #systemDetails — and bound
+      // another pair on every open, so they piled up for the life of the page.
+    }
     // Restore toggle icon to open state and reposition against the detail panel
-    var $toggle = $('#hud-toggle');
-    $toggle.attr('aria-expanded', 'true')
-      .attr('title', 'Collapse panel')
-      .attr('aria-label', 'Collapse panel')
-      .find('i').removeClass('fa-chevron-right').addClass('fa-chevron-left');
+    HUD.resetToggleIcon();
     if (HUD.repositionToggle) HUD.repositionToggle(true);
   },
   /**
    *
    */
   'closeHudDetails': function () {
-    $('#systemDetails').hide().removeClass('hud-collapsed');
-    $('#hud').removeClass('hud-collapsed').show();
+    var details = document.getElementById('systemDetails');
+    if (details) {
+      hudHide(details);
+      details.classList.remove('hud-collapsed');
+    }
+    var hud = document.getElementById('hud');
+    if (hud) {
+      hud.classList.remove('hud-collapsed');
+      hudShow(hud);
+    }
     // Restore toggle icon and reposition against the main hud panel
-    var $toggle = $('#hud-toggle');
-    $toggle.attr('aria-expanded', 'true')
-      .attr('title', 'Collapse panel')
-      .attr('aria-label', 'Collapse panel')
-      .find('i').removeClass('fa-chevron-right').addClass('fa-chevron-left');
+    HUD.resetToggleIcon();
     if (HUD.repositionToggle) HUD.repositionToggle(false);
   },
 
-  /**
-   * Create a Line route
-   */
-  'setRoute': function (idRoute, nameR) {
-    $('#routes').append('<a class="map_link" data-route="' + idRoute + '"><span class="check"> </span>' + nameR + '</a>');
+  /** The open-panel state of the collapse button, set from both details paths. */
+  'resetToggleIcon': function () {
+    var toggle = document.getElementById('hud-toggle');
+    if (!toggle) return;
+    toggle.setAttribute('aria-expanded', 'true');
+    toggle.setAttribute('title', 'Collapse panel');
+    toggle.setAttribute('aria-label', 'Collapse panel');
+    toggle.querySelectorAll('i').forEach(function (icon) {
+      icon.classList.remove('fa-chevron-right');
+      icon.classList.add('fa-chevron-left');
+    });
   },
-
-
 
   /**
    *
@@ -1470,21 +1579,23 @@ var HUD = {
       '<div id="nav">' +
       '</div>';
 
-    $('#systemDetails').html(html);
+    var details = document.getElementById('systemDetails');
+    if (!details) return;
+    details.innerHTML = html;
 
     //-- Add navigation
 
-    $('<a/>', { 'html': '<' })
-      .click(function () { Action.moveNextPrev(index - 1, -1); })
-      .appendTo("#nav");
-
-    $('<a/>', { 'html': 'X' })
-      .click(function () { HUD.closeHudDetails(); })
-      .appendTo("#nav");
-
-    $('<a/>', { 'html': '>' })
-      .click(function () { Action.moveNextPrev(index + 1, 1); })
-      .appendTo("#nav");
+    var nav = details.querySelector('#nav');
+    if (!nav) return;
+    [['<', function () { Action.moveNextPrev(index - 1, -1); }],
+     ['X', function () { HUD.closeHudDetails(); }],
+     ['>', function () { Action.moveNextPrev(index + 1, 1); }]
+    ].forEach(function (pair) {
+      var a = document.createElement('a');
+      a.textContent = pair[0];
+      a.addEventListener('click', pair[1]);
+      nav.appendChild(a);
+    });
 
   },
 

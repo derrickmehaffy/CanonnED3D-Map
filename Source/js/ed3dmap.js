@@ -237,11 +237,19 @@ var Ed3d = {
 
   'init': function (options) {
 
-    // Merge options with defaults Ed3d
-    var options = $.extend(Ed3d, options);
+    // Merge the caller's options into Ed3d, then read them back off Ed3d —
+    // `options` pointed at Ed3d after $.extend returned it, and `finished`
+    // below is read through that. Undefined values are skipped because
+    // $.extend skipped them, so passing { finished: undefined } cannot blank
+    // a default that something else has set.
+    Object.keys(options || {}).forEach(function (k) {
+      if (options[k] !== undefined) Ed3d[k] = options[k];
+    });
+    options = Ed3d;
 
     //-- Init 3D map container
-    $('#' + Ed3d.container).append('<div id="ed3dmap"></div>');
+    var host = document.getElementById(Ed3d.container);
+    if (host) host.insertAdjacentHTML('beforeend', '<div id="ed3dmap"></div>');
 
 
     // Dependencies are now static ES module imports in js/main.js; there is
@@ -327,9 +335,9 @@ var Ed3d = {
 
     // Create grid
 
-    Ed3d.grid1H = $.extend({}, Grid.init(100, 0x111E23, 0), {});
-    Ed3d.grid1K = $.extend({}, Grid.init(1000, 0x22323A, 1000), {});
-    Ed3d.grid1XL = $.extend({}, Grid.infos(10000, 0x22323A, 10000), {});
+    Ed3d.grid1H = Object.assign({}, Grid.init(100, 0x111E23, 0));
+    Ed3d.grid1K = Object.assign({}, Grid.init(1000, 0x22323A, 1000));
+    Ed3d.grid1XL = Object.assign({}, Grid.infos(10000, 0x22323A, 10000));
 
 
     // Add some scene enhancement
@@ -353,7 +361,7 @@ var Ed3d = {
     else if (this.jsonContainer != null) {
       Ed3d.loadDatasFromContainer();
     }
-    else if ($('.ed3d-item').length > 0) {
+    else if (document.querySelectorAll('.ed3d-item').length > 0) {
       Ed3d.loadDatasFromAttributes();
     }
     else if (this.json != null) {
@@ -510,16 +518,18 @@ var Ed3d = {
 
   'loadDatasFromFile': function () {
 
-    $.getJSON(this.jsonPath, function (data) {
-
-      Ed3d.loadDatasAsync(data);
-
-    });
+    fetch(this.jsonPath)
+      .then(function (res) { return res.json(); })
+      .then(function (data) { Ed3d.loadDatasAsync(data); })
+      .catch(function (err) {
+        console.error('Ed3d: could not load ' + Ed3d.jsonPath, err);
+      });
   },
 
   'loadDatasFromContainer': function () {
 
-    var content = $('#' + this.jsonContainer).html();
+    var holder = document.getElementById(this.jsonContainer);
+    var content = holder ? holder.innerHTML : null;
     var json = null;
 
     try {
@@ -539,9 +549,9 @@ var Ed3d = {
   'loadDatasFromAttributes': function () {
 
     var json = [];
-    $('.ed3d-item').each(function (e) {
-      var objName = $(this).html();
-      var coords = $(this).data('coords').split(",");
+    document.querySelectorAll('.ed3d-item').forEach(function (el) {
+      var objName = el.innerHTML;
+      var coords = String(el.dataset.coords || '').split(",");
       if (coords.length == 3)
         json.push({ name: objName, coords: { x: coords[0], y: coords[1], z: coords[2] } });
     });
@@ -577,7 +587,7 @@ var Ed3d = {
 
     //-- Register route waypoints so systems can be matched as they stream in
     if (data.routes != undefined) {
-      $.each(data.routes, function (key, route) {
+      data.routes.forEach(function (route, key) {
         Route.initRoute(key, route);
       });
     }
@@ -619,7 +629,7 @@ var Ed3d = {
 
         //-- All systems done – finalise routes, heatmap and camera
         if (data.routes != undefined) {
-          $.each(data.routes, function (key, route) {
+          data.routes.forEach(function (route, key) {
             Route.createRoute(key, route);
           });
         }
@@ -665,7 +675,7 @@ var Ed3d = {
 
     Loader.update('Routes...');
     if (data.routes != undefined) {
-      $.each(data.routes, function (key, route) {
+      data.routes.forEach(function (route, key) {
         Route.initRoute(key, route);
       });
     }
@@ -673,7 +683,7 @@ var Ed3d = {
     //-- Loop into systems
 
     Loader.update('Systems...');
-    $.each(list, function (key, val) {
+    list.forEach(function (val) {
 
       system = System.create(val);
       if (system != undefined) {
@@ -687,7 +697,7 @@ var Ed3d = {
 
     if (data.routes != undefined) {
 
-      $.each(data.routes, function (key, route) {
+      data.routes.forEach(function (route, key) {
         Route.createRoute(key, route);
       });
 
@@ -839,7 +849,8 @@ var Ed3d = {
     System.reset();
 
     if (data.categories !== undefined) {
-      $('#filters').empty();
+      var filtersEl = document.getElementById('filters');
+      if (filtersEl) filtersEl.innerHTML = '';
       HUD.filterGroupIds = {};
       Ed3d.catObjs = [];
     }
@@ -863,7 +874,7 @@ var Ed3d = {
 
   'addObjToCategories': function (index, catList) {
 
-    $.each(catList, function (keyArr, idCat) {
+    catList.forEach(function (idCat) {
       if (Ed3d.catObjs[idCat] != undefined)
         Ed3d.catObjs[idCat].push(index);
     });
@@ -1280,22 +1291,26 @@ var Loader = {
 
   'start': function () {
 
-    $('#loader').remove();
-    $('<div></div>')
-      .attr('id', 'loader')
-      .html(Loader.svgAnim)
-      .css('color', 'rgb(200, 110, 37)')
-      .css('font-size', '1.5rem')
-      .css('font-family', 'Helvetica')
-      .css('font-variant', 'small-caps')
-      .appendTo('#ed3dmap');
+    var old = document.getElementById('loader');
+    if (old) old.remove();
+
+    var panel = document.createElement('div');
+    panel.id = 'loader';
+    panel.innerHTML = Loader.svgAnim;
+    panel.style.color = 'rgb(200, 110, 37)';
+    panel.style.fontSize = '1.5rem';
+    panel.style.fontFamily = 'Helvetica';
+    panel.style.fontVariant = 'small-caps';
+    var stage = document.getElementById('ed3dmap');
+    if (stage) stage.appendChild(panel);
 
 
     clearInterval(this.animCount);
     this.animCount = setInterval(function () {
-      var animProgress = $('#loader #loadTimer');
-      animProgress.append('.');
-      if (animProgress.html() != undefined && animProgress.html().length > 10) animProgress.html('.');
+      var animProgress = document.querySelector('#loader #loadTimer');
+      if (!animProgress) return;
+      animProgress.appendChild(document.createTextNode('.'));
+      if (animProgress.innerHTML.length > 10) animProgress.innerHTML = '.';
     }, 1000);
 
   },
@@ -1306,7 +1321,8 @@ var Loader = {
 
   'update': function (info) {
 
-    $('#loader #loadInfos').html(info);
+    var loadInfos = document.querySelector('#loader #loadInfos');
+    if (loadInfos) loadInfos.innerHTML = info;
 
   },
 
@@ -1316,7 +1332,8 @@ var Loader = {
 
   'stop': function () {
 
-    $('#loader').remove();
+    var panel = document.getElementById('loader');
+    if (panel) panel.remove();
     clearInterval(this.animCount);
 
   },

@@ -213,15 +213,19 @@ var canonnEd3d_route = {
 				"California Sector": { name: "California Sector BA-A e6" },
 			};
 
-			// After Ed3d.init has built the filter DOM, add direct click handlers on
-			// the four reference-system items. Direct handlers fire before delegated ones
-			// in jQuery, so stopImmediatePropagation() prevents the HUD's filter-toggle
-			// handler from hiding the systems.
+			// After Ed3d.init has built the filter DOM, add click handlers directly on
+			// the four reference-system items. The HUD's filter-toggle handler is
+			// delegated from #filters, so it only hears the event on the way up —
+			// a listener on the item itself runs first, in the target phase, and
+			// stopImmediatePropagation() stops both the rest of this element's
+			// listeners and the climb to #filters. So the toggle never runs and
+			// the systems stay visible. (Under jQuery the same thing held for a
+			// different reason: it ran direct handlers before delegated ones.)
 			setTimeout(function () {
-				$('#filters .map_filter').each(function () {
-					var idCat = $(this).data('filter');
+				document.querySelectorAll('#filters .map_filter').forEach(function (el) {
+					var idCat = el.dataset.filter;
 					if (refCoords[idCat]) {
-						$(this).on('click', function (e) {
+						el.addEventListener('click', function (e) {
 							e.stopImmediatePropagation();
 							// Find the vertex index for this reference system by name
 							var target = null;

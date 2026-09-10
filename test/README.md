@@ -61,13 +61,13 @@ and before init is called.
 
 ## How it works
 
-`test/server.mjs` serves `Source/` as the web root — required, because 49 pages
-reference `/js/jquery-2.1.4.min.js` with a leading slash.
+`test/server.mjs` serves `Source/` as the web root, which is where every page
+expects `js/`, `css/`, `data/` and `vendor/` to hang off.
 
 `stubDataHosts()` in `test/helpers.mjs` intercepts every host in `DATA_HOSTS`
 and answers with `[]`, or with a shaped empty object for the two hosts whose
 loaders dereference a named property first (see `STUB_BODIES`). Asset CDNs are
-deliberately not intercepted, so three.js and jQuery load normally.
+deliberately not intercepted. three.js is vendored and served locally.
 
 **Canonn's cloud functions are billed per invocation, so the default run must
 never contact them.** If you add a new data source, add its host to

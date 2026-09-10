@@ -13,7 +13,7 @@ tooling. Anything that would need transpiling does not.
 
 | Part | Files | What it is |
 |---|---|---|
-| **The engine** | `js/ed3dmap.js`, `js/components/*.js` | Draws the galaxy: a point cloud of systems, a grid, routes, a HUD. Predates everything else. jQuery, classic scripts, module-scope globals. See [ED3D-ENGINE.md](ED3D-ENGINE.md). |
+| **The engine** | `js/ed3dmap.js`, `js/components/*.js` | Draws the galaxy: a point cloud of systems, a grid, routes, a HUD. Predates everything else — classic scripts, module-scope globals referenced as bare identifiers. Written on jQuery, off it now. See [ED3D-ENGINE.md](ED3D-ENGINE.md). |
 | **The console** | `js/console.js` | The chrome around the engine on every map page — rail, panels, system card, command palette, saved views. One file, generic across all 37 pages. |
 | **The orrery** | `js/orrery.js`, `js/orrery-surface.js`, `js/orrery-sky.js` | One system's bodies on their real orbits. An ES module, and the only part written after the rest. See [ORRERY.md](ORRERY.md). |
 
@@ -23,7 +23,6 @@ A map page is a thin shell. `gr-data.html` is representative:
 
 ```html
 <!-- classic, so they run first and in this order -->
-<script src="js/jquery-2.1.4.min.js"></script>       <!-- the engine needs it -->
 <script src="vendor/papaparse/papaparse.min.js"></script>
 <script src="js/canonn-palette.js"></script>          <!-- category colours -->
 <script src="js/canonn-api.js"></script>              <!-- one host, one place -->

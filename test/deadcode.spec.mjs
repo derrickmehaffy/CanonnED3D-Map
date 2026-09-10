@@ -338,3 +338,42 @@ test('no data loader declares something nothing calls', () => {
   }
   expect(dead.sort()).toEqual([]);
 });
+
+test('no page loads jQuery, and nothing reaches for the global', () => {
+  /* The engine was written on jQuery and 36 pages carried the tag. The engine,
+     the HUD and eight loaders are off it now, so the tag is gone and the
+     library is not parsed on any page — about 84KB that no longer has to be
+     fetched, parsed and kept before the map can draw.
+
+     Two things this checks. The tag, because a copied page header is how it
+     would come back. And the global, because a `$(...)` added to a file that
+     no longer loads jQuery is a ReferenceError at the point it runs, which on
+     a data loader means a blank map.
+
+     `Source/prototype/` still loads it for its own copy of the console and is
+     deliberately out of scope — it is an orphan snapshot, listed as one in
+     docs/ARCHITECTURE.md, and nothing links to it. Which is why this reads
+     `Source/*.html` and not the tree. */
+  const loading = pages.filter((p) => /jquery/i.test(read(p)));
+  expect(loading).toEqual([]);
+
+  /* console.js and orrery.js each define a local `$` — getElementById and a
+     panel-scoped querySelector — so the bare name is not proof of jQuery. A
+     file that defines its own is skipped, and comments do not count. */
+  const users = [];
+  for (const dir of ['js', 'js/components', 'data']) {
+    for (const f of readdirSync(join(SRC, dir)).filter((n) => n.endsWith('.js'))) {
+      if (f.includes('jquery')) continue;
+      const src = read(dir + '/' + f);
+      if (/(?:function|const|let|var)\s+\$\s*[=(]/.test(src)) continue;
+      const code = src
+        .split('\n')
+        .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
+        .join('\n');
+      if (/(?:^|[^\w$.])\$\s*\(|\bjQuery\s*\(|(?:^|[^\w$.])\$\.[a-zA-Z]/.test(code)) {
+        users.push(dir + '/' + f);
+      }
+    }
+  }
+  expect(users).toEqual([]);
+});
