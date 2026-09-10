@@ -25,11 +25,11 @@
   'use strict';
 
   function $(id) { return document.getElementById(id); }
-  function esc(s) {
-    return String(s == null ? '' : s)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
+  /* Shared with the orrery through canonn-fmt.js. There used to be two `esc`
+     declarations in this file, in this scope, and the later silently replaced
+     the earlier — they disagreed about null, and the one that lost was the
+     one that handled it. */
+  var esc = CanonnFmt.esc;
 
   /* ── boot screen ────────────────────────────────────────────────────────
      The R&D animated logo from the landing page, reused as the loader.
@@ -118,11 +118,6 @@
 
     return { mount: mount, say: say, dismiss: dismiss };
   })();
-  function esc(s) {
-    return String(s).replace(/[&<>"]/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
-    });
-  }
   function col(i) { return PALETTE[i % PALETTE.length]; }
 
   /* ── build Ed3d's data structure from the prepared snapshot ───────────── */
@@ -1837,7 +1832,7 @@
     };
   })();
 
-  function num(v, dp) { return v.toFixed(dp).replace(/\.?0+$/, '') || '0'; }
+  var num = CanonnFmt.num;
 
   /* How big to draw the disc. Radius in solar radii, on a flattened curve so a
      red dwarf still reads as a dot and a blue giant does not fill the card. */

@@ -4022,10 +4022,10 @@ const Orrery = (function () {
   const list = (a) => a.length < 2 ? (a[0] || '')
     : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
 
-  const esc = (s) => String(s).replace(/[&<>"]/g, (c) =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  // Shared with the console through canonn-fmt.js.
+  const esc = CanonnFmt.esc;
 
-  function num(v, dp) { return v.toFixed(dp).replace(/\.?0+$/, '') || '0'; }
+  const num = CanonnFmt.num;
   /** "1 year", not "1 years" — Testholm 1 orbits in exactly one. */
   function qty(v, dp, unit) {
     const t = num(v, dp);

@@ -186,3 +186,41 @@ test('no page still loads axios', async () => {
   const offenders = pages.filter((p) => read(p).includes('/axios/'));
   expect(offenders).toEqual([]);
 });
+
+test('the shared formatters load before whatever uses them', () => {
+  /* esc and num lived in both console.js and orrery.js, and console.js had two
+     esc declarations in one scope, the later of which silently replaced the
+     earlier. They disagreed about null — one gave "", the other the literal
+     text "null" — and the one that lost was the one that handled it. They are
+     in canonn-fmt.js now, read as a global because console.js is a classic
+     script and cannot import.
+
+     A missing tag is therefore a ReferenceError at load that takes the whole
+     console with it, exactly as a missing canonn-api.js tag once did on the
+     two pages whose smoke tests happened to be skipped.
+
+     Tags, not file text, and classic scripts only — the same two lessons the
+     canonn-api.js check above already carries. The first pass at this reported
+     orrery.html and voyager.html, and both were innocent: it was matching an
+     import map and a comment. */
+  const USERS = /js\/console\.js|js\/orrery\.js/;
+  const bad = [];
+
+  for (const f of pages) {
+    const scripts = [...read(f).matchAll(/<script\b([^>]*)>/gi)]
+      .map((m) => m[1])
+      .filter((attrs) => /\bsrc\s*=/.test(attrs))
+      .map((attrs) => ({
+        src: (attrs.match(/\bsrc\s*=\s*["']([^"']+)["']/) || [])[1] || '',
+        later: /\bdefer\b|\basync\b|type\s*=\s*["']module["']/i.test(attrs)
+      }));
+
+    if (!scripts.some((t) => USERS.test(t.src))) continue;
+    const fmt = scripts.findIndex((t) => t.src.includes('js/canonn-fmt.js'));
+    if (fmt < 0) { bad.push(f + ' uses the formatters and never loads them'); continue; }
+    expect(scripts[fmt].later, f + ': canonn-fmt.js must run in document order').toBe(false);
+    const early = scripts.findIndex((t, i) => i < fmt && !t.later && USERS.test(t.src));
+    if (early >= 0) bad.push(f + ': ' + scripts[early].src + ' runs before the formatters');
+  }
+  expect(bad).toEqual([]);
+});
