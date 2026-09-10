@@ -680,7 +680,7 @@
     updateShown();
     if (panel === 'layers' || panel === 'systems') renderPanel();
     feedNow();
-    applyMapBloom();
+    applyMapLight();
     tryWanted();
   }
 
@@ -1145,9 +1145,35 @@
      So the answer follows the data, and stops the moment the reader has one
      of their own: recall() rather than recallNum(), because a stored zero is
      a decision and a missing key is not. */
-  function applyMapBloom() {
-    if (!window.PostFX || recall('bloom') !== null) return;
-    if (SYSLIST().length) PostFX.setBloom(defaultBloom());
+  /* How big a star should be drawn on a map this crowded.
+
+     Reported as bloom at zero still being too bright, over a screenshot of a
+     white-hot map with the bloom slider at the bottom. Measured, bloom is
+     neither the cause nor the cure: turning it off takes the halo and leaves
+     the core. The point sprites blend additively, so at real screen density
+     hundreds of them land on the same pixel and sum far past white. Exposure
+     barely moves it, turning the HDR path off is worse — ACES was the only
+     thing holding it together — and material opacity cannot outrun a sum that
+     large.
+
+     What works is fewer of them overlapping, which is the System size control
+     that was on screen the whole time and reads as a preference rather than as
+     the fix for a glare nobody expected to have to fix. So a crowded map picks
+     a size to suit itself, exactly as it already picks its own bloom, and a
+     reader who has set one is left alone. */
+  function defaultSize() {
+    var n = (typeof SYSLIST === 'function' ? SYSLIST() : []).length;
+    if (!n) return 20;
+    return n <= 1500 ? 20 : n <= 6000 ? 14 : 10;
+  }
+
+  function applyMapLight() {
+    if (SYSLIST().length === 0) return;
+    if (window.PostFX && recall('bloom') === null) PostFX.setBloom(defaultBloom());
+    if (recall('sysSize') === null) {
+      var want = defaultSize();
+      if (want !== sysSize) { sysSize = want; applyDisplay(); syncDisplay(); }
+    }
   }
 
   function applyDisplay() {
@@ -2439,7 +2465,7 @@
       if (window.PostFX) {
         PostFX.setExposure(recallNum('exposure', PostFX.exposure));
         // A stored setting applies now; the map's own answer waits for the
-        // map, and arrives through applyMapBloom when the systems do.
+        // map, and arrives through applyMapLight when the systems do.
         PostFX.setBloom(recallNum('bloom', defaultBloom()));
         if (disp.hdr) PostFX.enable();
       }

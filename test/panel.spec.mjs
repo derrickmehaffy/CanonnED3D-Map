@@ -237,3 +237,40 @@ test('a reader who sets bloom is not overruled by the map', async ({ page }) => 
   await expect(page.locator('#side .layer').first()).toBeVisible({ timeout: 60_000 });
   await expect.poll(() => bloom(page), { timeout: 20_000 }).toBe(0);
 });
+
+/* ── stars sized to the crowd ───────────────────────────────────────────── */
+
+/* The reader-facing number, not System.scaleSize — the engine rewrites that
+   for its own flare scaling and it reads 400 whatever the control says. */
+const size = (page) => page.locator('#sizerange').inputValue().then(Number);
+
+test('a crowded map starts with smaller stars', async ({ page }) => {
+  /* Reported as "bloom zero is still a bit bright", with a screenshot of the
+     bloom slider at zero over a white-hot map. Measured, bloom was not the
+     cause and turning it off is not the cure: the halo goes, the core does
+     not. The point sprites blend additively, so at real screen density
+     hundreds of them land on the same pixel and sum far past white — exposure
+     barely touches it, turning the HDR path off is worse, and material
+     opacity cannot outrun a sum that large.
+
+     What does work is having fewer of them overlap, which is the System size
+     control that was on screen the whole time. So a crowded map picks a size
+     that suits it, the way it already picks its own bloom. */
+  await withSystems(page, 8000);
+  await page.locator('.rail button[data-p="display"]').click();
+  await expect.poll(() => size(page), { timeout: 20_000 }).toBeLessThan(20);
+});
+
+test('a sparse map is left at the size it always had', async ({ page }) => {
+  await withSystems(page, 300);
+  await page.locator('.rail button[data-p="display"]').click();
+  await expect.poll(() => size(page), { timeout: 20_000 }).toBe(20);
+});
+
+test('a reader who sets a size is not overruled by the map', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('canonn.console.sysSize', '44'));
+  await withSystems(page, 8000);
+  await page.waitForTimeout(1200);
+  await page.locator('.rail button[data-p="display"]').click();
+  expect(await size(page)).toBe(44);
+});
