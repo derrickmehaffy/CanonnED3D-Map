@@ -1734,24 +1734,47 @@ test('a paused orrery stops drawing', async ({ page }) => {
     let n = 0;
     const real = gl.drawElements.bind(gl);
     gl.drawElements = function () { n++; return real.apply(gl, arguments); };
-    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    /* Each window runs for a number of animation frames rather than for a
+       number of milliseconds, and reports how long that took.
+
+       A fixed window of wall clock says nothing on a machine running four
+       browsers at once: requestAnimationFrame gets starved to a handful of
+       ticks, and "no draws in 1.2 seconds" is then a fact about the load
+       rather than about the throttle — which is how this test failed
+       intermittently for months while passing every time in isolation. A
+       window counted in frames stretches to fit a slow machine instead of
+       lying about it. The cap is there so a page that has stopped rendering
+       altogether fails rather than hangs. */
+    const over = (frames, capMs) => new Promise((done) => {
+      const t0 = performance.now();
+      let seen = 0;
+      n = 0;
+      const step = () => {
+        seen++;
+        const ms = performance.now() - t0;
+        if (seen >= frames || ms > capMs) return done({ draws: n, ms, frames: seen });
+        requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    });
+
     const play = document.querySelector('#orr-play');
     play.click();                                   // pause
-    await wait(600);                                // let the camera settle
-    n = 0;
-    await wait(1200);
-    const paused = n;
-    n = 0;
+    await new Promise((r) => setTimeout(r, 600));   // let the camera settle
+    const paused = await over(90, 8000);
     play.click();                                   // and run again
-    await wait(1200);
-    return { paused, playing: n };
+    const playing = await over(90, 8000);
+    return { paused, playing };
   });
 
   /* It was rendering an identical frame sixty times a second for as long as
      the page was open. Not none, because a star's surface goes on boiling
      when the orbits are stopped — but a tenth of the rate, which is what a
      slow boil needs and a sixth of the work. */
-  expect(calls.paused, 'draw calls while paused and still').toBeGreaterThan(0);
+  const seen = ' — ' + JSON.stringify(calls);
+  expect(calls.paused.draws, 'draw calls while paused and still' + seen)
+    .toBeGreaterThan(0);
   /* The claim is the throttle: paused, it draws ten frames a second and no
      more. Three bodies is three draw calls a frame, so twelve seconds' worth
      is the ceiling over 1.2 s. Comparing against the running rate instead
@@ -1761,8 +1784,13 @@ test('a paused orrery stops drawing', async ({ page }) => {
      draws, met on the next animation frame after it, and a settling camera
      can add a draw or two at the start of the window. Fifteen is still a
      quarter of the sixty this guards against. */
-  expect(calls.paused / 3 / 1.2, 'paused frames per second').toBeLessThanOrEqual(15);
-  expect(calls.playing, 'running draws at least as often as paused').toBeGreaterThanOrEqual(calls.paused);
+  expect(calls.paused.draws / 3 / (calls.paused.ms / 1000),
+    'paused frames per second' + seen).toBeLessThanOrEqual(15);
+  /* Per frame rather than per window, since the two windows no longer take
+     the same time: running, every frame draws; paused, about one in six does. */
+  expect(calls.playing.draws / calls.playing.frames,
+    'running draws on more frames than paused' + seen)
+    .toBeGreaterThanOrEqual(calls.paused.draws / calls.paused.frames);
 });
 
 test('turning the view is not the same as picking something', async ({ page }) => {
@@ -2683,6 +2711,15 @@ test('a black hole is a shadow with a ring, not a glowing ball', async ({ page }
     (window.Orrery.state().holes.filter((h) => h.name === 'Annihilator B')[0] || {})
       .screen.shadowPx || 0);
   await expect.poll(wide, { timeout: 20_000 }).toBeGreaterThan(10);
+  /* And let the camera finish arriving before touching the wheel.
+
+     Choosing a body flies over to it, and a wheel event cancels that flight
+     because the reader is steering — so zooming out too early stops the
+     camera partway with the hole still off to one side, and eight shadow
+     radii around an off-centre hole runs off the edge of the frame. Every
+     band then reads zero, which looks like a black sky rather than like a
+     measurement taken of nothing. */
+  await settled(page);
 
   /* And then back off until eight shadow radii — the span these bands are
      measured across, out past the lens and into ordinary sky — fits on the
@@ -2699,7 +2736,16 @@ test('a black hole is a shadow with a ring, not a glowing ball', async ({ page }
   await settled(page);
   await page.waitForTimeout(1200);
 
-  const profile = await page.evaluate(() => {
+  /* The sky has to have been baked before any of this means anything.
+
+     Orrery.pixels renders its own frame, so it never reads a stale buffer —
+     but it can read a sky target that nothing has evaluated yet, which comes
+     back pure black, and then every band of the profile is zero and the
+     comparison is between nothing and nothing. On a loaded machine the bake
+     is simply later. Waiting for a sky that is actually lit is the
+     precondition of the measurement, not a sleep: if it never lights, this
+     fails on the timeout with the profile in hand. */
+  const measure = () => page.evaluate(() => {
     const at = window.Orrery.state().holes
       .filter((h) => h.name === 'Annihilator B')[0].screen;
     // Out to eight shadow radii, which reaches past the lens and into the
@@ -2732,6 +2778,10 @@ test('a black hole is a shadow with a ring, not a glowing ball', async ({ page }
     for (let r = 1.0; r < 3.2; r += 0.2) out.steps.push(band(r, r + 0.2));
     return out;
   });
+
+  await expect.poll(async () => (await measure()).sky > 0,
+    { timeout: 30_000, message: 'the sky is baked and lit' }).toBe(true);
+  const profile = await measure();
 
   const seen = ' — ' + JSON.stringify(profile);
   expect(profile.shadowPx, 'a shadow big enough to measure').toBeGreaterThan(4);
