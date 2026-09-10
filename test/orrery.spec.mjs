@@ -3468,3 +3468,49 @@ test('the close button is hittable, and only there when it can close something',
   expect(box.width, 'wide enough to hit').toBeGreaterThanOrEqual(24);
   expect(box.height, 'tall enough to hit').toBeGreaterThanOrEqual(24);
 });
+
+/* The speed shortcuts, and the guard that decides whether a key is a shortcut
+   or a character. `typing()` used to ask whether an <input> had focus, which
+   the speed slider is — so touching the slider killed the comma and full stop
+   that drive the very same control, silently, until you clicked away. */
+test('the speed keys survive touching the speed slider', async ({ page }) => {
+  await openOrrery(page);
+
+  const rate = () => page.evaluate(() => ({
+    slider: document.querySelector('#orr-speed').value,
+    focus: document.activeElement ? document.activeElement.id || document.activeElement.tagName : null
+  }));
+
+  // With focus nowhere in particular.
+  const rest = await rate();
+  await page.keyboard.press('Period');
+  expect((await rate()).slider, 'full stop should step the ladder up').not.toBe(rest.slider);
+  await page.keyboard.press('Comma');
+  expect((await rate()).slider, 'comma should step it back').toBe(rest.slider);
+
+  // And with the slider itself focused, which is where this broke.
+  await page.locator('#orr-speed').click();
+  const held = await rate();
+  expect(held.focus).toBe('orr-speed');
+  await page.keyboard.press('Period');
+  const stepped = await rate();
+  expect(stepped.slider, 'the slider holding focus must not eat the shortcut').not.toBe(held.slider);
+  expect(stepped.focus, 'and it should still have focus').toBe('orr-speed');
+});
+
+test('a comma typed into a text field is a comma, not a shortcut', async ({ page }) => {
+  /* The other half of the same guard: narrowing it to controls that actually
+     consume characters must not stop a real text field consuming them.
+     #orr-filter is the body-list filter, which is on screen over a map. */
+  await openOrrery(page);
+
+  const before = await page.evaluate(() => document.querySelector('#orr-speed').value);
+  await page.locator('#orr-filter').click();
+  await page.keyboard.type('Col 285,');
+
+  expect(await page.evaluate(() => document.querySelector('#orr-filter').value)).toBe('Col 285,');
+  expect(
+    await page.evaluate(() => document.querySelector('#orr-speed').value),
+    'a text field still owns its characters'
+  ).toBe(before);
+});

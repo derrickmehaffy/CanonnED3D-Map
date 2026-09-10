@@ -2499,10 +2499,25 @@ const Orrery = (function () {
 
   /* Is the reader writing rather than driving? A text field, or anything the
      page has made editable, owns its own keys. Escape is deliberately outside
-     this: it means "get me out of here" wherever the focus is. */
+     this: it means "get me out of here" wherever the focus is.
+
+     "INPUT" is too broad, and was: the speed slider is an <input type="range">,
+     so from the moment a reader touched it the comma and full stop that drive
+     the very same control went dead, silently, until they clicked elsewhere.
+     A range takes arrow keys, not characters — nothing is being typed into it.
+     So the question is not whether an input has focus but whether it consumes
+     what was pressed. */
+  const TYPED_INTO = /^(?:text|search|email|url|tel|password|number|date|datetime-local|month|week|time)$/;
+
   function typing() {
     const on = document.activeElement;
-    return !!on && (/^(INPUT|TEXTAREA|SELECT)$/.test(on.tagName) || on.isContentEditable);
+    if (!on) return false;
+    if (on.isContentEditable) return true;
+    const tag = on.tagName;
+    if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    if (tag !== 'INPUT') return false;
+    // An <input> with no type is a text field.
+    return TYPED_INTO.test(String(on.type || 'text').toLowerCase());
   }
 
   function onKey(e) {
