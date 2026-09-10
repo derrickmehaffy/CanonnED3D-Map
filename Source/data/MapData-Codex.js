@@ -43,9 +43,8 @@ const colours = [
 
 
 const API_ENDPOINT = window.CanonnAPI.query('codex')
-function getURLParameter(name) {
-	return decodeURIComponent((new RegExp('[?|&]' + name + '=' + '([^&;]+?)(&|#|;|$)').exec(location.search) || [null, ''])[1].replace(/\+/g, '%20')) || null;
-}
+// One shared implementation lives in js/canonn-filters.js.
+const getURLParameter = CanonnFilters.param;
 let urlParams = {
 	sub_class: "",
 	hud_category: "",
@@ -172,99 +171,13 @@ const loadFromDumps = async () => {
 	}
 };
 
-function sortObj(obj) {
-	return Object.keys(obj).sort().reduce(function (result, key) {
-		result[key] = (/boolean|number|string/).test(typeof obj[key]) || !obj[key] ? obj[key] : sortObj(obj[key]);
-		return result;
-	}, {});
-}
 
 const buildDropdownFilter = async (site_type_data) => {
-
-	let hierarchy_data = site_type_data.data;
-	//console.log("hierarchy_data: ", hierarchy_data)
-
 	for (let p in urlParams) {
 		let v = getURLParameter(p)
 		if (v) urlParams[p] = v;
 	}
-	//main select for hud_category
-	let hudmenu = $(`<select name="hud_category" id="select_hud_category" class="filter_dropdown"><option value="">-- Science --</option>`).detach()
-	let submenu = $(`<select name="sub_class" id="select_sub_class" class="filter_dropdown"><option value="">-- Class --</option>`).detach()
-	let namemenu = $(`<select name="english_name" id="select_english_name" class="filter_dropdown"><option value="">-- Name --</option>`).detach()
-
-	sortObj(hierarchy_data)
-
-	for (let hud_category in hierarchy_data) {
-		if (urlParams.hud_category && urlParams.hud_category != hud_category) continue
-
-		//build select for sub_class
-		let sub_found = false;
-		for (let sub_class in hierarchy_data[hud_category]) {
-			if (urlParams.sub_class && urlParams.sub_class != sub_class) continue
-
-			//build select for english_name
-			let name_found = false;
-			let last_english_short = "";
-			for (let english_name in hierarchy_data[hud_category][sub_class]) {
-				if (urlParams.english_name && english_name.indexOf(urlParams.english_name) < 0) continue
-
-				if (urlParams.platform
-					&& hierarchy_data[hud_category][sub_class][english_name].platform != urlParams.platform)
-					continue
-
-				english_short = english_name.split(' - ')[0]
-				if (english_short == last_english_short) continue
-				last_english_short = english_short
-
-				nameitem = $(`<option value="${english_short}">${english_short}</option>`)
-				namemenu.append(nameitem)
-				name_found = true;
-			}
-			//hide sub_class if sublevel urlParams.english_name was set and not found
-			if (name_found) {
-				subitem = $(`<option value="${sub_class}">${sub_class}</option>`)
-				submenu.append(subitem)
-				sub_found = true;
-			} else {
-				//console.log("no name found for sub_class: ", sub_class)
-			}
-		}
-		//hide hud_category option if sublevel urlParams.sub_class or english_name was set and not found
-		if (sub_found) {
-			let huditem = $(`<option value="${hud_category}">${hud_category}</option>`);
-			hudmenu.append(huditem)
-		} else {
-			//console.log("no sub_class (with name) found for hud_category: ", hud_category)
-		}
-	}
-	let filters_form = $(`<form id="filters_form" action="" method="get">`).detach()
-	//separate bio/geo links in nav.html
-	filters_form.append(hudmenu)
-	filters_form.append(submenu)
-	let checked = ""
-	if (urlParams['platform'] == "odyssey")
-		checked = ` checked="checked"`
-	filters_form.append(`<span class="checkbox"><label for="filters_check_legacy">Odyssey only<input type="checkbox" id="filters_check_legacy" name="platform" value="odyssey"${checked}><span class="fakebox"></span></label></span>`)
-	filters_form.append(namemenu)
-	//reflect selected choice in dropdowns
-	for (let p in urlParams) {
-		if (p == "platform") continue
-		if (urlParams[p]) $(`#select_${p} option[value='${urlParams[p]}']`, filters_form).attr('selected', 'selected')
-	}
-
-	//changing a dropdown will refresh page with new parameters
-	$('select', filters_form).on('change', () => { filters_form.submit() })
-	$('.checkbox input', filters_form).on('change', () => { filters_form.submit() })
-
-	$('#filters').prepend(filters_form);
-	$('#filters h2').css('cursor', 'pointer').on('click', toggleFilterHeader)
-}
-
-toggleFilterHeader = (event) => {
-	let filters = $(event.target).next('div')
-	filters.toggle()
-	$('a', filters).trigger('click')
+	CanonnFilters.build(site_type_data.data, urlParams);
 }
 
 const recenterViewport = (center, distance) => {

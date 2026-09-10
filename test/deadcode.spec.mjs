@@ -270,3 +270,31 @@ test('nothing fetches EDSM', async () => {
   }
   expect(fetching).toEqual([]);
 });
+
+test('a loader that needs the filter dropdowns loads them', () => {
+  /* Same shape of trap as the formatters above, and the same cost: the three
+     loaders that build the Science/Class/Name dropdowns read `CanonnFilters`
+     as a global, so a missing tag is a ReferenceError that takes the page's
+     data with it. The check is driven off the loader each page actually
+     includes rather than a hardcoded list, so a fourth map picking up the
+     dropdowns is covered the day it is written. */
+  const bad = [];
+  const needs = readdirSync(join(SRC, 'data'))
+    .filter((n) => n.endsWith('.js'))
+    .filter((n) => /\bCanonnFilters\./.test(read('data/' + n)));
+
+  expect(needs.length, 'no loader uses CanonnFilters — has it been renamed?').toBeGreaterThan(0);
+
+  for (const f of pages) {
+    const src = read(f);
+    if (!needs.some((n) => src.includes('data/' + n))) continue;
+    const tag = [...src.matchAll(/<script\b([^>]*)>/gi)]
+      .map((m) => m[1])
+      .find((attrs) => /js\/canonn-filters\.js/.test(attrs));
+    if (!tag) { bad.push(f + ' loads a filter-dropdown map and never loads canonn-filters.js'); continue; }
+    if (/\bdefer\b|\basync\b|type\s*=\s*["']module["']/i.test(tag)) {
+      bad.push(f + ': canonn-filters.js must run in document order');
+    }
+  }
+  expect(bad).toEqual([]);
+});
