@@ -587,3 +587,66 @@ test('two journals at once are two routes, in two colours', async ({ page }) => 
   expect(lines).toHaveLength(2);
   expect(new Set(lines).size, 'two routes, two colours').toBe(2);
 });
+
+test('a journal layer can be switched off and on again', async ({ page }) => {
+  /* Reported: "for the journals, I can't toggle them on/off." The rows look
+     exactly like the layer rows in the layers panel — a swatch, a name, a
+     count — and did nothing at all when clicked. */
+  await onMap(page);
+  await page.locator(rail('routes')).click();
+  await page.locator('#fileinput').setInputFiles([await journal('journal-with-route.log')]);
+
+  const row = page.locator('#side .layer[data-jr]', { hasText: 'journal-with-route' });
+  await expect(row).toBeVisible({ timeout: 20_000 });
+  await expect(row).toHaveClass(/on/);
+
+  const lineOn = () => page.evaluate(() => {
+    let v = null;
+    window.scene.traverse((o) => {
+      if (o.name && o.name.indexOf('route-journal-') === 0 && o.isLine2) v = o.visible;
+    });
+    return v;
+  });
+  const pointsOn = () => page.evaluate(() => System.points
+    .filter((p) => p && /journal-with-route/.test(p.infos || ''))
+    .every((p) => p.filtered !== false));
+
+  expect(await lineOn()).toBe(true);
+  expect(await pointsOn()).toBe(true);
+
+  await row.click();
+  await expect(row).not.toHaveClass(/on/);
+  await expect.poll(lineOn, { timeout: 10_000 }).toBe(false);
+  expect(await pointsOn()).toBe(false);
+
+  await row.click();
+  await expect(row).toHaveClass(/on/);
+  await expect.poll(lineOn, { timeout: 10_000 }).toBe(true);
+  expect(await pointsOn()).toBe(true);
+});
+
+test('a system from a journal opens its card like any other', async ({ page }) => {
+  /* Reported: "when I click on systems loaded from the journal the system data
+     isn't fetched in the right box based on my selection either."
+
+     The watcher that opens the card looked the clicked point up in SYSLIST and
+     gave up when it was not there — and a journal's systems are never there,
+     because they carry no category and SYSLIST drops uncategorised points to
+     keep Ed3d's reference star out of the totals. */
+  await onMap(page);
+  await page.locator(rail('routes')).click();
+  await page.locator('#fileinput').setInputFiles([await journal('journal-with-route.log')]);
+  await expect(page.locator('#side .layer[data-jr]')).toBeVisible({ timeout: 20_000 });
+
+  // Click one of the journal's own systems in the map, the engine's own way.
+  const name = await page.evaluate(() => {
+    const p = System.points.find((q) => q && /journal-with-route/.test(q.infos || ''));
+    const i = System.points.indexOf(p);
+    Action.oldSel = null; Action.moveToObj(i, p);
+    return p.name;
+  });
+
+  await expect(page.locator('#card .c-h')).toContainText(name, { timeout: 20_000 });
+  // And it says where it came from, rather than claiming to be map data.
+  await expect(page.locator('#card')).toContainText(/journal-with-route/);
+});

@@ -839,8 +839,10 @@
       (joinDots ? ' checked' : '') + '> Join the jumps in the order they happened</label>';
     if (extraRoutes.length) {
       h += '<div style="margin-top:12px">';
-      extraRoutes.forEach(function (r) {
-        h += '<div class="layer"><span class="sw" style="background:' +
+      extraRoutes.forEach(function (r, i) {
+        h += '<div class="layer' + (r.on ? ' on' : '') + '" data-jr="' + i + '">' +
+          '<span class="sw" style="background:' +
+          (r.on ? hex(r.colour) : 'transparent') + ';border:1px solid ' +
           hex(r.colour) + '"></span>' +
           '<span class="nm">' + esc(r.name) + '</span><span class="ct">' + r.count + '</span></div>';
       });
@@ -960,6 +962,8 @@
       renderPanel(); updateShown();
       return;
     }
+    var jr = e.target.closest('.layer[data-jr]');
+    if (jr) { setJournalOn(+jr.dataset.jr, !extraRoutes[+jr.dataset.jr].on); return; }
     var srow = e.target.closest('.sysrow[data-sys]');
     if (srow) {
       var name = srow.dataset.sys;
@@ -1336,12 +1340,44 @@
      does both here, because these points carry their coordinates with them. */
   var journeySeq = 0;
   function drawJourney(jumps, colour) {
-    if (typeof Route === 'undefined' || !Route.createRoute || jumps.length < 2) return;
+    if (typeof Route === 'undefined' || !Route.createRoute || jumps.length < 2) return null;
     var route = { points: jumps, color: colour, circle: true };
     var id = 'journal-' + (journeySeq++);
     Route.initRoute(id, route);
     Route.createRoute(id, route);
     if (Route.resize) Route.resize();
+    return 'route-' + id;
+  }
+
+  /* A dropped journal is a layer, and behaves like one.
+
+     Its rows carry a swatch, a name and a count, exactly like the rows in the
+     layers panel — and did nothing at all when clicked, which is what
+     "I can't toggle them on/off" means. They cannot borrow the category
+     machinery, because that works by clicking Ed3d's own HUD filter element
+     and a journal has none, so this drives the same two things by hand: the
+     points, through the visibility attribute the layer toggles already use,
+     and the line, which is a scene object with a name. */
+  function setJournalOn(i, on) {
+    var r = extraRoutes[i];
+    if (!r) return;
+    r.on = on;
+    (r.names || []).forEach(function (nm) {
+      var n = window.System && System.nameIndex ? System.nameIndex[nm] : undefined;
+      var pt = n === undefined ? null : System.points && System.points[n];
+      if (!pt) return;
+      pt.filtered = on;
+      if (System.setColor && window.THREE) {
+        System.setColor(n, on ? pt.color : new THREE.Color(0x111111));
+      }
+    });
+    if (window.System && System.applyVisibility) System.applyVisibility(true);
+    [r.routeId, r.routeId + '-first', r.routeId + '-last'].forEach(function (nm) {
+      var o = nm && typeof scene !== 'undefined' && scene.getObjectByName(nm);
+      if (o) o.visible = on;
+    });
+    renderPanel();
+    updateShown();
   }
 
   function handleFiles(files) {
@@ -1384,8 +1420,15 @@
         if (got.systems.length) {
           var colour = ROUTE_COLOURS[extraRoutes.length % ROUTE_COLOURS.length];
           Ed3d.addBatch({ systems: got.systems });
-          extraRoutes.push({ name: f.name, count: got.systems.length, colour: colour });
-          if (joinDots) drawJourney(got.jumps, colour);
+          /* The names, not the indices. addBatch works through its systems in
+             chunks on a timer, so nothing has been created yet when this
+             line runs and every index would have come back undefined —
+             which is why the first cut of the toggle switched nothing off.
+             Looked up when the row is actually clicked instead. */
+          var mine = got.systems.map(function (sy) { return sy.name; });
+          var line = joinDots ? drawJourney(got.jumps, colour) : null;
+          extraRoutes.push({ name: f.name, count: got.systems.length,
+            colour: colour, on: true, names: mine, routeId: line });
           plotted++;
         } else if (got.journal) { quiet.push(f.name); } else { alien.push(f.name); }
         finish();
@@ -1435,7 +1478,17 @@
     if (sel && sel.n === p.name) return;
     var rec = null;
     for (var i = 0; i < SYSLIST().length; i++) if (SYSLIST()[i].n === p.name) { rec = SYSLIST()[i]; break; }
-    if (!rec) return;
+    /* A point SYSLIST does not carry is still a system somebody just clicked.
+       Journal systems are never in it — they have no category, and SYSLIST
+       drops uncategorised points to keep Ed3d's reference star out of the
+       totals — so clicking one opened nothing at all. Built from the point
+       itself, which holds everything the card actually reads. */
+    if (!rec) {
+      var at = Action && Action.oldSel;
+      rec = { n: p.name, x: p.x, y: p.y, z: -p.z, entries: 1,
+              idx: typeof at === 'number' ? at : -1,
+              s: [[0, p.infos || '', p.url || '', typeof at === 'number' ? at : -1]] };
+    }
     sel = rec; cardType = null; renderCard();
     if (CFG.templates) showTemplate(catName(rec.s[0][0]));
   }, 200);
