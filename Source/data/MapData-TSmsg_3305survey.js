@@ -2,27 +2,41 @@ const API_ENDPOINT = `https://api.canonn.tech`;
 const EDSM_ENDPOINT = `https://www.edsm.net/api-v1`;
 const API_LIMIT = 1000;
 
-const capi = axios.create({
-    baseURL: API_ENDPOINT,
-    headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-    },
-});
+const capi = async function ({ url, method }) {
+    /* Was an axios instance. fetch keeps the two things that one did for us:
+       a base URL to join onto, and rejecting rather than resolving when the
+       server answers with a 4xx or a 5xx — fetch resolves on both, so an
+       error page would otherwise arrive here as if it were data.
+    
+       The shape of the call and of the reply are unchanged, so every caller
+       below still passes { url, method } and still reads .data. */
+    const res = await fetch(API_ENDPOINT + url, {
+    	method: (method || 'get').toUpperCase(),
+    	headers: { 'Accept': 'application/json' }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' from ' + url);
+    return { data: await res.json() };
+};
 
 let sites = {
     tssites: [],
 };
 
-const edsmapi = axios.create({
-    baseURL: EDSM_ENDPOINT,
-    headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-    },
-})
-
-const go = async types => {
+const edsmapi = async function ({ url, method }) {
+    /* Was an axios instance. fetch keeps the two things that one did for us:
+       a base URL to join onto, and rejecting rather than resolving when the
+       server answers with a 4xx or a 5xx — fetch resolves on both, so an
+       error page would otherwise arrive here as if it were data.
+    
+       The shape of the call and of the reply are unchanged, so every caller
+       below still passes { url, method } and still reads .data. */
+    const res = await fetch(EDSM_ENDPOINT + url, {
+    	method: (method || 'get').toUpperCase(),
+    	headers: { 'Accept': 'application/json' }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' from ' + url);
+    return { data: await res.json() };
+};const go = async types => {
     const keys = Object.keys(types);
     return (await Promise.all(
         keys.map(type => getSites(type))

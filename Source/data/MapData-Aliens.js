@@ -16,15 +16,15 @@ var canonnEd3d_aliens = {
 	systemsData: {
 		categories: {
 			"Guardians": {
-				"401": { name: "Guardian Ruins",      color: "4488FF" },
-				"501": { name: "Guardian Structures", color: "0055CC" },
-				"601": { name: "Guardian Beacons",   color: "88BBFF" },
-				"701": { name: "Brain Trees",         color: "00AAFF" }
+				"401": { name: "Guardian Ruins",      color: CanonnPalette.of('guardian', 0, 3).replace('#', '') },
+				"501": { name: "Guardian Structures", color: CanonnPalette.of('guardian', 1, 3).replace('#', '') },
+				"601": { name: "Guardian Beacons",   color: CanonnPalette.of('guardian', 2, 3).replace('#', '') },
+				"701": { name: "Brain Trees",         color: CanonnPalette.of('bio', 0, 1).replace('#', '') }
 			},
 			"Thargoids": {
-				"801":  { name: "Thargoid Barnacles",        color: "00CC44" },
-				"900":  { name: "Thargoid Structures",       color: "008800" },
-				"1001": { name: "Non-Human Signal Sources",  color: "44FF88" }
+				"801":  { name: "Thargoid Barnacles",        color: CanonnPalette.of('thargoid', 0, 3).replace('#', '') },
+				"900":  { name: "Thargoid Structures",       color: CanonnPalette.of('thargoid', 1, 3).replace('#', '') },
+				"1001": { name: "Non-Human Signal Sources",  color: CanonnPalette.of('thargoid', 2, 3).replace('#', '') }
 			}
 		},
 		systems: []

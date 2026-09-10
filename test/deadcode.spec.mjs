@@ -175,3 +175,14 @@ test('no map category picks its colour at random', async () => {
     .filter((f) => read('data/' + f).includes('randomColor'));
   expect(offenders).toEqual([]);
 });
+
+test('no page still loads axios', async () => {
+  /* Seven axios instances and three plain GETs, on a 2019 release carried by
+     every page that loads the console. The instances were callable —
+     `capi({ url, method })` — which is why a grep for `capi.get` found nothing
+     and briefly convinced me they were dead; four of them were live. They are
+     fetch now, keeping the two things axios did that matter: a base URL, and
+     rejecting rather than resolving on a 4xx or 5xx. */
+  const offenders = pages.filter((p) => read(p).includes('/axios/'));
+  expect(offenders).toEqual([]);
+});

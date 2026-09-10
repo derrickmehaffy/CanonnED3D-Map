@@ -140,15 +140,20 @@ var CanonnCodexOverlay = (function () {
   }
 
   async function processDumpEntry(entry, categories) {
-    var response;
+    /* fetch, not axios. One difference worth naming: axios rejects on a 4xx
+       or 5xx and fetch resolves, so the status has to be checked by hand or a
+       404 page arrives here as CSV and parses to nothing. */
+    var csvText;
     try {
-      response = await axios.get(entry.dump);
+      var res = await fetch(entry.dump);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      csvText = await res.text();
     } catch (e) {
       console.error('CodexOverlay: could not fetch dump', entry.dump, e);
       return;
     }
 
-    var systems = parseDumpCSV(response.data);
+    var systems = parseDumpCSV(csvText);
     var batchSystems = systems.map(function (sys) {
       return {
         name: sys.name,
@@ -168,15 +173,17 @@ var CanonnCodexOverlay = (function () {
     var hasAny = paramNames.some(function (p) { return !!getURLParameter(p); });
     if (!hasAny) return;
 
-    var hierarchyResponse;
+    var hierarchy;
     try {
-      hierarchyResponse = await axios.get(API_BASE + '/ref?hierarchy=1');
+      var hres = await fetch(API_BASE + '/ref?hierarchy=1');
+      if (!hres.ok) throw new Error('HTTP ' + hres.status);
+      hierarchy = await hres.json();
     } catch (e) {
       console.error('CodexOverlay: could not fetch the hierarchy', e);
       return;
     }
 
-    var dumpEntries = getFilteredDumps(hierarchyResponse.data);
+    var dumpEntries = getFilteredDumps(hierarchy);
     if (dumpEntries.length === 0) {
       // Not a failure: most pages carry no parameters this overlay matches.
       // debug, so it is there when you go looking and silent when you are not.

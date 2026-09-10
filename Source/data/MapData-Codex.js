@@ -55,14 +55,21 @@ let urlParams = {
 function signalLink(system, name) {
 	return '<a href="https://signals.canonn.tech/?system=' + system + '" target="_blank" rel="noopener">' + name + '</a><br/>'
 }
-const capi = axios.create({
-	baseURL: API_ENDPOINT,
-	headers: {
-		'Content-Type': 'application/json',
-		'Accept': 'application/json',
-		'Access-Control-Max-Age': 86400,
-	},
-});
+const capi = async function ({ url, method }) {
+	/* Was an axios instance. fetch keeps the two things that one did for us:
+	   a base URL to join onto, and rejecting rather than resolving when the
+	   server answers with a 4xx or a 5xx — fetch resolves on both, so an
+	   error page would otherwise arrive here as if it were data.
+	
+	   The shape of the call and of the reply are unchanged, so every caller
+	   below still passes { url, method } and still reads .data. */
+	const res = await fetch(API_ENDPOINT + url, {
+		method: (method || 'get').toUpperCase(),
+		headers: { 'Accept': 'application/json' }
+	});
+	if (!res.ok) throw new Error('HTTP ' + res.status + ' from ' + url);
+	return { data: await res.json() };
+};
 
 // Match a value against a pattern that may use % as a wildcard.
 // An implicit trailing wildcard is always applied so e.g. "Fumerola Aquatis"
@@ -310,10 +317,13 @@ var canonnEd3d_codex = {
 	processDumpEntry: async function (entry) {
 		let csvText;
 		try {
-			const response = await axios.get(entry.dump);
-			csvText = response.data;
+			// A dump is CSV, so text rather than json — and the status is checked
+			// because fetch resolves on a 404 where axios rejected.
+			const res = await fetch(entry.dump);
+			if (!res.ok) throw new Error('HTTP ' + res.status);
+			csvText = await res.text();
 		} catch (e) {
-			console.log("Error fetching dump:", entry.dump, e);
+			console.error('Codex: could not fetch dump', entry.dump, e);
 			return;
 		}
 
