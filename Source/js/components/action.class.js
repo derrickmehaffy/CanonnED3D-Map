@@ -49,7 +49,6 @@ var Action = {
 
 
     if(Ed3d.showNameNear) {
-      console.log('Launch EXPERIMENTAL func');
       window.setInterval(function(){
         obj.highlightAroundCamera(obj);
       }, 1000);

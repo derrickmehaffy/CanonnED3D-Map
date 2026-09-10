@@ -144,7 +144,7 @@ var CanonnCodexOverlay = (function () {
     try {
       response = await axios.get(entry.dump);
     } catch (e) {
-      console.log('CodexOverlay: Error fetching dump:', entry.dump, e);
+      console.error('CodexOverlay: could not fetch dump', entry.dump, e);
       return;
     }
 
@@ -172,13 +172,15 @@ var CanonnCodexOverlay = (function () {
     try {
       hierarchyResponse = await axios.get(API_BASE + '/ref?hierarchy=1');
     } catch (e) {
-      console.log('CodexOverlay: Error fetching hierarchy:', e);
+      console.error('CodexOverlay: could not fetch the hierarchy', e);
       return;
     }
 
     var dumpEntries = getFilteredDumps(hierarchyResponse.data);
     if (dumpEntries.length === 0) {
-      console.log('CodexOverlay: No matching dump entries found for current URL params');
+      // Not a failure: most pages carry no parameters this overlay matches.
+      // debug, so it is there when you go looking and silent when you are not.
+      console.debug('CodexOverlay: no dump matches the current URL parameters');
       return;
     }
 

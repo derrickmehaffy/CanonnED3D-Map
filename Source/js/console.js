@@ -8,9 +8,12 @@
  *     <link rel="stylesheet" href="css/console.css">
  *     <script defer src="js/console.js"></script>
  *
- * placed BEFORE its MapData-*.js, and drops its include/nav.html div.
+ * placed BEFORE its MapData-*.js. (It used to also drop the page's
+ * include/nav.html div; that nav and its last six pages were retired, so
+ * there is nothing left to drop.)
  *
- * How it stays generic across all 29 pages:
+ * How it stays generic across all 36 pages that load it (every page except
+ * orrery.html, which is its own view rather than a map):
  *   - Categories are whatever Ed3d built. The console reads the real
  *     .map_filter anchors out of #filters and proxies clicks back to them, so
  *     route toggling, colour handling and recentring stay Ed3d's job. A map
@@ -225,9 +228,10 @@
   Boot.say('Loading', MAPNAME);
 
   /* ── the map catalogue ──────────────────────────────────────────────────
-     Generated from include/nav.html so replacing the nav loses no destination:
-     every one of its 84 map links, in its own groups, reachable from the map
-     index (Cmd/Ctrl+Shift+M) and the command palette. */
+     Every destination the old include/nav.html offered carried over when that
+     nav was replaced, so nothing became unreachable. It is the source of the map index (Cmd/Ctrl+Shift+M) and of
+     the command palette. The nav itself no longer exists; this list is the
+     record of what it held, and is edited here. */
   var CATALOGUE = [
     { g: "CanonnED3D", items: [
       { n: "CanonnED3D", u: "index.html" },

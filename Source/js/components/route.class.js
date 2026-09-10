@@ -75,8 +75,6 @@ var Route = {
 
     var hideLast = (route.hideLast !== undefined && route.hideLast);
 
-    //console.log(route);
-
     /* A colour given outright, for routes that are not a map category — a
        journal dropped on the console is one line per file, and telling two
        files apart is the whole point of colouring them. */
@@ -109,7 +107,11 @@ var Route = {
 
       } else {
 
-        console.log("Missing point: "+val.s);
+        /* A waypoint whose system never arrived. Worth saying — the line is
+           drawn through the points that did, so it comes out shorter than the
+           route it was given and nothing else would explain that. */
+        console.warn('Route ' + idRoute + ': no system named "' + val.s +
+                     '", so the line skips it');
       }
 
     });
@@ -205,8 +207,6 @@ var Route = {
 
   'addPoint' : function(x, y, z, name) {
 
-    /*console.log('Add point route');*/
-
     var cursor = new THREE.Object3D;
 
     //-- Ring around the system
@@ -261,8 +261,6 @@ var Route = {
   'addPointToRoute' : function(x,y,z,system,label) {
 
     idRoute = 1;
-
-    console.log('add point');
 
     var routes = JSON.parse(localStorage.getItem("routes"));
     if(routes[idRoute] == undefined) return false;

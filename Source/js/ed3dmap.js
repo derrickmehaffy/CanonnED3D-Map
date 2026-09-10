@@ -525,7 +525,9 @@ var Ed3d = {
     try {
       json = JSON.parse(content);
     } catch (e) {
-      console.log("Can't load JSon for systems");
+      // An error, not a note — nothing downstream can do its job without this,
+      // and the exception says which byte was wrong.
+      console.error('Ed3d: system data is not valid JSON', e);
     }
 
     if (json != null) Ed3d.loadDatasAsync(json);

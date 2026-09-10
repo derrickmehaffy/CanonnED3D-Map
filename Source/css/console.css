@@ -251,9 +251,6 @@ body.bare .top, body.bare .strip{display:none}
 .site .sw{width:9px;height:9px;flex:none;border-radius:1px}
 .site .ty{font-family:var(--cond);font-size:12.5px;font-weight:600}
 .site .bd{font-family:var(--mono);font-size:10.5px;color:var(--dimmer);margin-left:auto}
-.c-tmpl{padding:9px 13px 11px}
-.c-tmpl img{display:block;width:100%;border:1px solid var(--rule);background:#080C10}
-.c-tmpl .cap{font-family:var(--mono);font-size:10px;color:var(--dimmer);margin-top:6px;line-height:1.5}
 .c-link{margin:0 13px 10px;padding:8px 10px;border:1px solid var(--rule);background:#080C10;
   font-family:var(--mono);font-size:10px;color:var(--dimmer);line-height:1.6}
 .c-link a{color:var(--ion);text-decoration:none;border-bottom:1px solid rgba(77,227,225,.3)}
