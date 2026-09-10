@@ -82,6 +82,13 @@ bare identifiers. This is a compatibility posture, not a design to copy.
 - **`api.canonn.tech`** — retired, does not resolve, and **nothing calls it**.
   Two loaders still named it, both by unreachable code, and both were removed.
   If you find it again, it came back by accident.
+- **EDSM** — **not fetched either.** It is unreliable, and the one question the
+  map ever asked it — a name in, coordinates out — is answered by Canonn's own
+  typeahead. What is left of the name is deliberate: `edsmLink()` in
+  `codex-overlay.js` offers the reader an outbound link beside the Signals one,
+  and `ts-msg_3305survey` reads a static local snapshot of eagle-eye
+  coordinates. `nothing fetches EDSM` holds that line, and it counts code
+  rather than the word, so a comment recording the refresh query is fine.
 
 ## Orphans worth knowing about
 
@@ -91,11 +98,14 @@ bare identifiers. This is a compatibility posture, not a design to copy.
   was removed rather than a file that was abandoned. Left in place because
   restoring the page is a decision about what Canonn offers; delete it or wire
   it up, but do not leave it to rot silently.
-- **`route_uia.html`** — calls `getSystemsEDSM(...)` in the middle of building
-  its routes, and never declares it. The only declaration in the tree is in
-  `MapData-TSmsg_3305survey.js`, which that page does not load. Classic
-  scripts share one scope, so this is the sort of dependency that works right
-  up until the two files stop being loaded together.
+- **`data/csvCache/UIA Vector Survey (Responses) - Responses.csv`** —
+  referenced by nothing. It fed a `formatMeasurements` layer in
+  `MapData-UIA.js` that drew a route between each observer's current and
+  targeted system; the call was commented out before December 2022, and the
+  method has now gone with the EDSM lookup it depended on. The cached CSV is
+  still here, so reviving the layer means re-reading it and asking Canonn's
+  typeahead for the coordinates EDSM used to supply — a decision about what the
+  map shows, not a cleanup.
 
 ## Tests
 

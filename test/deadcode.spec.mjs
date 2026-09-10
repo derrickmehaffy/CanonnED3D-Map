@@ -239,3 +239,34 @@ test('nothing calls the retired Canonn API', async () => {
   for (const p of pages) if (read(p).includes('api.canonn.tech')) named.push(p);
   expect(named).toEqual([]);
 });
+
+test('nothing fetches EDSM', async () => {
+  /* EDSM is unreliable and Canonn's own query API answers the one question the
+     map ever asked it — a name in, coordinates out. The live path was dead
+     twice over when it was removed: `getSystemsEDSM` was declared in
+     MapData-TSmsg_3305survey.js and never called there, and its only caller
+     was a `formatMeasurements` that nothing had called since 2022.
+
+     Two uses of the name are deliberate and stay: `edsmLink()` builds an
+     outbound link to EDSM's own site for a reader, and ts-msg_3305survey reads
+     a static local snapshot whose comment records the query that refreshed it.
+     So this asks about code, not about the word — a line that is wholly a
+     comment does not count. */
+  const code = (src) => src
+    .split('\n')
+    .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
+    .join('\n');
+
+  const fetching = [];
+  for (const dir of ['js', 'data']) {
+    for (const f of readdirSync(join(SRC, dir)).filter((n) => n.endsWith('.js'))) {
+      const src = read(dir + '/' + f);
+      if (/edsm\.net\/api/.test(code(src))) fetching.push(dir + '/' + f + ' fetches edsm.net/api');
+      if (/getSystemsEDSM/.test(src)) fetching.push(dir + '/' + f + ' references getSystemsEDSM');
+    }
+  }
+  for (const p of pages) {
+    if (/edsm\.net\/api/.test(code(read(p)))) fetching.push(p + ' fetches edsm.net/api');
+  }
+  expect(fetching).toEqual([]);
+});

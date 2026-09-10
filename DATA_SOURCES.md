@@ -13,7 +13,7 @@ This document maps each navigation menu option to its underlying data source(s).
 | **Canonn Google Storage** | `https://storage.googleapis.com/canonn-downloads` |
 | **EliteBGS API** | `https://elitebgs.app/api/ebgs/v5` |
 | **DCOH Watch API** | `https://dcoh.watch/api/v1` |
-| **EDSM API** | `https://www.edsm.net/api-v1` |
+| **EDSM** *(not fetched)* | `https://www.edsm.net` — linked to for the reader; one static snapshot is cached locally |
 | **Canonn Signals** | `https://canonn-science.github.io/canonn-signals` |
 | **Local CSV Cache** | `Source/data/csvCache/` |
 
@@ -88,9 +88,11 @@ This document maps each navigation menu option to its underlying data source(s).
 ### Thargoid Link Messages — 3305 Survey
 - **Page:** `ts-msg_3305survey.html`
 - **MapData:** `MapData-TSmsg_3305survey.js`
-- **Data Sources:**
-  - Canonn API → `/tssites` (static survey data)
-  - EDSM API → `/api-v1/` (system coordinate lookups)
+- **Data Sources:** all local; this map fetches nothing external.
+  - `data/json_stations.json` (populated systems, for station coordinates)
+  - `data/edsm-eagleeye-systems.json` (static EDSM snapshot; the file's own
+    comment records the query that refreshed it)
+  - Local CSV Cache → the TS Export and Thargoid Surface Site Survey CSVs
 
 ### Thargoids Combo Map
 - **Page:** `thargoids-combo.html`
@@ -148,9 +150,10 @@ This document maps each navigation menu option to its underlying data source(s).
 ### Unknown Interstellar Anomaly (UIA)
 - **Page:** `route_uia.html`
 - **MapData:** `MapData-UIA.js`
-- **Data Sources:**
-  - Canonn Cloud Functions → `/query`
-  - EDSM API → `/api-v1/` (system coordinate lookups)
+- **Data Sources:** all local; this map fetches nothing external.
+  - `data/csvCache/uia_waypoints_1.json` … `_9.json` (one per UIA)
+  - Local CSV Cache → `route_UIA_Hyperdictions.csv`
+  - To refresh the waypoints: `fetch-uia-waypoints.ps1` from the repo root
 
 ### Listening Posts
 - **Page:** `listening_posts.html`

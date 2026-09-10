@@ -1,7 +1,6 @@
 // External API endpoints no longer used directly — data is cached as local static files.
 // To refresh: run fetch-uia-waypoints.ps1 from the repo root.
 // const API_ENDPOINT = window.CanonnAPI.query('');
-// const EDSM_ENDPOINT = `https://www.edsm.net/api-v1`;
 
 const numberOfUIAs = 9;
 const predictionFactor = 2;
@@ -1188,58 +1187,6 @@ var canonnEd3d_challenge = {
 			//*/
 		}
 
-	},
-	formatMeasurements: async function (data, resolvePromise) {
-		//console.log(data);
-		var measystems = {};
-		for (var i = 0; i < data.length; i++) {
-			if (data[i]["Permit Lock"]) continue
-			if (data[i]["Accuracy"] > 3) continue
-			if (data[i]["Current System"]
-				&& data[i]["Current System"].replace(/\s/g, '').length > 1
-				&& data[i]["Targetted System"]
-				&& data[i]["Targetted System"].replace(/\s/g, '').length > 1) {
-				var route = {};
-				route['points'] = [
-					{ 's': data[i]["Current System"], 'label': data[i]["Current System"] },
-					{ 's': data[i]["Targetted System"], 'label': data[i]["Targetted System"] }
-				]
-				route['cat'] = ["1003"];
-				route['circle'] = false;
-				canonnEd3d_challenge.systemsData.routes.push(route);
-				if (!Object.keys(measystems).includes(data[i]["Current System"]))
-					measystems[data[i]["Current System"]] = false;
-				if (!Object.keys(measystems).includes(data[i]["Targetted System"]))
-					measystems[data[i]["Targetted System"]] = false;
-			}
-		}
-		let response = await getSystemsEDSM(Object.keys(measystems));
-
-		if (response.data.length <= 0) {
-			console.log("EDSM debug", response);
-		}
-		for (const index in response.data) {
-			let system = response.data[index];
-			if (!system.name || !system.coords) continue
-			measystems[system.name] = system
-		}
-		for (let systemName in measystems) {
-			if (!measystems[systemName].name || !measystems[systemName].coords) continue;
-			var poiSite = {};
-			poiSite['name'] = measystems[systemName].name;
-			poiSite['infos'] = '<a href="https://signals.canonn.tech/?system=' + poiSite['name'] + '" target="_blank" rel="noopener">Signals</a>';
-			//poiSite['url'] = "https://signals.canonn.tech/?system=" + poiSite['name']
-			poiSite['coords'] = {
-				x: parseFloat(measystems[systemName].coords.x),
-				y: parseFloat(measystems[systemName].coords.y),
-				z: parseFloat(measystems[systemName].coords.z),
-			};
-			//console.log(measystems[systemName])
-			poiSite['cat'] = ["1005"];
-			// We can then push the site to the object that stores all systems
-			canonnEd3d_challenge.systemsData.systems.push(poiSite);
-		}
-		resolvePromise();
 	},
 	parseCSVData: function (uri, cb, resolve) {
 		Papa.parse(uri, {

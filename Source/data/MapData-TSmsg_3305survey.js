@@ -1,36 +1,3 @@
-const EDSM_ENDPOINT = `https://www.edsm.net/api-v1`;
-
-const edsmapi = async function ({ url, method }) {
-    /* Was an axios instance. fetch keeps the two things that one did for us:
-       a base URL to join onto, and rejecting rather than resolving when the
-       server answers with a 4xx or a 5xx — fetch resolves on both, so an
-       error page would otherwise arrive here as if it were data.
-    
-       The shape of the call and of the reply are unchanged, so every caller
-       below still passes { url, method } and still reads .data. */
-    const res = await fetch(EDSM_ENDPOINT + url, {
-    	method: (method || 'get').toUpperCase(),
-    	headers: { 'Accept': 'application/json' }
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status + ' from ' + url);
-    return { data: await res.json() };
-};
-
-const getSystemsEDSM = async (systemNames) => {
-    if (Array.isArray(systemNames)) {
-        systemNames = "systemName[]=" + systemNames.join("&systemName[]=");
-    } else {
-        systemNames = "systemName=" + systemNames;
-    }
-    //console.log("EDSM Query: ", systemNames);
-    let payload = await edsmapi({
-        url: `/systems?showCoordinates=1&${systemNames}`,
-        method: 'get'
-    });
-
-    return payload;
-};
-
 const recenterViewport = (center, distance) => {
     //-- Set new camera & target position
     Ed3d.playerPos = [center.x, center.y, center.z];
@@ -343,10 +310,6 @@ https://tool.canonn.tech/linkdecoder/?origin=Taurus+Dark+Region+CL-Y+d53&data=ll
     },
     systemsWithStations: [],
     fetchAddSystems: async () => {
-        var edsmQueues = [];
-        var edsmQueue = [];
-        //console.log("Names:", names);
-
         //check json_stations.json if the target site has a station (populated systems)
         if (canonnEd3d_tslinks.systemsWithStations.length <= 0) {
             //console.log("waiting for stations file");
@@ -359,7 +322,6 @@ https://tool.canonn.tech/linkdecoder/?origin=Taurus+Dark+Region+CL-Y+d53&data=ll
         for (const systemName in canonnEd3d_tslinks.addingSystems) {
             //if (canonnEd3d_tslinks.addingSystems[systemName].done) continue;
 
-            var found = false;
             for (var i = 0; i < canonnEd3d_tslinks.systemsWithStations.length; i++) {
                 let stationSystem = canonnEd3d_tslinks.systemsWithStations[i];
                 if (systemName.toUpperCase() === stationSystem.name.toUpperCase()) {
@@ -380,20 +342,10 @@ https://tool.canonn.tech/linkdecoder/?origin=Taurus+Dark+Region+CL-Y+d53&data=ll
                             ['206']
                         );
                     }
-                    found = true;
                     break;
                 }
             }
-            if (!found) {
-                //console.log("system has no station. adding to edsm queue");
-                edsmQueue.push(systemName);
-                if (edsmQueue.length > 70) {
-                    edsmQueues.push(edsmQueue);
-                    edsmQueue = [];
-                }
-            }
         }
-        edsmQueues.push(edsmQueue);
 
         // Static snapshot of EDSM eagle-eye system coordinates (fetched 2026-03-01).
         // To refresh: query https://www.edsm.net/api-v1/systems?showCoordinates=1&systemName[]=...
@@ -496,7 +448,7 @@ https://tool.canonn.tech/linkdecoder/?origin=Taurus+Dark+Region+CL-Y+d53&data=ll
             return;
         }
 
-        //add to system fetching queue, checking for stations and calling edsm later
+        //note the system so fetchAddSystems looks it up in the stations file
         if (!(msg in canonnEd3d_tslinks.addingSystems)) {
             canonnEd3d_tslinks.addingSystems[msg] = { done: false };
             if (canonnEd3d_tslinks.addingSystems[msg].type == "EagleEye") cat.push('60');
