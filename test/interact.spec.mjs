@@ -481,3 +481,109 @@ test('the card hands out the coordinates, ready to paste', async ({ page }) => {
   });
   expect(Number(nums[2])).toBeCloseTo(-rec.z, 3);
 });
+
+test('a dropped journal joins the dots, in its own colour', async ({ page }) => {
+  /* Asked for: "a feature I would have liked to have added ... is to be able
+     to tell it to treat the uploaded file as a route (e.g. join the dots in
+     order of appearance) or leave them unconnected. Also allow the user to
+     pick a colour so that they can add additional files with different
+     colours if they want."
+
+     Drawn through Route, which lcunfool already built and which the codex and
+     GMP route maps already use — rather than a second way of drawing a line
+     between two systems. */
+  await onMap(page);
+  await page.locator(rail('routes')).click();
+
+  const lines = () => page.evaluate(() => {
+    const out = [];
+    window.scene.traverse((o) => {
+      // route-journal-* only: this map plots the Voyager probes' own
+      // trajectories as routes, and they are not what is under test.
+      if (o.name && o.name.indexOf('route-journal-') === 0 && o.isLine2) {
+        out.push({ name: o.name, colour: '#' + o.material.color.getHexString() });
+      }
+    });
+    return out;
+  });
+  expect(await lines()).toHaveLength(0);
+
+  await page.locator('#fileinput').setInputFiles([await journal('journal-with-route.log')]);
+  const added = page.locator('#side .layer', { hasText: 'journal-with-route' });
+  await expect(added).toBeVisible({ timeout: 20_000 });
+
+  // One line for the file, drawn through the jumps it found.
+  await expect.poll(async () => (await lines()).length, { timeout: 20_000 }).toBe(1);
+
+  // And the layer's swatch says which line is which, rather than every file
+  // being the same green.
+  const swatch = await added.locator('.sw').evaluate((e) =>
+    getComputedStyle(e).backgroundColor);
+  const drawn = (await lines())[0].colour;
+  const rgb = drawn.slice(1).match(/../g).map((h) => parseInt(h, 16));
+  expect(swatch.replace(/\s/g, '')).toBe('rgb(' + rgb.join(',') + ')');
+});
+
+test('a journal can be plotted without joining the dots', async ({ page }) => {
+  await onMap(page);
+  await page.locator(rail('routes')).click();
+  // The choice LCU asked for, off.
+  await page.locator('#joindots').uncheck();
+  await page.locator('#fileinput').setInputFiles([await journal('journal-with-route.log')]);
+
+  const added = page.locator('#side .layer', { hasText: 'journal-with-route' });
+  await expect(added).toBeVisible({ timeout: 20_000 });
+  // The systems are on the map; nothing is strung between them.
+  await expect(added.locator('.ct')).toHaveText('9');
+  const n = await page.evaluate(() => {
+    let c = 0;
+    window.scene.traverse((o) => {
+      if (o.name && o.name.indexOf('route-journal-') === 0) c++;
+    });
+    return c;
+  });
+  expect(n).toBe(0);
+});
+
+test('two journals at once are two routes, in two colours', async ({ page }) => {
+  /* The per-file mechanism was always there — each file gets its own layer
+     row — but with every route the same green there was nothing to tell them
+     apart, which is what made the colour worth asking for. Two files, two
+     lines, two colours, and one row each.
+
+     Also the case that used to bury a good file behind a quiet one: the
+     jumpless journal goes in with them. */
+  await onMap(page);
+  await page.locator(rail('routes')).click();
+  await page.locator('#fileinput').setInputFiles([
+    await journal('journal-with-route.log'),
+    await journal('journal-no-jumps.log')
+  ]);
+
+  await expect(page.locator('#side .layer', { hasText: 'journal-with-route' }))
+    .toBeVisible({ timeout: 20_000 });
+
+  // A second file with jumps of its own, dropped after the first.
+  await page.locator('#fileinput').setInputFiles([
+    { name: 'second-trip.log', mimeType: 'text/plain',
+      buffer: Buffer.from([
+        { event: 'FSDJump', StarSystem: 'Deciat', StarPos: [122.6, -0.8, -47.2] },
+        { event: 'FSDJump', StarSystem: 'Maia', StarPos: [-81.6, -149.4, -343.2] },
+        { event: 'FSDJump', StarSystem: 'Merope', StarPos: [-78.5, -149.6, -340.5] }
+      ].map((o) => JSON.stringify(o)).join('\n')) }
+  ]);
+  await expect(page.locator('#side .layer', { hasText: 'second-trip' }))
+    .toBeVisible({ timeout: 20_000 });
+
+  const lines = await page.evaluate(() => {
+    const out = [];
+    window.scene.traverse((o) => {
+      if (o.name && o.name.indexOf('route-journal-') === 0 && o.isLine2) {
+        out.push('#' + o.material.color.getHexString());
+      }
+    });
+    return out;
+  });
+  expect(lines).toHaveLength(2);
+  expect(new Set(lines).size, 'two routes, two colours').toBe(2);
+});

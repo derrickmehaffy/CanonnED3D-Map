@@ -359,6 +359,15 @@
   var sel = null, panel = 'layers';
   var cardType = null;   // which type's site plan the card is showing
   var extraRoutes = [];                    // systems added from a dropped journal
+  /* One colour per dropped file, so two journals can be told apart — asked
+     for alongside the joining itself. lcunfool's HUD already keeps a palette
+     of distinct colours for per-commander routes; this is the same idea for
+     files, and the swatch beside the file's name in the panel is the key. */
+  var ROUTE_COLOURS = [
+    0x5FD08A, 0x00BFFF, 0xFF9D00, 0xFF69B4, 0xDA70D6,
+    0x40E0D0, 0xFF6347, 0xADFF2F, 0xFFD700, 0x87CEEB
+  ];
+  var joinDots = recallBool('joindots', true);
   var sysQuery = '', sysSort = 'name';     // systems panel: filter text and order
   var lastScrolledTo = null;               // system the list last jumped to
   /* Most pages title themselves "CanonnED3D - Maps", so the title is no use as
@@ -825,11 +834,14 @@
     var h = '<div class="s-t">Routes &amp; journals</div>' +
       '<div class="s-sub">Drop a journal to plot where you have been</div>' +
       '<div class="drop" id="drop">' + DROP_PROMPT + '</div>' +
-      '<input type="file" id="fileinput" accept=".log,.json,.txt" multiple style="display:none">';
+      '<input type="file" id="fileinput" accept=".log,.json,.txt" multiple style="display:none">' +
+      '<label class="p-check"><input type="checkbox" id="joindots"' +
+      (joinDots ? ' checked' : '') + '> Join the jumps in the order they happened</label>';
     if (extraRoutes.length) {
       h += '<div style="margin-top:12px">';
       extraRoutes.forEach(function (r) {
-        h += '<div class="layer"><span class="sw" style="background:#5FD08A"></span>' +
+        h += '<div class="layer"><span class="sw" style="background:' +
+          hex(r.colour) + '"></span>' +
           '<span class="nm">' + esc(r.name) + '</span><span class="ct">' + r.count + '</span></div>';
       });
       h += '</div>';
@@ -1271,6 +1283,11 @@
       drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); });
     });
     drop.addEventListener('drop', function (e) { handleFiles(e.dataTransfer.files); });
+    var join = $('joindots');
+    if (join) join.onchange = function () {
+      joinDots = this.checked;
+      remember('joindots', joinDots ? '1' : '0');
+    };
   }
   /* What one file turned out to be.
 
@@ -1281,7 +1298,12 @@
      journal is told apart from something that is not a journal at all, and
      neither is called a failure. */
   function readJournal(text, label) {
-    var seen = {}, systems = [];
+    /* Two readings of the same file. `systems` is what goes on the map, one
+       per system — a system visited twice is one point. `jumps` is the
+       journey, in the order it happened and with the repeats kept, because
+       that is exactly what a line through them needs and exactly what
+       de-duplicating throws away. */
+    var seen = {}, systems = [], jumps = [];
     /* One scan of the whole string, before splitting it: the big journals run
        to 1.7 MB and 5,700 lines, and this only has to answer "was this ever a
        journal" for the message at the end. */
@@ -1291,13 +1313,35 @@
       try {
         var j = JSON.parse(line);
         if (j.event !== 'FSDJump' || !j.StarPos || !j.StarSystem) return;
+        var at = { x: j.StarPos[0], y: j.StarPos[1], z: -j.StarPos[2] };
+        jumps.push({ s: j.StarSystem, coords: at });
         if (seen[j.StarSystem]) return;
         seen[j.StarSystem] = 1;
-        systems.push({ name: j.StarSystem, infos: 'From ' + label,
-          coords: { x: j.StarPos[0], y: j.StarPos[1], z: -j.StarPos[2] } });
+        systems.push({ name: j.StarSystem, infos: 'From ' + label, coords: at });
       } catch (err) { /* not a JSON line — journals are line-delimited */ }
     });
-    return { systems: systems, journal: journal };
+    return { systems: systems, journal: journal, jumps: jumps };
+  }
+
+  /* #RRGGBB from the number the palette holds. */
+  function hex(c) {
+    return '#' + ('000000' + (c >>> 0).toString(16)).slice(-6);
+  }
+
+  /* The journey as a line, through the component that already draws the codex
+     and GMP routes rather than a second way of joining two systems.
+
+     Route wants its waypoints registered before the systems exist, so that
+     System.create can fill in each one's coordinates as it goes — initRoute
+     does both here, because these points carry their coordinates with them. */
+  var journeySeq = 0;
+  function drawJourney(jumps, colour) {
+    if (typeof Route === 'undefined' || !Route.createRoute || jumps.length < 2) return;
+    var route = { points: jumps, color: colour, circle: true };
+    var id = 'journal-' + (journeySeq++);
+    Route.initRoute(id, route);
+    Route.createRoute(id, route);
+    if (Route.resize) Route.resize();
   }
 
   function handleFiles(files) {
@@ -1338,8 +1382,10 @@
       rd.onload = function () {
         var got = readJournal(String(rd.result), f.name);
         if (got.systems.length) {
+          var colour = ROUTE_COLOURS[extraRoutes.length % ROUTE_COLOURS.length];
           Ed3d.addBatch({ systems: got.systems });
-          extraRoutes.push({ name: f.name, count: got.systems.length });
+          extraRoutes.push({ name: f.name, count: got.systems.length, colour: colour });
+          if (joinDots) drawJourney(got.jumps, colour);
           plotted++;
         } else if (got.journal) { quiet.push(f.name); } else { alien.push(f.name); }
         finish();

@@ -77,7 +77,13 @@ var Route = {
 
     //console.log(route);
 
-    if(route.cat !== undefined && route.cat[0] != undefined && Ed3d.colors[route.cat[0]] != undefined) {
+    /* A colour given outright, for routes that are not a map category — a
+       journal dropped on the console is one line per file, and telling two
+       files apart is the whole point of colouring them. */
+    if(route.color !== undefined) {
+      color = new THREE.MeshBasicMaterial({ color: route.color });
+      colorLine = Route.lineMaterial(route.color);
+    } else if(route.cat !== undefined && route.cat[0] != undefined && Ed3d.colors[route.cat[0]] != undefined) {
       color = new THREE.MeshBasicMaterial({
         color: Ed3d.colors[route.cat[0]]
       });
