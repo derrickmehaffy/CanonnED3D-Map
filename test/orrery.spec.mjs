@@ -3134,14 +3134,32 @@ test('choosing a body swoops over to it rather than jumping', async ({ page }) =
   await page.locator('.orr-row[data-id]').last().click();
   await page.waitForTimeout(1500);
 
-  const between = await page.evaluate(() => {
+  const seen = await page.evaluate(() => {
     const f = window.__fly;
     const d = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
     const a = f[0], b = f[f.length - 1], total = d(a, b);
-    return f.filter((p) => { const t = d(a, p) / (total || 1);
-      return t > 0.05 && t < 0.95; }).length;
+    // The largest single hop, as a share of the whole journey.
+    let biggest = 0;
+    for (let i = 1; i < f.length; i++) biggest = Math.max(biggest, d(f[i - 1], f[i]));
+    return {
+      total,
+      biggestShare: total ? biggest / total : 1,
+      between: f.filter((p) => {
+        const t = d(a, p) / (total || 1); return t > 0.05 && t < 0.95;
+      }).length
+    };
   });
-  expect(between, 'the camera was seen part of the way there').toBeGreaterThan(3);
+  expect(seen.total, 'the camera went somewhere').toBeGreaterThan(1);
+  expect(seen.between, 'the camera was seen part of the way there').toBeGreaterThan(3);
+  /* And no single frame carried most of the journey.
+
+     This is the assertion that matters, and its absence let a snap through:
+     with Follow on, the target was pinned to the body on the very first frame
+     and the camera shifted by the whole distance with it, leaving the flight
+     to interpolate only how far back it sat. Between two neighbouring planets
+     that is a few per cent of the trip, so there were plenty of intermediate
+     positions — all of them at the far end. */
+  expect(seen.biggestShare, 'no one frame crossed the system').toBeLessThan(0.4);
 });
 
 test('zooming in on a planet names the moons around it', async ({ page }) => {
@@ -3296,4 +3314,44 @@ test('the real stars can be put on the sky, by direction', async ({ page }) => {
   await far.click();
   await expect(far).not.toHaveClass(/on/);
   expect(await page.evaluate(() => window.Orrery.state().farStars)).toBe(0);
+});
+
+test('crossing the system is a flight, not a jump', async ({ page }) => {
+  /* Reported after the first cut shipped: "moving between planets still snaps
+     most of the time". Testholm is one planet and one moon, which is a short
+     enough hop that a snap and a flight look similar in the numbers; Sol is
+     Mercury to Neptune, which is the case the complaint was actually about. */
+  await stubDataHosts(page);
+  await stubApi(page, SOL);
+  await page.goto('/orrery.html?system=Sol', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(9, { timeout: 60_000 });
+
+  const pick = async (name) => {
+    await page.locator('.orr-row[data-id]').filter({ hasText: name }).first().click();
+    await settled(page);
+  };
+  await pick('Mercury');
+
+  await page.evaluate(() => {
+    window.__fly = [];
+    const tick = () => {
+      const c = window.Orrery.state().camera;
+      if (c) window.__fly.push(c);
+      if (window.__fly.length < 300) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  await page.locator('.orr-row[data-id]').filter({ hasText: 'Neptune' }).first().click();
+  await page.waitForTimeout(1800);
+
+  const seen = await page.evaluate(() => {
+    const f = window.__fly;
+    const d = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+    const total = d(f[0], f[f.length - 1]);
+    let biggest = 0;
+    for (let i = 1; i < f.length; i++) biggest = Math.max(biggest, d(f[i - 1], f[i]));
+    return { total, share: total ? biggest / total : 1 };
+  });
+  expect(seen.total, 'it crossed the system').toBeGreaterThan(1);
+  expect(seen.share, 'no one frame crossed it').toBeLessThan(0.4);
 });

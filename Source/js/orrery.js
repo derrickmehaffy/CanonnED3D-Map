@@ -3644,7 +3644,15 @@ const Orrery = (function () {
        before the first frame finished and you were left looking at where it
        had been. Both ends move by the same step, which also leaves whatever
        angle and distance the reader had chosen exactly as they left it. */
-    if (following && selected && selected._pos) {
+    /* Not while a flight is in the air. Follow pins the target to the body on
+       every frame, so it pinned it on the flight's very first frame and shifted
+       the camera by that whole jump with it — which is a snap, and left the
+       flight interpolating nothing but how far back the camera sat. Between two
+       neighbouring planets that is a few per cent of the trip, so it still read
+       as "moving between planets snaps most of the time". stepFlight is already
+       lerping toward the body's live position, so nothing is lost by standing
+       aside until it lands. */
+    if (following && selected && selected._pos && !flight) {
       step.copy(selected._pos).sub(controls.target);
       controls.target.add(step);
       (mode3d ? cam3 : cam2).position.add(step);
