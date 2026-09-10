@@ -1,14 +1,5 @@
 // Thargoids Combo Map — Thargoid Barnacles + Thargoid Structures + Non-Human Signal Sources
 
-const recenterViewport_thargoids = (center, distance) => {
-	Ed3d.playerPos = [center.x, center.y, center.z];
-	Ed3d.cameraPos = [
-		center.x + (Math.floor((Math.random() * 100) + 1) - 50),
-		center.y + distance,
-		center.z - distance
-	];
-	Action.moveInitalPosition();
-};
 
 
 var canonnEd3d_thargoids = {

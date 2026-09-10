@@ -325,20 +325,6 @@ function getUrlParameter(name) {
 };
 
 
-function fetchUrl(yUrl, callback) {
-	return fetch(yUrl)
-		.then(response => response.json())
-		.then(function (response) {
-			//alert(JSON.stringify(response.query));
-			//console.log(response)
-			callback(response);
-			return { response };
-		})
-		.catch(function (error) {
-			console.log(error);
-		});
-}
-
 var canonnEd3d_route = {
 	//Define Categories
 	systemsData: {

@@ -298,3 +298,43 @@ test('a loader that needs the filter dropdowns loads them', () => {
   }
   expect(bad).toEqual([]);
 });
+
+test('no data loader declares something nothing calls', () => {
+  /* `recenterViewport` was declared in seven loaders and called by none of
+     them — six identical copies plus one renamed `_thargoids`, differing only
+     in comments and tabs-versus-spaces. `fetchUrl` was three byte-identical
+     dead copies. 113 lines that read like working code, which is worse than a
+     gap, because the next person keeps them alive while refactoring around
+     them.
+
+     Every top-level declaration in a loader is looked for across all of
+     Source: the other loaders, the engine, and the pages' inline scripts,
+     since classic scripts share one scope and a page can call straight into
+     one. A name mentioned only as many times as it is declared is mentioned
+     only by its own declarations. */
+  const decl = /^(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?(?:function|\()|^(?:async\s+)?function\s+([A-Za-z_$][\w$]*)/gm;
+
+  const declared = new Map();
+  for (const f of readdirSync(join(SRC, 'data')).filter((n) => n.endsWith('.js'))) {
+    const src = read('data/' + f);
+    for (const m of src.matchAll(decl)) {
+      const name = m[1] || m[2];
+      declared.set(name, (declared.get(name) || []).concat(f));
+    }
+  }
+  expect(declared.size, 'no declarations found — has the regex rotted?').toBeGreaterThan(20);
+
+  const everywhere = [
+    ...readdirSync(join(SRC, 'data')).filter((n) => n.endsWith('.js')).map((n) => read('data/' + n)),
+    ...readdirSync(join(SRC, 'js')).filter((n) => n.endsWith('.js')).map((n) => read('js/' + n)),
+    ...readdirSync(join(SRC, 'js/components')).filter((n) => n.endsWith('.js')).map((n) => read('js/components/' + n)),
+    ...pages.map((p) => read(p))
+  ].join('\n');
+
+  const dead = [];
+  for (const [name, files] of declared) {
+    const uses = (everywhere.match(new RegExp('\\b' + name + '\\b', 'g')) || []).length;
+    if (uses <= files.length) dead.push(name + ' (' + files.join(', ') + ')');
+  }
+  expect(dead.sort()).toEqual([]);
+});

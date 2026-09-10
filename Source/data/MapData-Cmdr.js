@@ -123,17 +123,6 @@ const buildDropdownFilter = async (site_type_data) => {
 	CanonnFilters.build(site_type_data.data, urlParams);
 }
 
-const recenterViewport = (center, distance) => {
-	//-- Set new camera & target position
-	Ed3d.playerPos = [center.x, center.y, center.z];
-	Ed3d.cameraPos = [
-		center.x + (Math.floor((Math.random() * 100) + 1) - 50), //-- Add a small rotation effect
-		center.y + distance,
-		center.z - distance
-	];
-
-	Action.moveInitalPosition();
-}
 
 
 const getCodexMeta = (getHierarchy = true) => {
