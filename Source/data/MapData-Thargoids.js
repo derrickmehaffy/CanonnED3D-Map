@@ -16,11 +16,11 @@ var canonnEd3d_thargoids = {
 	systemsData: {
 		categories: {
 			"Thargoid Barnacles - (TB)": {
-				"201": { name: "Common Thargoid Barnacle", color: randomColor().replace('#', '').toString() },
-				"202": { name: "Large Thargoid Barnacle",  color: randomColor().replace('#', '').toString() },
-				"203": { name: "Barnacle Barbs",           color: randomColor().replace('#', '').toString() },
-				"204": { name: "Barnacle Matrix",          color: randomColor().replace('#', '').toString() },
-				"205": { name: "Mega Barnacles",           color: randomColor().replace('#', '').toString() }
+				"201": { name: "Common Thargoid Barnacle", color: CanonnPalette.of('thargoid', 0, 5).replace('#', '') },
+				"202": { name: "Large Thargoid Barnacle",  color: CanonnPalette.of('thargoid', 1, 5).replace('#', '') },
+				"203": { name: "Barnacle Barbs",           color: CanonnPalette.of('thargoid', 2, 5).replace('#', '') },
+				"204": { name: "Barnacle Matrix",          color: CanonnPalette.of('thargoid', 3, 5).replace('#', '') },
+				"205": { name: "Mega Barnacles",           color: CanonnPalette.of('thargoid', 4, 5).replace('#', '') }
 			},
 			"Thargoid Structures - (TS)": {
 				"300": { name: "0 Inactive", color: "A63333" },

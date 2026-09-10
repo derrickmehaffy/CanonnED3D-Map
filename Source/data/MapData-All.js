@@ -215,63 +215,63 @@ var canonnEd3d_all = {
 			"Sites": {
 				"201": {
 					name: "(AP) Amphora Plants",
-					color: randomColor().replace('#', '').toString()
+					color: CanonnPalette.of('bio', 0, 6).replace('#', '')
 				},
 				"202": {
 					name: "(BM) Bark Mounds",
-					color: randomColor().replace('#', '').toString()
+					color: CanonnPalette.of('bio', 1, 6).replace('#', '')
 				},
 				"203": {
 					name: "(BT) Brain Trees",
-					color: randomColor().replace('#', '').toString()
+					color: CanonnPalette.of('bio', 2, 6).replace('#', '')
 				},
 				"204": {
 					name: "(CS) Crystalline Shards",
-					color: randomColor().replace('#', '').toString()
+					color: CanonnPalette.of('bio', 3, 6).replace('#', '')
 				},
 				"205": {
 					name: "(FG) Fungal Gourds",
-					color: randomColor().replace('#', '').toString()
+					color: CanonnPalette.of('bio', 4, 6).replace('#', '')
 				},
 				"206": {
 					name: "(FM) Fumaroles",
-					color: randomColor().replace('#', '').toString()
+					color: CanonnPalette.of('geo', 0, 4).replace('#', '')
 				},
 				"207": {
 					name: "(GEN) Generation Ships",
-					color: randomColor().replace('#', '').toString()
+					color: CanonnPalette.of('human', 0, 1).replace('#', '')
 				},
 				"208": {
 					name: "(GB) Guardian Beacons",
-					color: randomColor().replace('#', '').toString()
+					color: CanonnPalette.of('guardian', 0, 2).replace('#', '')
 				},
 				"209": {
 					name: "(G) Guardian Sites",
-					color: randomColor().replace('#', '').toString()
+					color: CanonnPalette.of('guardian', 1, 2).replace('#', '')
 				},
 				"211": {
 					name: "(GV) Gas Vents",
-					color: randomColor().replace('#', '').toString()
+					color: CanonnPalette.of('geo', 1, 4).replace('#', '')
 				},
 				"212": {
 					name: "(GY) Geysers",
-					color: randomColor().replace('#', '').toString()
+					color: CanonnPalette.of('geo', 2, 4).replace('#', '')
 				},
 				"213": {
 					name: "(LS) Lava Spouts",
-					color: randomColor().replace('#', '').toString()
+					color: CanonnPalette.of('geo', 3, 4).replace('#', '')
 				},
 				"214": {
 					name: "(TB) Thargoid Barnacles",
-					color: randomColor().replace('#', '').toString()
+					color: CanonnPalette.of('thargoid', 0, 2).replace('#', '')
 				},
 				"215": {
 					name: "(TS) Thargoid Structure",
-					color: randomColor().replace('#', '').toString()
+					color: CanonnPalette.of('thargoid', 1, 2).replace('#', '')
 				},
 				"216": {
 					name: "(TW) Tube Worms",
-					color: randomColor().replace('#', '').toString()
+					color: CanonnPalette.of('bio', 5, 6).replace('#', '')
 				}
 			},
 			'Unknown Type': {

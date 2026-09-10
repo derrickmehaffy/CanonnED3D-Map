@@ -16,35 +16,35 @@ var canonnEd3d_guardians = {
 	systemsData: {
 		categories: {
 			"Guardian Ruins - (GR)": {
-				"401": { name: "Alpha",      color: randomColor().replace('#', '').toString() },
-				"402": { name: "Beta",       color: randomColor().replace('#', '').toString() },
-				"403": { name: "Gamma",      color: randomColor().replace('#', '').toString() },
+				"401": { name: "Alpha",      color: CanonnPalette.of('guardian', 0, 3).replace('#', '') },
+				"402": { name: "Beta",       color: CanonnPalette.of('guardian', 1, 3).replace('#', '') },
+				"403": { name: "Gamma",      color: CanonnPalette.of('guardian', 2, 3).replace('#', '') },
 				"404": { name: "Unknown GR", color: "800000" }
 			},
 			"Guardian Structures - (GS)": {
-				"501": { name: "Lacrosse",    color: randomColor().replace('#', '').toString() },
-				"502": { name: "Crossroads",  color: randomColor().replace('#', '').toString() },
-				"503": { name: "Fistbump",    color: randomColor().replace('#', '').toString() },
-				"504": { name: "Hammerbot",   color: randomColor().replace('#', '').toString() },
-				"505": { name: "Bear",        color: randomColor().replace('#', '').toString() },
-				"506": { name: "Bowl",        color: randomColor().replace('#', '').toString() },
-				"507": { name: "Turtle",      color: randomColor().replace('#', '').toString() },
-				"508": { name: "Robolobster", color: randomColor().replace('#', '').toString() },
-				"509": { name: "Squid",       color: randomColor().replace('#', '').toString() },
-				"510": { name: "Stickyhand",  color: randomColor().replace('#', '').toString() }
+				"501": { name: "Lacrosse",    color: CanonnPalette.of('guardian', 0, 10).replace('#', '') },
+				"502": { name: "Crossroads",  color: CanonnPalette.of('guardian', 1, 10).replace('#', '') },
+				"503": { name: "Fistbump",    color: CanonnPalette.of('guardian', 2, 10).replace('#', '') },
+				"504": { name: "Hammerbot",   color: CanonnPalette.of('guardian', 3, 10).replace('#', '') },
+				"505": { name: "Bear",        color: CanonnPalette.of('guardian', 4, 10).replace('#', '') },
+				"506": { name: "Bowl",        color: CanonnPalette.of('guardian', 5, 10).replace('#', '') },
+				"507": { name: "Turtle",      color: CanonnPalette.of('guardian', 6, 10).replace('#', '') },
+				"508": { name: "Robolobster", color: CanonnPalette.of('guardian', 7, 10).replace('#', '') },
+				"509": { name: "Squid",       color: CanonnPalette.of('guardian', 8, 10).replace('#', '') },
+				"510": { name: "Stickyhand",  color: CanonnPalette.of('guardian', 9, 10).replace('#', '') }
 			},
 			"Guardian Beacons - (GB)": {
-				"601": { name: "Beacon", color: randomColor().replace('#', '').toString() }
+				"601": { name: "Beacon", color: CanonnPalette.of('guardian', 0, 1).replace('#', '') }
 			},
 			"Brain Trees": {
-				"701": { name: "Roseum",       color: randomColor().replace('#', '').toString() },
-				"702": { name: "Gypseeum",     color: randomColor().replace('#', '').toString() },
-				"703": { name: "Ostrinum",     color: randomColor().replace('#', '').toString() },
-				"704": { name: "Viride",       color: randomColor().replace('#', '').toString() },
-				"705": { name: "Lividum",      color: randomColor().replace('#', '').toString() },
-				"706": { name: "Aureum",       color: randomColor().replace('#', '').toString() },
-				"707": { name: "Puniceum",     color: randomColor().replace('#', '').toString() },
-				"708": { name: "Lindigoticum", color: randomColor().replace('#', '').toString() }
+				"701": { name: "Roseum",       color: CanonnPalette.of('bio', 0, 8).replace('#', '') },
+				"702": { name: "Gypseeum",     color: CanonnPalette.of('bio', 1, 8).replace('#', '') },
+				"703": { name: "Ostrinum",     color: CanonnPalette.of('bio', 2, 8).replace('#', '') },
+				"704": { name: "Viride",       color: CanonnPalette.of('bio', 3, 8).replace('#', '') },
+				"705": { name: "Lividum",      color: CanonnPalette.of('bio', 4, 8).replace('#', '') },
+				"706": { name: "Aureum",       color: CanonnPalette.of('bio', 5, 8).replace('#', '') },
+				"707": { name: "Puniceum",     color: CanonnPalette.of('bio', 6, 8).replace('#', '') },
+				"708": { name: "Lindigoticum", color: CanonnPalette.of('bio', 7, 8).replace('#', '') }
 			}
 		},
 		systems: []

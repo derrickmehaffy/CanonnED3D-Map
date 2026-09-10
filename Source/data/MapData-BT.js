@@ -7,14 +7,14 @@ var canonnEd3d_bt = {
 	systemsData: {
 		categories: {
 			'Brain Trees - (BT)': {
-				'201': { name: 'Roseum Brain Tree',       color: randomColor().replace('#', '').toString() },
-				'202': { name: 'Gypseeum Brain Tree',     color: randomColor().replace('#', '').toString() },
-				'203': { name: 'Ostrinum Brain Tree',     color: randomColor().replace('#', '').toString() },
-				'204': { name: 'Viride Brain Tree',       color: randomColor().replace('#', '').toString() },
-				'205': { name: 'Lividum Brain Tree',      color: randomColor().replace('#', '').toString() },
-				'206': { name: 'Aureum Brain Tree',       color: randomColor().replace('#', '').toString() },
-				'207': { name: 'Puniceum Brain Tree',     color: randomColor().replace('#', '').toString() },
-				'208': { name: 'Lindigoticum Brain Tree', color: randomColor().replace('#', '').toString() },
+				'201': { name: 'Roseum Brain Tree',       color: CanonnPalette.of('bio', 0, 8).replace('#', '') },
+				'202': { name: 'Gypseeum Brain Tree',     color: CanonnPalette.of('bio', 1, 8).replace('#', '') },
+				'203': { name: 'Ostrinum Brain Tree',     color: CanonnPalette.of('bio', 2, 8).replace('#', '') },
+				'204': { name: 'Viride Brain Tree',       color: CanonnPalette.of('bio', 3, 8).replace('#', '') },
+				'205': { name: 'Lividum Brain Tree',      color: CanonnPalette.of('bio', 4, 8).replace('#', '') },
+				'206': { name: 'Aureum Brain Tree',       color: CanonnPalette.of('bio', 5, 8).replace('#', '') },
+				'207': { name: 'Puniceum Brain Tree',     color: CanonnPalette.of('bio', 6, 8).replace('#', '') },
+				'208': { name: 'Lindigoticum Brain Tree', color: CanonnPalette.of('bio', 7, 8).replace('#', '') },
 			},
 		},
 		systems: [],

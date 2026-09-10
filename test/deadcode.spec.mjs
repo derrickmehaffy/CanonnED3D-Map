@@ -133,3 +133,45 @@ test('the API is loaded before anything that uses it', () => {
   }
   expect(late, 'canonn-api.js has to come first').toEqual([]);
 });
+
+/* ── category colours are a fact about the data, not a per-visit accident ── */
+
+test('every page whose data needs the palette loads it, and loads it first',
+  async () => {
+  /* Read off disk rather than driven in a browser, for the same reason the
+     canonn-api.js checks below are: a page whose smoke test happens to be
+     skipped will not tell you its script tag is missing, and two of them
+     shipped that way. A data file that calls CanonnPalette on a page that
+     never loaded it is a ReferenceError at load, which takes the whole map
+     with it. */
+  const bad = [];
+  for (const page of pages) {
+    const html = read(page);
+    const data = [...html.matchAll(/data\/(MapData-[A-Za-z0-9_]+\.js)/g)].map((m) => m[1]);
+    const wants = data.some((d) => {
+      try { return read('data/' + d).includes('CanonnPalette'); } catch { return false; }
+    });
+    const has = html.includes('canonn-palette.js');
+    if (wants && !has) bad.push(page + ' calls CanonnPalette but never loads it');
+    if (!wants && has) bad.push(page + ' loads the palette and has no use for it');
+    if (wants && has) {
+      const first = Math.min(...data.map((d) => html.indexOf('data/' + d)));
+      if (html.indexOf('canonn-palette.js') > first) {
+        bad.push(page + ' loads the palette after the data file that calls it');
+      }
+    }
+  }
+  expect(bad).toEqual([]);
+});
+
+test('no map category picks its colour at random', async () => {
+  /* Eight data files used to set category colours with randomColor(), so
+     Guardian Ruins site types and Thargoid barnacle classes came up different
+     on every visit. The legend and the points always agreed with each other,
+     which is why it never looked broken and never got fixed — but a colour
+     nobody can learn is not a legend. */
+  const offenders = readdirSync(join(SRC, 'data'))
+    .filter((f) => f.endsWith('.js'))
+    .filter((f) => read('data/' + f).includes('randomColor'));
+  expect(offenders).toEqual([]);
+});

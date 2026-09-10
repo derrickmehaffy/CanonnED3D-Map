@@ -6,19 +6,19 @@ var canonnEd3d_gr = {
 			"Guardian Ruins - (GR)": {
 				"201": {
 					name: "Alpha",
-					color: randomColor().replace('#', '').toString()
+					color: CanonnPalette.of('guardian', 0, 3).replace('#', '')
 				},
 				"202": {
 					name: "Beta",
-					color: randomColor().replace('#', '').toString()
+					color: CanonnPalette.of('guardian', 1, 3).replace('#', '')
 				},
 				"203": {
 					name: "Gamma",
-					color: randomColor().replace('#', '').toString()
+					color: CanonnPalette.of('guardian', 2, 3).replace('#', '')
 				},
 				"214": {
 					name: "Unknown",
-					color: randomColor().replace('#', '').toString()
+					color: CanonnPalette.unknown.replace('#', '')
 				}
 			}
 		},

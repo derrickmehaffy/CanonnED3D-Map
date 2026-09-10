@@ -6,7 +6,7 @@ var canonnEd3d_gb = {
 			"Guardian Beacons - (GB)": {
 				"201": {
 					name: "Beacon",
-					color: randomColor().replace('#', '').toString()
+					color: CanonnPalette.of('guardian', 0, 1).replace('#', '')
 				}
 			}
 		},

@@ -3,16 +3,16 @@ var canonnEd3d_gs = {
 	systemsData: {
 		categories: {
 			"Guardian Structures - (GS)": {
-				"301": { name: "Lacrosse",   color: randomColor().replace('#', '').toString() },
-				"302": { name: "Crossroads", color: randomColor().replace('#', '').toString() },
-				"303": { name: "Fistbump",   color: randomColor().replace('#', '').toString() },
-				"304": { name: "Hammerbot",  color: randomColor().replace('#', '').toString() },
-				"305": { name: "Bear",       color: randomColor().replace('#', '').toString() },
-				"306": { name: "Bowl",       color: randomColor().replace('#', '').toString() },
-				"307": { name: "Turtle",     color: randomColor().replace('#', '').toString() },
-				"308": { name: "Robolobster",color: randomColor().replace('#', '').toString() },
-				"309": { name: "Squid",      color: randomColor().replace('#', '').toString() },
-				"310": { name: "Stickyhand", color: randomColor().replace('#', '').toString() }
+				"301": { name: "Lacrosse",   color: CanonnPalette.of('guardian', 0, 10).replace('#', '') },
+				"302": { name: "Crossroads", color: CanonnPalette.of('guardian', 1, 10).replace('#', '') },
+				"303": { name: "Fistbump",   color: CanonnPalette.of('guardian', 2, 10).replace('#', '') },
+				"304": { name: "Hammerbot",  color: CanonnPalette.of('guardian', 3, 10).replace('#', '') },
+				"305": { name: "Bear",       color: CanonnPalette.of('guardian', 4, 10).replace('#', '') },
+				"306": { name: "Bowl",       color: CanonnPalette.of('guardian', 5, 10).replace('#', '') },
+				"307": { name: "Turtle",     color: CanonnPalette.of('guardian', 6, 10).replace('#', '') },
+				"308": { name: "Robolobster",color: CanonnPalette.of('guardian', 7, 10).replace('#', '') },
+				"309": { name: "Squid",      color: CanonnPalette.of('guardian', 8, 10).replace('#', '') },
+				"310": { name: "Stickyhand", color: CanonnPalette.of('guardian', 9, 10).replace('#', '') }
 			}
 		},
 		systems: []
