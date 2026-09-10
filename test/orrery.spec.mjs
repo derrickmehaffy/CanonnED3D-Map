@@ -3428,3 +3428,43 @@ test('a rail width recorded by the old bug heals itself', async ({ page }) => {
   expect(w.left, 'wide enough to read').toBeGreaterThanOrEqual(220);
   expect(w.right, 'wide enough to read').toBeGreaterThanOrEqual(220);
 });
+
+test('the header does not jump when the orrery opens over a map', async ({ page }) => {
+  /* The orrery covers the whole page — position:fixed, inset:0 — so its header
+     replaces the console's visually rather than sitting under it. They were
+     44px and 46px, so the chrome moved two pixels on open. Nobody would file
+     that, and it is still the difference between one product and two. */
+  await openOrrery(page);
+  const heights = await page.evaluate(() => ({
+    orrery: Math.round(document.querySelector('.orr-top').getBoundingClientRect().height),
+    console: Math.round(document.querySelector('.top').getBoundingClientRect().height)
+  }));
+  expect(heights.orrery).toBe(heights.console);
+});
+
+test('the close button is hittable, and only there when it can close something',
+  async ({ page }) => {
+  /* It was 19x19, under the smallest target a pointer should have to hit, and
+     the console's card close was 21x17 with the same problem — the same
+     control, undersized in both places.
+
+     The visibility half is here because raising the size broke it once: the
+     base rule must not set `display`, since .orr-page toggles this button
+     between none and block and a display in the base rule wins over the none,
+     putting a close button on a page with nothing to close. */
+  await stubDataHosts(page);
+  await stubApi(page);
+
+  // Standalone, nothing chosen yet: no close.
+  await page.goto('/orrery.html', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#orr-q')).toBeVisible({ timeout: 60_000 });
+  // By id: .orr-x is also worn by the station sheet's own close.
+  await expect(page.locator('#orr-close')).toBeHidden();
+
+  // With a system, it is there and big enough.
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+  const box = await page.locator('#orr-close').boundingBox();
+  expect(box.width, 'wide enough to hit').toBeGreaterThanOrEqual(24);
+  expect(box.height, 'tall enough to hit').toBeGreaterThanOrEqual(24);
+});

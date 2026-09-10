@@ -60,12 +60,18 @@ body.orrery-open .app{visibility:hidden}
 .orr-page:not(.has-system) .orr-empty{display:flex}
 
 /* top */
-.orr-top{display:flex;align-items:center;gap:12px;min-height:46px;
+/* 44px, which is the height of the console's own header — see .app's
+   grid-template-rows in console.css. The orrery covers the whole page
+   when it opens over a map, so its header replaces that one visually;
+   at 46px the chrome jumped two pixels on open, which is exactly the
+   sort of thing that makes one product read as two. */
+.orr-top{display:flex;align-items:center;gap:12px;min-height:44px;
   padding:env(safe-area-inset-top) max(12px,env(safe-area-inset-right)) 0
           max(12px,env(safe-area-inset-left));
   border-bottom:1px solid var(--rule,#1B242E);background:var(--panel,#0C1116);
   position:relative;z-index:5}
-.orr-home{align-items:center;gap:9px;color:var(--amber,#FF9D00);text-decoration:none;flex:none}
+.orr-home{align-items:center;gap:9px;color:var(--amber,#FF9D00);text-decoration:none;
+  flex:none;min-height:24px}
 .orr-home svg{width:19px;height:19px}
 .orr-home span{font-family:var(--cond,sans-serif);font-size:14px;font-weight:600;
   letter-spacing:.02em;color:var(--text,#CAD4DC)}
@@ -130,8 +136,13 @@ body.orrery-open .app{visibility:hidden}
   color:#E4EBF1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .orr-title span{font-family:var(--mono,monospace);font-size:10.5px;
   color:var(--dimmer,#6E7F8D);white-space:nowrap}
+/* 24px square minimum, matching the console's card close — it was 19x19,
+   under the smallest target a pointer should have to hit. No display here:
+   .orr-page toggles this button between none and block, and a display in the
+   base rule would win over the none and show it on a page with no system. */
 .orr-x{color:var(--dimmer,#6E7F8D);font-size:19px;line-height:1;background:none;
-  border:0;cursor:pointer;padding:0 4px}
+  border:0;cursor:pointer;padding:0 4px;min-width:24px;min-height:24px;
+  text-align:center}
 .orr-x:hover{color:var(--text,#CAD4DC)}
 
 /* ── the spine ──────────────────────────────────────────────────────────────
@@ -693,7 +704,8 @@ body.orr-dragging{user-select:none}
    signed ladder, backwards through real time to forwards, lives on it. */
 .orr-speed{width:132px;height:24px;margin:0 2px;accent-color:var(--amber,#FF9D00);
   cursor:pointer;background:transparent}
-.orr-speed:focus-visible{outline:1px solid var(--amber,#FF9D00);outline-offset:2px}
+/* 2px, like every other focus ring in both stylesheets. */
+.orr-speed:focus-visible{outline:2px solid var(--amber,#FF9D00);outline-offset:2px}
 @media (max-width:520px){.orr-speed{width:88px}}
 
 .orr-rate{margin-left:6px;min-width:78px;font-family:var(--mono,monospace);

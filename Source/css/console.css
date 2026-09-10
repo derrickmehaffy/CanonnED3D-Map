@@ -237,7 +237,11 @@ body.bare .top, body.bare .strip{display:none}
 .c-h{padding:11px 13px;border-bottom:1px solid var(--rule);display:flex;
   justify-content:space-between;align-items:flex-start;gap:8px}
 .c-h .n{font-family:var(--cond);font-size:15.5px;font-weight:600;color:#E4EBF1;line-height:1.25}
-.c-h .x{color:var(--dimmer);font-size:15px;line-height:1;flex:none}
+/* 24px square minimum. It was 21x17, which is under the smallest target
+   a pointer should have to hit, and the orrery's close was the same size
+   with the same problem — the same control, undersized in both places. */
+.c-h .x{color:var(--dimmer);font-size:15px;line-height:1;flex:none;
+  min-width:24px;min-height:24px;display:grid;place-items:center;margin:-4px -6px -4px 0}
 .c-h .x:hover{color:var(--text)}
 .c-meta{padding:9px 13px;font-family:var(--mono);font-size:10.5px;color:var(--dimmer);
   line-height:1.7;border-bottom:1px solid var(--rule)}
@@ -434,7 +438,7 @@ body.resizing .side-grip::after{background:var(--amber)}
 .card .c-grip::after{content:'';position:absolute;left:3px;bottom:3px;
   width:7px;height:7px;border-left:2px solid var(--rule);border-bottom:2px solid var(--rule)}
 .card .c-grip:hover::after{border-color:var(--amber)}
-.card .c-reset{display:block;margin-left:auto;font-family:var(--mono);
+.card .c-reset{display:block;margin-left:auto;min-height:24px;font-family:var(--mono);
   font-size:9.5px;color:var(--dimmer);
   background:none;border:0;cursor:pointer;padding:0 13px 9px}
 .card .c-reset:hover{color:var(--amber)}

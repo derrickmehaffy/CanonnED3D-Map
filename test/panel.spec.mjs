@@ -316,3 +316,72 @@ test('the real named stars can be shown on the map, where they are',
   await expect.poll(() => page.evaluate(() => window.CanonnConsole.namedStars()),
     { timeout: 10_000 }).toBe(0);
 });
+
+test('nothing in the console is set smaller than it can be read at', async () => {
+  /* The orrery has had this guarantee for a while; the console had none, and
+     the two are meant to read as one product. Nine pixels is the floor, and
+     what sits there is uppercase micro-labelling with letter-spacing, which
+     reads a size larger than it is set.
+
+     One carve-out, and it is a real distinction rather than a convenience:
+     .c-star-scoop's ::before is the content '◆', a diamond marking a
+     scoopable star. A glyph is seen, not read, and its size is chosen for
+     optical balance against the 11px line it sits on — the floor is about
+     legibility of text. */
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('../Source/css/console.css', import.meta.url), 'utf8');
+
+  const rules = [...css.matchAll(/([^{}]+)\{([^}]*font-size:\s*([0-9.]+)px[^}]*)\}/g)]
+    .map((m) => ({ sel: m[1].trim().split('\n').pop().trim(), px: parseFloat(m[3]), body: m[2] }));
+  expect(rules.length, 'found the rules to check').toBeGreaterThan(30);
+
+  const text = rules.filter((r) => !/::before|::after/.test(r.sel) || !/content:/.test(r.body));
+  const small = text.filter((r) => r.px < 9).map((r) => `${r.sel} @ ${r.px}px`);
+  expect(small, 'text below the nine-pixel floor').toEqual([]);
+});
+
+test('every focus ring in both stylesheets is the same ring', async () => {
+  /* One amber 2px outline, offset 2px, is the focus style for the whole
+     product. It drifted once — the orrery's speed slider went in at 1px — and
+     a focus ring that changes weight between controls reads as two products
+     rather than one. */
+  const { readFileSync } = await import('node:fs');
+  const odd = [];
+  for (const f of ['console.css', 'orrery.css']) {
+    const css = readFileSync(new URL('../Source/css/' + f, import.meta.url), 'utf8');
+    for (const m of css.matchAll(/([^{}]*:focus-visible[^{}]*)\{([^}]*)\}/g)) {
+      const body = m[2];
+      if (!/outline\s*:/.test(body)) continue;            // e.g. the grip, which tints
+      const w = (body.match(/outline\s*:\s*([0-9.]+)px/) || [])[1];
+      if (w && w !== '2') odd.push(`${f}: ${m[1].trim()} → ${w}px`);
+    }
+  }
+  expect(odd).toEqual([]);
+});
+
+test('the chrome you click is big enough to click', async ({ page }) => {
+  /* The card's close was 21x17 and the orrery's 19x19 — the same control,
+     undersized in both places, which is how a shared idiom drifts. Anything
+     that is chrome rather than data gets 24px in each direction.
+
+     Deliberately not everything: the orrery's spine draws an 8px pip per body
+     on a dense axis, and links inside a sentence in the card are inline. Both
+     have an equivalent full-size path — the body list, and the card's own
+     buttons — which is the exemption that matters here. */
+  await withSystems(page, 60);
+  await page.locator('.rail button[data-p="systems"]').click();
+  await page.locator('.sysrow[data-sys]').first().click();
+  await expect(page.locator('#card .c-h')).toBeVisible({ timeout: 20_000 });
+
+  const small = await page.evaluate(() => {
+    const out = [];
+    document.querySelectorAll('#card .c-h .x, #card .c-reset, .rail button').forEach((e) => {
+      const b = e.getBoundingClientRect();
+      if (b.width && b.height && (b.width < 24 || b.height < 24)) {
+        out.push((e.id || e.className) + ' ' + Math.round(b.width) + 'x' + Math.round(b.height));
+      }
+    });
+    return out;
+  });
+  expect(small).toEqual([]);
+});
