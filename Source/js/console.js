@@ -1264,7 +1264,8 @@
   }
 
   /* ── routes: parse a journal in-browser and push it onto the live map ─── */
-  var DROP_PROMPT = 'Drop a <b>Journal*.log</b> here<br>or click to choose a file';
+  var DROP_PROMPT = 'Drop a <b>Journal*.log</b> or a <b>Spansh</b> export here' +
+    '<br>or click to choose a file';
 
   /* Taking hold of the map overrules a flight in progress — the same rule the
      orrery follows when a pointer lands on its canvas. */
@@ -1301,6 +1302,52 @@
      just given you one blames the file for the wrong thing, so a quiet
      journal is told apart from something that is not a journal at all, and
      neither is called a failure. */
+  /* A Spansh export, which is a whole JSON document rather than a line per
+     event — so a scan for FSDJump lines finds nothing in one, which is the
+     whole of "the file upload has stopped working for some of the spansh
+     json". It never worked; the file picker just kept advertising .json.
+
+     Three shapes turn up, and all three are real: a system dump comes back
+     under a "system" key, a search under "min_max", and a plotted route as a
+     bare ordered array. Coordinates arrive either as a "coords" object or
+     flat on the row. Nothing here guesses — anything without a name and a
+     pair of coordinates is passed over, and if none of it lands the file
+     falls through to the journal reader. */
+  var SPANSH_LISTS = ['min_max', 'results', 'systems', 'records', 'route'];
+
+  function readSpansh(text, label) {
+    var doc;
+    try { doc = JSON.parse(text); } catch (e) { return null; }
+    if (!doc || typeof doc !== 'object') return null;
+
+    var rows = null;
+    if (Array.isArray(doc)) rows = doc;
+    else if (doc.system && typeof doc.system === 'object') rows = [doc.system];
+    else {
+      for (var i = 0; i < SPANSH_LISTS.length; i++) {
+        if (Array.isArray(doc[SPANSH_LISTS[i]])) { rows = doc[SPANSH_LISTS[i]]; break; }
+      }
+    }
+    if (!Array.isArray(rows)) return null;
+
+    var seen = {}, systems = [], jumps = [];
+    rows.forEach(function (r) {
+      if (!r || typeof r !== 'object') return;
+      var n = r.name || r.system || r.systemName;
+      var c = r.coords && typeof r.coords === 'object' ? r.coords : r;
+      if (!n || typeof c.x !== 'number' || typeof c.y !== 'number' ||
+          typeof c.z !== 'number') return;
+      // Game coordinates, handed over as they came: System.create does the
+      // one negation the scene needs, and doing it twice mirrors the system.
+      var at = { x: c.x, y: c.y, z: c.z };
+      jumps.push({ s: n, coords: at });
+      if (seen[n]) return;
+      seen[n] = 1;
+      systems.push({ name: n, infos: 'From ' + label, coords: at });
+    });
+    return systems.length ? { systems: systems, journal: true, jumps: jumps } : null;
+  }
+
   function readJournal(text, label) {
     /* Two readings of the same file. `systems` is what goes on the map, one
        per system — a system visited twice is one point. `jumps` is the
@@ -1317,7 +1364,13 @@
       try {
         var j = JSON.parse(line);
         if (j.event !== 'FSDJump' || !j.StarPos || !j.StarSystem) return;
-        var at = { x: j.StarPos[0], y: j.StarPos[1], z: -j.StarPos[2] };
+        /* Not negated here. System.create negates z on the way in — "Revert
+           Z coord" — so negating it first landed every dropped system
+           mirrored through the galactic plane from everything native to the
+           map, and handed sign-flipped coordinates out of the card. Measured
+           against Spansh both ways round: a native system stores minus its
+           game z, and this now does too. */
+        var at = { x: j.StarPos[0], y: j.StarPos[1], z: j.StarPos[2] };
         jumps.push({ s: j.StarSystem, coords: at });
         if (seen[j.StarSystem]) return;
         seen[j.StarSystem] = 1;
@@ -1341,7 +1394,12 @@
   var journeySeq = 0;
   function drawJourney(jumps, colour) {
     if (typeof Route === 'undefined' || !Route.createRoute || jumps.length < 2) return null;
-    var route = { points: jumps, color: colour, circle: true };
+    /* No start and end circles. Route draws them as tori, which is also what
+       the selection cursor is, so two per file arrive looking exactly like
+       selections nobody made and cannot clear — reported as "phantom
+       selections on the journal routes that I can't get rid of". The systems
+       are already drawn as points; the ends of the line need no ornament. */
+    var route = { points: jumps, color: colour, circle: false };
     var id = 'journal-' + (journeySeq++);
     Route.initRoute(id, route);
     Route.createRoute(id, route);
@@ -1404,19 +1462,23 @@
       }
       if (alien.length) {
         note += (note ? '<br>' : '') + (alien.length === 1
-          ? '<b>' + esc(alien[0]) + '</b> is not a journal.'
-          : alien.length + ' of those are not journals.');
+          ? '<b>' + esc(alien[0]) + '</b> is neither a journal nor a Spansh export.'
+          : alien.length + ' of those are neither journals nor Spansh exports.');
       }
       if (!note) return;
       $('drop').innerHTML = plotted
         ? DROP_PROMPT + '<div class="skipped">' + note + '</div>'
-        : note + '<br>Drop a <b>Journal*.log</b> from your game folder.';
+        : note + '<br>Drop a <b>Journal*.log</b> from your game folder, or a Spansh export.';
     }
 
     list.forEach(function (f) {
       var rd = new FileReader();
       rd.onload = function () {
-        var got = readJournal(String(rd.result), f.name);
+        /* Spansh first, because a journal is a line per event and will not
+           parse as one document — so the Spansh reader declines it and the
+           journal reader takes it, rather than the other way about. */
+        var raw = String(rd.result);
+        var got = readSpansh(raw, f.name) || readJournal(raw, f.name);
         if (got.systems.length) {
           var colour = ROUTE_COLOURS[extraRoutes.length % ROUTE_COLOURS.length];
           Ed3d.addBatch({ systems: got.systems });

@@ -515,6 +515,19 @@ test('a dropped journal joins the dots, in its own colour', async ({ page }) => 
   // One line for the file, drawn through the jumps it found.
   await expect.poll(async () => (await lines()).length, { timeout: 20_000 }).toBe(1);
 
+  /* And nothing else. Route can mark a line's ends with a torus, which is
+     also what the selection cursor is — so they arrived looking like
+     selections nobody made and could not clear. The systems are already
+     drawn as points. */
+  const rings = await page.evaluate(() => {
+    const out = [];
+    window.scene.traverse((o) => {
+      if (o.name && /^route-journal-.*-(first|last)$/.test(o.name)) out.push(o.name);
+    });
+    return out;
+  });
+  expect(rings, 'no start or end ornaments').toEqual([]);
+
   // And the layer's swatch says which line is which, rather than every file
   // being the same green.
   const swatch = await added.locator('.sw').evaluate((e) =>
@@ -649,4 +662,117 @@ test('a system from a journal opens its card like any other', async ({ page }) =
   await expect(page.locator('#card .c-h')).toContainText(name, { timeout: 20_000 });
   // And it says where it came from, rather than claiming to be map data.
   await expect(page.locator('#card')).toContainText(/journal-with-route/);
+});
+
+/* ── Spansh exports ─────────────────────────────────────────────────────── */
+
+async function spansh(name) {
+  const { readFileSync } = await import('node:fs');
+  return { name, mimeType: 'application/json',
+           buffer: readFileSync(new URL(name, FIXTURES)) };
+}
+
+test('a Spansh system dump plots the system it describes', async ({ page }) => {
+  /* The other half of "the file upload has stopped working for some of the
+     spansh json". It never worked: a Spansh dump is one pretty-printed JSON
+     document, so a line-by-line scan for FSDJump finds nothing in it, while
+     the file picker went on advertising .json. */
+  await onMap(page);
+  await page.locator(rail('routes')).click();
+  await page.locator('#fileinput').setInputFiles([await spansh('spansh-system.json')]);
+
+  const added = page.locator('#side .layer[data-jr]', { hasText: 'spansh-system' });
+  await expect(added).toBeVisible({ timeout: 20_000 });
+  await expect(added.locator('.ct')).toHaveText('1');
+
+  // Sol, at the origin, which is where Spansh says it is.
+  const at = await page.evaluate(() => {
+    const p = System.points.find((q) => q && q.name === 'Sol' && /spansh/.test(q.infos || ''));
+    return p ? [p.x, p.y, p.z] : null;
+  });
+  expect(at[0]).toBe(0); expect(at[1]).toBe(0); expect(Math.abs(at[2])).toBe(0);
+});
+
+test('a Spansh search result plots every system in it', async ({ page }) => {
+  await onMap(page);
+  await page.locator(rail('routes')).click();
+  await page.locator('#fileinput').setInputFiles([await spansh('spansh-search.json')]);
+
+  const added = page.locator('#side .layer[data-jr]', { hasText: 'spansh-search' });
+  await expect(added).toBeVisible({ timeout: 20_000 });
+  // Twenty, straight out of Spansh's own reply — and coordinates given flat
+  // on the row rather than under a "coords" object, which is the other shape.
+  await expect(added.locator('.ct')).toHaveText('20');
+
+  const one = await page.evaluate(() => {
+    const p = System.points.find((q) => q && q.name === 'Synuefe WH-F c1');
+    return p ? [p.x, p.y, p.z] : null;
+  });
+  // Stored as minus the game z, exactly as every native system is.
+  expect(one).toEqual([-47.9375, -162.75, 1046.125]);
+});
+
+test('a Spansh route is joined in the order it was plotted', async ({ page }) => {
+  await onMap(page);
+  await page.locator(rail('routes')).click();
+  await page.locator('#fileinput').setInputFiles([await spansh('spansh-route.json')]);
+
+  await expect(page.locator('#side .layer[data-jr]', { hasText: 'spansh-route' }))
+    .toBeVisible({ timeout: 20_000 });
+  // A plotted route is an order, so it gets a line like a journal's does.
+  await expect.poll(() => page.evaluate(() => {
+    let n = 0;
+    window.scene.traverse((o) => {
+      if (o.name && o.name.indexOf('route-journal-') === 0 && o.isLine2) n++;
+    });
+    return n;
+  }), { timeout: 20_000 }).toBe(1);
+});
+
+test('a dropped system lands where the map already puts systems', async ({ page }) => {
+  /* The convention, pinned. System.create negates z on the way in — "Revert
+     Z coord" — so a caller that negates it first lands the system mirrored
+     through the galactic plane from everything native to the map. The journal
+     drop did exactly that from the day it was written, which put every route
+     it drew on the wrong side of the galaxy from the Canonn data beside it,
+     and handed out sign-flipped coordinates from the card as well.
+
+     Measured against Spansh both ways round: a native system stores minus its
+     game z, and a dropped one must do the same. */
+  await onMap(page);
+  await page.locator(rail('routes')).click();
+
+  // Real coordinates, so the numbers mean something: Spansh puts LFT 672 here.
+  const GAME = { x: -11.8125, y: 33.6875, z: -30.6875 };
+  await page.locator('#fileinput').setInputFiles([{
+    name: 'zcheck.log', mimeType: 'text/plain',
+    buffer: Buffer.from(JSON.stringify({
+      event: 'FSDJump', StarSystem: 'LFT 672',
+      StarPos: [GAME.x, GAME.y, GAME.z]
+    }) + '\n' + JSON.stringify({
+      event: 'FSDJump', StarSystem: 'Sirius', StarPos: [6.25, -1.28125, -5.75]
+    }) + '\n')
+  }]);
+  await expect(page.locator('#side .layer[data-jr]')).toBeVisible({ timeout: 20_000 });
+
+  const stored = await page.evaluate(() => {
+    const p = System.points.find((q) => q && q.name === 'LFT 672');
+    return p ? { x: p.x, y: p.y, z: p.z } : null;
+  });
+  expect(stored.x).toBeCloseTo(GAME.x, 4);
+  expect(stored.y).toBeCloseTo(GAME.y, 4);
+  expect(stored.z, 'stored z is minus the game z, as for every native system')
+    .toBeCloseTo(-GAME.z, 4);
+
+  // And the card hands the game coordinates back out unchanged.
+  await page.evaluate(() => {
+    window.__wrote = null;
+    navigator.clipboard.writeText = (t) => { window.__wrote = t; return Promise.resolve(); };
+    const p = System.points.find((q) => q && q.name === 'LFT 672');
+    Action.oldSel = null; Action.moveToObj(System.points.indexOf(p), p);
+  });
+  await expect(page.locator('#card .c-h')).toContainText('LFT 672', { timeout: 20_000 });
+  await page.locator('#ccoords').click();
+  const back = await page.evaluate(() => window.__wrote);
+  expect(back.split(', ').map(Number)[2]).toBeCloseTo(GAME.z, 4);
 });

@@ -130,10 +130,26 @@ The three cover what real journals actually look like:
 | `journal-no-jumps.log` | A real evening that never left the system. Three of five real journals look like this; it is not a broken file |
 | `journal-near-empty.log` | A session that opened and closed — one header line |
 
-Spansh exports are a different shape and are **not** parsed yet: a Spansh dump
-is one pretty-printed JSON document, so the line-by-line `FSDJump` scan finds
-nothing in it. The file picker still advertises `.json`, which is why it reads
-as broken rather than unimplemented.
+## Spansh fixtures
+
+Spansh exports are a different shape from a journal — one JSON document rather
+than a line per event — and three of those shapes turn up. Two of these
+fixtures are **real replies from the Spansh API**; one is constructed, and it
+matters which:
+
+| Fixture | Provenance |
+|---|---|
+| `spansh-system.json` | Real: `api/dump/10477373803` (Sol), trimmed to the system block and two bodies. The parser reads a name and coordinates; 1.9 MB of bodies proves nothing extra |
+| `spansh-search.json` | Real, verbatim: `api/systems/field_values/system_names?q=Synuefe WH-F`, 20 systems with coordinates flat on the row rather than under `coords` |
+| `spansh-route.json` | **Constructed** — a bare ordered array, the plotter's shape. The wrapper is mine; the coordinates are lifted out of the search reply above, so the numbers are Frontier's |
+
+One thing worth knowing before adding to these. `System.create` negates z on
+the way in — `var z = -parseFloat(val.coords.z); //-- Revert Z coord` — so a
+caller hands over **game** coordinates and lets it do that once. Negating
+first lands the system mirrored through the galactic plane from everything
+native to the map, which is what the journal drop did from the day it was
+written. `a dropped system lands where the map already puts systems` pins the
+convention with real coordinates, checked against Spansh in both directions.
 
 ## What this suite does not do
 
