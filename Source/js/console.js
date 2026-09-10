@@ -1827,6 +1827,12 @@
         '<button class="wide alt" id="correry" hidden>Open the orrery <span class="ax">&#9678;</span></button>' +
         '<a class="wide" href="https://signals.canonn.tech/?system=' + q + '" target="_blank" rel="noopener">Open in Signals <span class="ax">&#8599;</span></a>' +
         '<button id="ccopy">Copy name</button><button id="clink">Copy link</button>' +
+        /* Asked for by a reader who plots routes by hand: "I am so sick to
+           death of copying the xyz from spansh or edsm". Game coordinates —
+           what the card is already showing — comma separated, nothing to
+           strip. Signals offers the same three delimited by comma, pipe or
+           tab; this is the comma. */
+        '<button id="ccoords">Copy x, y, z</button>' +
       '<button id="ccentre">Centre here</button>' +
       '</div>' +
       '<button class="c-reset" id="creset">Reset position</button>';
@@ -1855,18 +1861,22 @@
 
     $('card-x').onclick = closeCard;
     makeCardMovable(c);
-    $('ccopy').onclick = function () {
-      var b = this;
-      navigator.clipboard.writeText(s.n).then(function () {
-        b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy name'; }, 1200);
-      }).catch(function () { b.textContent = 'Copy failed'; });
-    };
-    $('clink').onclick = function () {
-      var b = this;
-      navigator.clipboard.writeText(systemLink(s.n)).then(function () {
-        b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy link'; }, 1200);
-      }).catch(function () { b.textContent = 'Copy failed'; });
-    };
+    /* Says "Copied" on the button that was pressed and puts its own label
+       back, rather than three copies of the same dance. */
+    function copies(id, label, text) {
+      $(id).onclick = function () {
+        var b = this;
+        navigator.clipboard.writeText(text()).then(function () {
+          b.textContent = 'Copied';
+          setTimeout(function () { b.textContent = label; }, 1200);
+        }).catch(function () { b.textContent = 'Copy failed'; });
+      };
+    }
+    copies('ccopy', 'Copy name', function () { return s.n; });
+    copies('clink', 'Copy link', function () { return systemLink(s.n); });
+    copies('ccoords', 'Copy x, y, z', function () {
+      return [s.x, s.y, s.z].join(', ');
+    });
     $('ccentre').onclick = function () {
       controls.target.set(s.x, s.y, -s.z);
       moveTo({ x: s.x - 120, y: s.y + 90, z: -s.z + 120 });

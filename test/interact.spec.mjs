@@ -441,3 +441,43 @@ test('picking a system flies there rather than cutting', async ({ page }) => {
   expect(steps, 'the camera went somewhere').toBeGreaterThan(1);
   expect(between, 'it was seen part of the way there').toBeGreaterThan(3);
 });
+
+test('the card hands out the coordinates, ready to paste', async ({ page }) => {
+  /* Asked for: "could a fourth box get thrown in there for 'copy x,y,z' as
+     simple text delimited coords with commas, because I am so sick to death
+     of copying the xyz from spansh or edsm and this gives a hugely faster way
+     of finding plotting data."
+
+     Game coordinates, which are what the card already shows and what every
+     other tool wants — the scene negates z when it points the camera, and
+     copying that would hand out a mirror of the system. */
+  await onMap(page);
+  await page.evaluate(() => {
+    window.__wrote = null;
+    navigator.clipboard.writeText = (t) => { window.__wrote = t; return Promise.resolve(); };
+  });
+
+  await page.locator(rail('systems')).click();
+  const row = page.locator('.sysrow[data-sys]').first();
+  await row.click();
+  await expect(page.locator('#card .c-h')).toBeVisible({ timeout: 20_000 });
+
+  await page.locator('#ccoords').click();
+  const wrote = await page.evaluate(() => window.__wrote);
+
+  // Three numbers, comma separated, and nothing else to strip out.
+  expect(wrote).toMatch(/^-?\d+(\.\d+)?, -?\d+(\.\d+)?, -?\d+(\.\d+)?$/);
+
+  // The same three the card is showing, in the same order.
+  const shown = await page.locator('#card .c-meta').textContent();
+  const nums = wrote.split(', ');
+  for (const n of nums) expect(shown).toContain(n);
+
+  // And they are the game's coordinates, not the scene's mirrored z.
+  const rec = await page.evaluate(() => {
+    const n = document.querySelector('#card .c-h').textContent.replace(/×$/, '').trim();
+    const p = System.points.find((q) => q.name === n);
+    return p ? { x: p.x, y: p.y, z: p.z } : null;
+  });
+  expect(Number(nums[2])).toBeCloseTo(-rec.z, 3);
+});

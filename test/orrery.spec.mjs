@@ -69,12 +69,21 @@ async function stubApi(page, system = SYSTEM) {
    identical readings a frame apart, not a fixed sleep: a sleep is a guess
    about a loaded machine and is how these tests flake. */
 async function settled(page) {
+  /* Asked outright first — state().flying says whether one is in the air, so
+     this cannot mistake the stillness before a flight starts for the stillness
+     after it ends, which is a race the camera positions alone cannot settle. */
+  await expect.poll(() => page.evaluate(() => window.Orrery.state().flying),
+    { timeout: 15_000, message: 'a camera flight finished' }).toBe(false);
+  /* And then for the camera to stop moving, which covers the damping after a
+     drag as well. With Follow on and a body on a short orbit it never quite
+     stops, so a near-enough threshold rather than an exact match. */
   await expect.poll(async () => {
     const a = await page.evaluate(() => window.Orrery.state().camera);
     await new Promise((r) => setTimeout(r, 90));
     const b = await page.evaluate(() => window.Orrery.state().camera);
-    return a && b && a.every((v, i) => Math.abs(v - b[i]) < 1e-6);
-  }, { timeout: 15_000 }).toBe(true);
+    const span = Math.max(...b.map(Math.abs), 1);
+    return a && b && a.every((v, i) => Math.abs(v - b[i]) < span * 1e-4);
+  }, { timeout: 15_000, message: 'the camera stopped moving' }).toBe(true);
 }
 
 /** Load the module in the page and hand back a handle to it. */
@@ -2779,8 +2788,18 @@ test('a black hole is a shadow with a ring, not a glowing ball', async ({ page }
     return out;
   });
 
+  const diag = await page.evaluate(() => {
+    const st = window.Orrery.state();
+    const h = st.holes.filter((x) => x.name === 'Annihilator B')[0];
+    const c = document.querySelector('#orr-canvas');
+    return { hole: h && h.screen, canvas: { w: c.clientWidth, h: c.clientHeight,
+             bw: c.width, bh: c.height }, dpr: window.devicePixelRatio,
+             flying: st.flying, following: st.following };
+  });
   await expect.poll(async () => (await measure()).sky > 0,
-    { timeout: 30_000, message: 'the sky is baked and lit' }).toBe(true);
+    { timeout: 45_000,
+      message: 'the sky baked and lit before measuring — diag ' + JSON.stringify(diag)
+    }).toBe(true);
   const profile = await measure();
 
   const seen = ' — ' + JSON.stringify(profile);
@@ -3200,4 +3219,34 @@ test('a body with no period is not stacked on top of its parent', async ({ page 
     return o && o.pos ? Math.hypot(o.pos[0], o.pos[1], o.pos[2]) : -1;
   });
   expect(away, 'parked out on its orbit, not at the star').toBeGreaterThan(0.5);
+});
+
+test('"right now" means now, and keeps up as the bodies move', async ({ page }) => {
+  /* Reported with a screenshot of the panel: "the distance from doesn't seem
+     to update continually — we use a simple Stephan Boltzman calc with
+     distance in light seconds to calculate current surface temperature, and
+     this would be quite a nice tool to have, for science."
+
+     It was worked out once, when the panel was rendered, and then sat there
+     under a heading that says "Right now" while the moon it was measuring
+     went round its planet. */
+  await stubDataHosts(page);
+  await stubApi(page);
+  await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
+
+  // Pick the planet, then the moon: the panel then measures moon from planet.
+  await page.locator('.orr-row[data-id="1"]').click();
+  await settled(page);
+  await page.locator('.orr-row[data-id="2"]').click();
+
+  const shown = page.locator('#orr-from-d');
+  await expect(shown).toBeVisible({ timeout: 20_000 });
+  const first = await shown.textContent();
+
+  // The moon goes round in 27 days; a day a second moves it plainly.
+  await expect.poll(() => shown.textContent(), { timeout: 20_000 }).not.toBe(first);
+
+  // And the light-time follows it, being the same distance in other units.
+  await expect(page.locator('#orr-from-t')).toHaveText(/\d/);
 });

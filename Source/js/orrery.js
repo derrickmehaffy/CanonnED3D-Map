@@ -3475,8 +3475,10 @@ const Orrery = (function () {
     // Parents before children, so a moon can read its planet's fresh position.
     meshes.forEach((m) => { m.node._done = false; });
     meshes.forEach((m) => place(m.node));
-    // After placement: a flight aims at where its body is now.
+    // After placement: a flight aims at where its body is now, and the
+    // distance between two bodies is the distance between them now.
     stepFlight(dtSeconds);
+    updateFromLast();
 
     meshes.forEach((m) => {
       const n = m.node;
@@ -4243,17 +4245,47 @@ const Orrery = (function () {
   /* An orrery invites "how far is that from that", and there was no way to
      ask it. There is no mode: pick a body, then pick another, and the second
      one says how far it is from the first — right now, since both are moving. */
-  function fromLast(n) {
-    if (!lastPick || lastPick === n) return '';
+  /* How far one body is from the last one looked at, in both the units people
+     ask for it in. */
+  function fromFigures(n) {
     const au = physical(n, pA).distanceTo(physical(lastPick, pB));
     const ls = au * AU_LS;
-    return sect('From ' + esc(shortName(lastPick)), table([
-      ['Right now', au >= 0.01 ? num(au, 3) + ' AU'
-        : Math.round(au * AU_KM).toLocaleString() + ' km'],
-      ['Light takes', ls >= 60 ? num(ls / 60, 1) + ' min' : ls >= 1 ? num(ls, 1) + ' s'
-        : num(ls * 1000, 0) + ' ms']
-    ]) + '<div class="orr-note-i">Pick another body and it will say how far that is from '
+    return {
+      d: au >= 0.01 ? num(au, 3) + ' AU'
+                    : Math.round(au * AU_KM).toLocaleString() + ' km',
+      t: ls >= 60 ? num(ls / 60, 1) + ' min' : ls >= 1 ? num(ls, 1) + ' s'
+                                                       : num(ls * 1000, 0) + ' ms'
+    };
+  }
+
+  function fromLast(n) {
+    if (!lastPick || lastPick === n) return '';
+    const v = fromFigures(n);
+    /* Written out rather than through table(), which escapes its values and so
+       cannot carry the two ids these need to be kept up to date by. */
+    return sect('From ' + esc(shortName(lastPick)),
+      '<dl><div><dt>Right now</dt><dd id="orr-from-d">' + esc(v.d) + '</dd></div>' +
+      '<div><dt>Light takes</dt><dd id="orr-from-t">' + esc(v.t) + '</dd></div></dl>' +
+      '<div class="orr-note-i">Pick another body and it will say how far that is from '
       + esc(shortName(n)) + '.</div>');
+  }
+
+  /* "Right now" means now.
+
+     It was worked out once, when the panel was rendered, and then sat there
+     under that heading while the moon it was measuring went round its planet.
+     Reported by someone feeding the light-time into a Stephan-Boltzmann
+     calculation for surface temperature, which is a use that wants the number
+     to be true rather than to have been true. Two text nodes per frame, and
+     only when they have actually changed. */
+  function updateFromLast() {
+    if (!panel || !selected || !lastPick || lastPick === selected) return;
+    const d = panel.querySelector('#orr-from-d');
+    const t = panel.querySelector('#orr-from-t');
+    if (!d || !t) return;
+    const v = fromFigures(selected);
+    if (d.textContent !== v.d) d.textContent = v.d;
+    if (t.textContent !== v.t) t.textContent = v.t;
   }
 
   /* ── the system ────────────────────────────────────────────────────────────
@@ -4933,6 +4965,8 @@ const Orrery = (function () {
     return {
       system: model ? model.name : null,
       trueScale: trueDistance,
+      flying: !!flight,
+      following: following,
       selected: sel ? sel.name : null,
       // Where the eye is. Sampled per frame, a flight is a run of these and a
       // cut is two, which is the only honest way to tell them apart.
