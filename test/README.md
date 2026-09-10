@@ -130,6 +130,26 @@ The three cover what real journals actually look like:
 | `journal-no-jumps.log` | A real evening that never left the system. Three of five real journals look like this; it is not a broken file |
 | `journal-near-empty.log` | A session that opened and closed — one header line |
 
+## The landing page
+
+`index.html` is the map with four thousand systems, the one whose bloom glare
+got reported, and the only page that swaps a cached snapshot for a live dump
+seconds in. It was also the only page in the project with no offline coverage
+at all, because it cannot boot without its data: no `?factions=` parameter and
+it returns before `Ed3d.init()`, and the dump itself is a gzipped JSON array
+from `downloads.spansh.co.uk`.
+
+`multifaction.spec.mjs` covers it, against
+`fixtures/spansh-factions.json.gz` — three factions over six real systems with
+their real coordinates, **gzipped exactly as Spansh serves it**, so the page's
+`DecompressionStream` path is under test rather than stubbed around.
+
+It stays `offlineSkip: true` in `pages.json`, and that is not the gap
+reopening. The smoke suite answers every data host with a bare `[]`, which
+cannot be a gzip stream; serving one needs the per-test route that
+`multifaction.spec.mjs` installs. The generic smoke test and the dedicated
+spec are covering different things, and only the second can cover this page.
+
 ## Spansh fixtures
 
 Spansh exports are a different shape from a journal — one JSON document rather
