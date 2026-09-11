@@ -1,6 +1,7 @@
-// Every host that serves map *data*.  Asset CDNs are deliberately absent, so
-// three.js and jQuery still load normally.  Canonn's cloud functions are billed
-// per invocation, so the default suite must never call them.
+// Every host that serves map *data*. Asset CDNs are deliberately absent, so
+// fonts and Font Awesome still load normally — three.js is vendored and served
+// locally, and jQuery is gone. Canonn's cloud functions are billed per
+// invocation, so the suite must never call them.
 export const DATA_HOSTS = [
   'api.canonn.tech',
   'us-central1-canonn-api-236217.cloudfunctions.net',
@@ -16,15 +17,16 @@ export const DATA_HOSTS = [
   'www.googletagmanager.com'
 ];
 
-// Hosts the offline suite is allowed to actually contact: assets only.
-// www.w3schools.com is deliberately absent: all 50 pages used to load
-// lib/w3data.js from there for the w3IncludeHTML() nav include, but that has
-// been replaced with a local Source/js/nav-include.js (see test/deadcode.spec.mjs
-// "nav renders without contacting w3schools"), so nothing should reach that
-// host anymore. Leaving it here would silently weaken that assertion.
+/* Hosts the offline suite is allowed to actually contact: assets only.
+   www.w3schools.com is deliberately absent. Every page used to load
+   lib/w3data.js from there for a w3IncludeHTML() nav include; that include and
+   its nav are gone, and `the old nav is gone, and nothing reaches w3schools
+   for it` in deadcode.spec.mjs holds the line. Listing the host here would
+   silently weaken that assertion, which is the same reason cdn.jsdelivr.net
+   was removed below: no page uses it, and an unused entry is a hole waiting
+   for someone to fall into. */
 export const ALLOWED_EXTERNAL = [
   'cdnjs.cloudflare.com',
-  'cdn.jsdelivr.net',
   'fonts.googleapis.com',
   'fonts.gstatic.com',
   'maxcdn.bootstrapcdn.com'

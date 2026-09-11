@@ -76,7 +76,7 @@ test('setColor changes the rendered colour without clobbering the base colour', 
   // survive being dimmed — otherwise re-enabling a filter leaves the systems grey.
   const r = await page.evaluate(() => {
     const i = System.points.findIndex((p) => p && p.color);
-    if (i < 0) return { skipped: true };
+    if (i < 0) return { found: false };
     const base = System.points[i].color.getHexString();
 
     System.setColor(i, new THREE.Color('#111111'));
@@ -88,7 +88,7 @@ test('setColor changes the rendered colour without clobbering the base colour', 
     // restore exactly the way hud.class.js does
     System.setColor(i, System.points[i].color);
     return {
-      skipped: false,
+      found: true,
       base,
       baseAfterDim: afterDim.base,
       drawnWhenDim: afterDim.drawn,
@@ -96,7 +96,11 @@ test('setColor changes the rendered colour without clobbering the base colour', 
     };
   });
 
-  if (r.skipped) test.skip(true, 'no coloured categories on this page');
+  /* This used to be `if (r.skipped) test.skip(...)`, which meant a regression
+     that stopped assigning category colours made the test *skip* rather than
+     fail — the suite would have gone green on a map with no coloured systems
+     at all. The reference page always has them; their absence is the failure. */
+  expect(r.found, 'the reference page must have coloured systems to test with').toBe(true);
   expect(r.baseAfterDim, 'base colour survives dimming').toBe(r.base);
   expect(r.drawnWhenDim, 'dimming actually changed the drawn colour').toBeLessThan(0.2);
   expect(r.restored, 'restoring brings the drawn colour back').toBeGreaterThan(0.2);

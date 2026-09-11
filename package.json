@@ -5,9 +5,7 @@
   "description": "Canonn ED3D galaxy map. Source/ is deployed verbatim; this package.json exists only for the test harness.",
   "scripts": {
     "serve": "node test/server.mjs",
-    "test": "playwright test --project=offline",
-    "test:live": "playwright test --project=live",
-    "test:update": "playwright test --project=offline --update-snapshots"
+    "test": "playwright test --project=offline"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.0"

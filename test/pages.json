@@ -102,7 +102,8 @@
   {
     "path": "index.html",
     "query": "",
-    "offlineSkip": true
+    "offlineSkip": true,
+    "why": "the landing page needs a ?factions= dump; multifaction.spec.mjs covers it with a real one"
   },
   {
     "path": "landscape_signal.html",
@@ -122,7 +123,8 @@
   {
     "path": "multifaction.html",
     "query": "?factions=Canonn",
-    "offlineSkip": true
+    "offlineSkip": true,
+    "why": "same dump, same reason; multifaction.spec.mjs covers it"
   },
   {
     "path": "nhss-data.html",
@@ -147,7 +149,8 @@
   {
     "path": "route_data.html",
     "query": "",
-    "offlineSkip": true
+    "offlineSkip": true,
+    "why": "needs startSystem/endSystem/jumpRange params and two shaped API replies; route.spec.mjs covers it"
   },
   {
     "path": "route_uia.html",

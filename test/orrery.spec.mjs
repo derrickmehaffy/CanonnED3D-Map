@@ -86,6 +86,23 @@ async function settled(page) {
   }, { timeout: 15_000, message: 'the camera stopped moving' }).toBe(true);
 }
 
+/**
+ * Advance a counted number of rendered frames.
+ *
+ * Sim time advances with frame count, not wall clock — orrery.js clamps each
+ * frame's dt — so a fixed sleep measures the machine. That makes any *negative*
+ * assertion behind a sleep weaker the slower the box gets: a starved clock
+ * barely moves, so "it did not move" passes for the wrong reason. Frames are
+ * the unit the thing under test actually runs in.
+ */
+function frames(page, n) {
+  return page.evaluate((count) => new Promise((done) => {
+    let seen = 0;
+    const tick = () => (++seen < count ? requestAnimationFrame(tick) : done(seen));
+    requestAnimationFrame(tick);
+  }), n);
+}
+
 /** Load the module in the page and hand back a handle to it. */
 async function mechanics(page) {
   await stubDataHosts(page);
@@ -221,7 +238,11 @@ test('the clock runs, pauses, and changes rate', async ({ page }) => {
 
   await page.locator('#orr-play').click();
   const paused = await date();
-  await page.waitForTimeout(1200);
+  /* Frames, not milliseconds. Behind a sleep this assertion got *easier* the
+     more loaded the machine was — a starved clock does not advance whether or
+     not pausing works, so it passed for the wrong reason. Sixty frames is more
+     than enough movement to catch a clock that is still running. */
+  await frames(page, 60);
   expect(await date(), 'and stops when paused').toBe(paused);
 
   // A week a second was too quick to read on opening; a day a second still
@@ -739,8 +760,18 @@ test('you can get right up to a body at true scale', async ({ page }) => {
   expect(s.near).toBeLessThan(s.toSelected);
 
   /* Following carries the camera, not just the aim. The body is moving; if
-     only the target moved, this distance would run away within a second. */
-  await page.waitForTimeout(2500);
+     only the target moved, this distance would run away within a second.
+
+     Counted frames rather than a sleep, and the clock is checked first: this
+     assertion is about the camera keeping up with a body that moved, so a
+     window in which the body did not move proves nothing. Behind a 2500ms
+     sleep on a loaded box that was exactly what could happen. */
+  const clockBefore = await page.locator('#orr-date').textContent();
+  await frames(page, 120);
+  expect(await page.locator('#orr-date').textContent(),
+    'the sim has to have advanced, or there was nothing to keep up with')
+    .not.toBe(clockBefore);
+
   const later = await at();
   expect(later.selected).toBe('Testholm 1');
   expect(Math.abs(later.toSelected - s.toSelected)).toBeLessThan(s.toSelected * 0.5);
@@ -1711,7 +1742,7 @@ test('rebuilding the scene does not allocate more of the GPU', async ({ page }) 
   await stubApi(page, rings);
   await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
-  await page.waitForTimeout(700);
+  await settled(page);
 
   /* Toggling the scale rebuilds every mesh in the scene. Ring bands were made
      fresh each time and a body's face is cached, and neither was ever freed —
@@ -1738,7 +1769,7 @@ test('a paused orrery stops drawing', async ({ page }) => {
   await stubApi(page);
   await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
-  await page.waitForTimeout(700);
+  await settled(page);
 
   /* Without the bloom pipeline, which is about what the frame is made of and
      not about how often one is made — and which under software rendering is
@@ -1820,7 +1851,7 @@ test('turning the view is not the same as picking something', async ({ page }) =
   await stubApi(page);
   await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
-  await page.waitForTimeout(700);
+  await settled(page);
 
   /* Stop the clock first. Everything below measures where a body is and then
      aims three mouse events at it, and a body that is still orbiting has
@@ -1890,7 +1921,7 @@ test('framing the system puts the system in the frame', async ({ page }) => {
     await page.setViewportSize({ width: w, height: h });
     await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
-    await page.waitForTimeout(600);
+    await settled(page);
 
     const onScreen = async (label) => page.evaluate((want) => {
       const host = document.querySelector('.orr-labels').getBoundingClientRect();
@@ -2126,7 +2157,7 @@ test('a world with air is drawn with air', async ({ page }) => {
   await stubApi(page, sys);
   await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
-  await page.waitForTimeout(700);
+  await settled(page);
 
   const air = await page.evaluate(() => window.Orrery.air());
   const withAir = air.filter((a) => a.air);
@@ -2350,7 +2381,7 @@ test('2D has a sky too', async ({ page }) => {
   await stubApi(page, { ...SYSTEM, coords: { x: 120, y: -30, z: 4200 } });
   await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
-  await page.waitForTimeout(600);
+  await settled(page);
 
   const sky = () => page.evaluate(() => window.Orrery.state().sky);
   expect((await sky()).flat).toBe(false);
@@ -2487,7 +2518,7 @@ test('the view can be saved as a picture', async ({ page }) => {
   await stubApi(page);
   await page.goto('/orrery.html?system=Testholm&body=1', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
-  await page.waitForTimeout(600);
+  await settled(page);
 
   const [dl] = await Promise.all([
     page.waitForEvent('download', { timeout: 20_000 }),
@@ -2553,7 +2584,7 @@ test('a body is painted properly, and the one you look at is painted sharp', asy
   await stubApi(page);
   await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('.orr-row[data-id]')).toHaveCount(3, { timeout: 60_000 });
-  await page.waitForTimeout(800);
+  await settled(page);
 
   const read = () => page.evaluate(() => {
     const s = window.Orrery.state();
@@ -2939,7 +2970,7 @@ test('the sky has weather in it', async ({ page }) => {
   await stubApi(page, { ...SYSTEM, coords: { x: 120, y: -30, z: 4200 } });
   await page.goto('/orrery.html?system=Testholm', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
-  await page.waitForTimeout(1200);
+  await settled(page);
 
   // A patch of the frame away from the star and its orbits.
   const patch = () => page.evaluate(() => {
