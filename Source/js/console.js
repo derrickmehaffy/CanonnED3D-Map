@@ -140,9 +140,9 @@
   "        <span class=\"feed\" id=\"feed\"><span class=\"d\"></span><span id=\"feedtxt\">loading&#8230;</span></span>",
   "        <div class=\"toprail\">",
   "          <button class=\"tb\" id=\"toolsbtn\" title=\"Canonn tools\">&#8862; Tools</button>",
-  "          <a class=\"tb\" href=\"https://github.com/canonn-science/CanonnED3D-Map\" target=\"_blank\"",
+  "          <a class=\"tb only-wide\" href=\"https://github.com/canonn-science/CanonnED3D-Map\" target=\"_blank\"",
   "             rel=\"noopener\" title=\"Source on GitHub\">GitHub</a>",
-  "          <a class=\"tb donate\" href=\"https://canonn.science/donate/\" target=\"_blank\"",
+  "          <a class=\"tb donate only-wide\" href=\"https://canonn.science/donate/\" target=\"_blank\"",
   "             rel=\"noopener\" title=\"Support Canonn\">Donate</a>",
   "        </div>",
   "      </div>",
@@ -2525,7 +2525,28 @@
     var k = e.key.toLowerCase();
     if ((e.metaKey || e.ctrlKey) && e.shiftKey && k === 'm') { e.preventDefault(); closePal(); openIndex(); }
     else if ((e.metaKey || e.ctrlKey) && k === 'k') { e.preventDefault(); openPal(''); }
-    else if (e.key === 'Escape') { closePal(); $('idxscrim').classList.remove('open'); }
+    else if (e.key === 'Escape') {
+      /* Escape used to reach only the palette and the index scrim, so on a
+         narrow window — where the panel covers the map outright — the two
+         things actually in the way could not be dismissed from the keyboard at
+         all. Innermost first, one layer per press, so it never closes more than
+         the reader asked it to. */
+      /* The palette's open state lives on #scrim, which is what closePal
+         clears — the .pal element itself carries no open class. */
+      var scrim = $('idxscrim');
+      var palScrim = $('scrim');
+      if (palScrim && palScrim.classList.contains('open')) { closePal(); return; }
+      if (scrim && scrim.classList.contains('open')) { scrim.classList.remove('open'); return; }
+      var card = $('card');
+      if (card && !card.classList.contains('hidden')) { closeCard(); return; }
+      var panel = $('side');
+      if (panel && !panel.classList.contains('hidden')) {
+        panel.classList.add('hidden');
+        var lit = document.querySelector('.rail button.on');
+        if (lit) lit.classList.remove('on');
+        remember('collapsed', '1');
+      }
+    }
   });
 
   /* ── the system card can be moved and resized ───────────────────────────
