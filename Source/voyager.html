@@ -28,7 +28,7 @@
        define #edmap, #loading, #nav-controls and #hud too. -->
   <link rel="stylesheet" type="text/css" href="css/console.css" />
   <!-- The console owns the page layout: top bar, rail, panels, status strip.
-       It replaces include/nav.html, so css/menu.css is no longer loaded. -->
+       It replaced include/nav.html, whose stylesheet is gone with it. -->
   <title>CanonnED3D - Voyager Pulsars</title>
 </head>
 
@@ -48,6 +48,7 @@
   <!-- Launch ED3Dmap -->
   <script src="js/canonn-api.js"></script>
   <script src="js/canonn-fmt.js"></script>
+  <script src="js/canonn-spectral.js"></script>   <!-- star colour by spectral class -->
   <script src="vendor/tween-js/Tween.js"></script>
   <script type="importmap">
   {

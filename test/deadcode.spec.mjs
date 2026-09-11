@@ -377,3 +377,109 @@ test('no page loads jQuery, and nothing reaches for the global', () => {
   }
   expect(users).toEqual([]);
 });
+
+test('the two surfaces agree on every star colour', () => {
+  /* console.js and orrery.js each carried their own copy of the spectral
+     lookup, and the copies tried different key lengths — 2→1 against 3→2→1.
+     So "TTS" was added to the table for the orrery and the console could never
+     reach it: a T Tauri star came out the magenta of a T-class brown dwarf on
+     the card and peach in the orrery, side by side on the same screen.
+
+     Both now call js/canonn-spectral.js. This asserts the thing that actually
+     matters — that neither file has grown a second lookup — rather than
+     re-testing the shared one, which filters/colour tests already cover. */
+  const bad = [];
+  for (const f of ['js/console.js', 'js/orrery.js']) {
+    const src = read(f);
+    // Either sign of a second copy: its own table, or its own fetch of the file.
+    if (/\bSPECTRAL\s*[=[]/.test(src)) bad.push(f + ' has its own spectral table again');
+    if (/spectral-colors\.json/.test(src)) bad.push(f + ' fetches the table itself again');
+    if (!/CanonnSpectral\./.test(src)) bad.push(f + ' no longer reads CanonnSpectral');
+  }
+  expect(bad).toEqual([]);
+
+  // And the table must actually carry the key the drift was about.
+  const table = JSON.parse(read('data/spectral-colors.json'));
+  expect(Object.keys(table), 'TTS is why this file exists').toContain('TTS');
+});
+
+test('every shared global loads before whatever reads it', () => {
+  /* Generalises the canonn-fmt check to all five. Each is a classic script
+     setting one global, read as a bare identifier by console.js, orrery.js or
+     a data loader — so a missing tag is a ReferenceError at load, which on a
+     data loader means a blank map. Two of these shipped missing once already. */
+  const GLOBALS = {
+    'js/canonn-api.js': 'CanonnAPI',
+    'js/canonn-fmt.js': 'CanonnFmt',
+    'js/canonn-palette.js': 'CanonnPalette',
+    'js/canonn-spectral.js': 'CanonnSpectral',
+    'js/canonn-filters.js': 'CanonnFilters'
+  };
+  const bad = [];
+
+  for (const p of pages) {
+    const src = read(p);
+    const tags = [...src.matchAll(/<script\b([^>]*)>/gi)].map((m) => m[1]);
+    const srcs = tags
+      .filter((a) => /\bsrc\s*=/.test(a))
+      .map((a) => ({
+        src: (a.match(/\bsrc\s*=\s*["']([^"']+)["']/) || [])[1] || '',
+        later: /\bdefer\b|\basync\b|type\s*=\s*["']module["']/i.test(a)
+      }));
+
+    // Which files does this page actually run?
+    const runs = srcs.map((t) => t.src).filter((s) => s.startsWith('js/') || s.startsWith('data/'));
+    const body = runs.map((r) => { try { return read(r); } catch { return ''; } }).join('\n');
+
+    for (const [file, name] of Object.entries(GLOBALS)) {
+      if (!new RegExp('\\b' + name + '\\b').test(body)) continue;
+      const at = srcs.findIndex((t) => t.src === file);
+      if (at < 0) { bad.push(p + ' reads ' + name + ' and never loads ' + file); continue; }
+      if (srcs[at].later) bad.push(p + ': ' + file + ' must run in document order');
+    }
+  }
+  expect(bad).toEqual([]);
+});
+
+test('the HUD typeahead and upload dialog are gone, not hidden', () => {
+  /* Both lived inside #hud, which console.css hides with
+     `display:none !important` on every page, so neither could be reached: the
+     search input measured 0×0 with a null offsetParent, and the upload
+     dialog's only opener was a button in the same hidden subtree. Between
+     them, ~730 lines including a CanonnAPI typeahead call and a second,
+     untested implementation of journal/Spansh/CSV import — the live one is
+     console.js's #drop. Removed; this stops them coming back. */
+  const hud = read('js/components/hud.class.js');
+  expect(hud).not.toMatch(/system-search|file-upload|fu-msg|fu-spinner/);
+  for (const f of ['css/styles.css', 'css/console.css']) {
+    expect(read(f), f + ' still styles the removed markup')
+      .not.toMatch(/system-search|file-upload|fu-msg|fu-spinner|fu-done/);
+  }
+  // The live drop must still be there.
+  expect(read('js/console.js')).toMatch(/fileinput/);
+});
+
+test('no page asks for a font it never renders', () => {
+  /* Orbitron was requested on 35 pages and rendered in exactly one place — an
+     inline font-family on an error string in MapData-landscape.js. A
+     render-blocking third-party request per page for a face that never
+     appeared. Generalised: every Google Fonts family a page asks for has to be
+     named by some stylesheet or script. */
+  const css = ['css/console.css', 'css/orrery.css', 'css/style.css', 'css/styles.css']
+    .map((f) => { try { return read(f); } catch { return ''; } }).join('\n');
+  const js = readdirSync(join(SRC, 'js')).filter((n) => n.endsWith('.js'))
+    .map((n) => read('js/' + n)).join('\n')
+    + readdirSync(join(SRC, 'data')).filter((n) => n.endsWith('.js'))
+      .map((n) => read('data/' + n)).join('\n');
+
+  const unused = new Set();
+  for (const p of pages) {
+    for (const m of read(p).matchAll(/fonts\.googleapis\.com\/css2?\?([^"']+)/g)) {
+      for (const fam of m[1].matchAll(/family=([^&:]+)/g)) {
+        const name = decodeURIComponent(fam[1].replace(/\+/g, ' '));
+        if (!css.includes(name) && !js.includes(name)) unused.add(name);
+      }
+    }
+  }
+  expect([...unused].sort()).toEqual([]);
+});

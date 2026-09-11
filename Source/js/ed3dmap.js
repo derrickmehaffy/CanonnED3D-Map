@@ -19,31 +19,6 @@ import { System } from './components/system.class.js';
 import { Galaxy } from './components/galaxy.class.js';
 import { Heatmap } from './components/heat.class.js';
 
-//-- Nav-to-edmap position adjustment
-(function () {
-  function adjustMapToNav() {
-    var nav = document.getElementById('cssmenu');
-    var edmap = document.getElementById('edmap');
-    if (!nav || !edmap) return;
-    var navH = nav.getBoundingClientRect().height;
-    edmap.style.top = navH + 'px';
-    edmap.style.height = 'calc(100vh - ' + navH + 'px)';
-  }
-
-  // Re-run whenever the nav is mutated (w3IncludeHTML injects it asynchronously)
-  var observer = new MutationObserver(function () {
-    adjustMapToNav();
-  });
-  observer.observe(document.body, { childList: true, subtree: true, attributes: true });
-
-  window.addEventListener('load', function () {
-    adjustMapToNav();
-    // Stop watching after load — resize listener takes over
-    observer.disconnect();
-  });
-  window.addEventListener('resize', adjustMapToNav);
-})();
-
 //--
 var camera;
 var controls;
@@ -571,6 +546,20 @@ var Ed3d = {
    * @param {number}       batchSize Systems to process per tick (default 500)
    * @param {function}     [done]    Optional callback fired when finished
    */
+  /**
+   * JSON_SCHEMA.md documents `routes` as an object keyed by route id, and every
+   * MapData-*.js in the tree uses an array. $.each walked both; forEach walks
+   * only arrays, so the documented shape threw — and because loadDatasAsync is
+   * called synchronously from launchMap, the throw skipped Loader.stop() and
+   * left the spinner up forever over an empty map. Both shapes are legitimate
+   * public API, so normalise once and let the four walks below stay plain.
+   */
+  'routeList': function (routes) {
+    if (routes == undefined) return [];
+    if (Array.isArray(routes)) return routes.map(function (r, i) { return [i, r]; });
+    return Object.keys(routes).map(function (k) { return [k, routes[k]]; });
+  },
+
   'loadDatasAsync': function (data, batchSize, done, skipInit) {
 
     var BATCH_SIZE = batchSize || 500;
@@ -587,8 +576,8 @@ var Ed3d = {
 
     //-- Register route waypoints so systems can be matched as they stream in
     if (data.routes != undefined) {
-      data.routes.forEach(function (route, key) {
-        Route.initRoute(key, route);
+      Ed3d.routeList(data.routes).forEach(function (pair) {
+        Route.initRoute(pair[0], pair[1]);
       });
     }
 
@@ -629,8 +618,8 @@ var Ed3d = {
 
         //-- All systems done – finalise routes, heatmap and camera
         if (data.routes != undefined) {
-          data.routes.forEach(function (route, key) {
-            Route.createRoute(key, route);
+          Ed3d.routeList(data.routes).forEach(function (pair) {
+            Route.createRoute(pair[0], pair[1]);
           });
         }
 
@@ -657,72 +646,6 @@ var Ed3d = {
 
   },
 
-
-  'loadDatas': function (data) {
-
-    //-- Init Particle system
-    System.initParticleSystem();
-    //-- Always register Sagittarius A* as a clickable particle so it behaves like any other system
-    System.create({ name: 'Sagittarius A*', coords: { x: Galaxy.x, y: Galaxy.y, z: Galaxy.z } });
-
-    //-- Load cat filters
-    if (data.categories != undefined) HUD.initFilters(data.categories);
-
-    //-- Check if simple or complex json
-    list = (data.systems !== undefined) ? data.systems : data;
-
-    //-- Init Routes
-
-    Loader.update('Routes...');
-    if (data.routes != undefined) {
-      data.routes.forEach(function (route, key) {
-        Route.initRoute(key, route);
-      });
-    }
-
-    //-- Loop into systems
-
-    Loader.update('Systems...');
-    list.forEach(function (val) {
-
-      system = System.create(val);
-      if (system != undefined) {
-        if (val.cat != undefined) Ed3d.addObjToCategories(system, val.cat);
-        if (val.cat != undefined) Ed3d.systems.push(system);
-      }
-
-    });
-
-    //-- Routes
-
-    if (data.routes != undefined) {
-
-      data.routes.forEach(function (route, key) {
-        Route.createRoute(key, route);
-      });
-
-    }
-
-    //-- Heatmap
-
-    if (data.heatmap != undefined) {
-      Heatmap.create(data.heatmap);
-    }
-
-    //-- Check start position in JSon
-
-    if (Ed3d.startAnim && data.position != undefined) {
-      Ed3d.playerPos = [data.position.x, data.position.y, data.position.z];
-
-      var camX = (parseInt(data.position.x) - 500);
-      var camY = (parseInt(data.position.y) + 8500);
-      var camZ = (parseInt(data.position.z) - 8500);
-      Ed3d.cameraPos = [camX, camY, camZ];
-
-      Action.moveInitalPosition(4000);
-    }
-
-  },
 
   'loadDatasComplete': function () {
 

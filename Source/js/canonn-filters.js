@@ -144,11 +144,20 @@
 
     form.appendChild(namemenu);
 
-    // Reflect the choice already in the URL back into the dropdowns.
+    /* Reflect the choice already in the URL back into the dropdowns.
+       The value used to be interpolated into a selector, which a query string
+       can break: ?hud_category=a"]x threw a DOMException, the rejection escaped
+       buildDropdownFilter, and the whole filter went unrendered on three pages.
+       A shareable link should not be able to do that, so match on the option's
+       value rather than asking the engine to parse it. */
     Object.keys(urlParams).forEach(function (p) {
       if (p === 'platform' || !urlParams[p]) return;
-      var opt = form.querySelector('#select_' + p + ' option[value="' + urlParams[p] + '"]');
-      if (opt) opt.selected = true;
+      var sel = form.querySelector('#select_' + p);
+      if (!sel) return;
+      var want = String(urlParams[p]);
+      for (var i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === want) { sel.options[i].selected = true; break; }
+      }
     });
 
     // Changing anything reloads the page with the new parameters.

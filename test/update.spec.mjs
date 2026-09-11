@@ -88,3 +88,50 @@ test('the event bus reports changes and survives a throwing listener', async ({ 
   expect(r.afterOff, 'off() unsubscribes').toBe(1);
   expect(crashes, 'a throwing listener is contained').toEqual([]);
 });
+
+test('routes arrive as an array or as an object, and both draw', async ({ page }) => {
+  /* JSON_SCHEMA.md documents `routes` as an object keyed by route id; every
+     MapData-*.js in the tree uses an array. jQuery's $.each walked both, so
+     nobody noticed — until the migration to forEach, which walks only arrays.
+     The documented shape then threw, and because loadDatasAsync is called
+     synchronously from launchMap the throw skipped Loader.stop(), leaving the
+     spinner up forever over an empty map. Both shapes are public API. */
+  await loaded(page);
+
+  const draw = (routes) =>
+    page.evaluate((r) => new Promise((done) => {
+      const before = [];
+      scene.traverse((o) => { if (o.type === 'Line2' || o.isLine2) before.push(o); });
+      let threw = null;
+      try {
+        Ed3d.updateSystems({
+          categories: { 'Site type': { a: { name: 'Alpha', color: 'FF9D00' } } },
+          systems: [
+            { name: 'RouteEnd A', coords: { x: 0, y: 0, z: 0 }, cat: ['a'] },
+            { name: 'RouteEnd B', coords: { x: 60, y: 0, z: 60 }, cat: ['a'] }
+          ],
+          routes: r
+        }, () => {
+          const after = [];
+          scene.traverse((o) => { if (o.type === 'Line2' || o.isLine2) after.push(o); });
+          done({ threw, lines: after.length });
+        });
+      } catch (e) {
+        done({ threw: String(e), lines: -1 });
+      }
+    }), routes);
+
+  const POINTS = [{ s: 'RouteEnd A' }, { s: 'RouteEnd B' }];
+
+  const asArray = await draw([{ points: POINTS, cat: ['a'], circle: false }]);
+  expect(asArray.threw, 'an array of routes must not throw').toBeNull();
+  expect(asArray.lines, 'the array form should draw one line').toBeGreaterThan(0);
+
+  // The documented shape. This is the one that used to throw.
+  const asObject = await draw({ '0': { points: POINTS, cat: ['a'], circle: false } });
+  expect(asObject.threw, 'an object of routes must not throw either').toBeNull();
+  expect(asObject.lines, 'the object form should draw the same').toBe(asArray.lines);
+
+  // And the loader must have been dismissed, which is what the throw broke.
+  expect(await page.locator('#loader').count()).toBe(0);
+});

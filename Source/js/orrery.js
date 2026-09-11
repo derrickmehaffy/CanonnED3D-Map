@@ -750,34 +750,11 @@ const SHADOW = 3 * Math.sqrt(3) / 2;      // 2.598 — shadow radius ÷ horizon 
    Which is exactly why this is here — going through window.CanonnConsole
    meant that on the standalone page nothing found the table and every star in
    every system fell back to the same amber, black holes included. */
-let SPECTRAL = null, spectralAsked = null;
-function spectralTable() {
-  if (!spectralAsked) {
-    spectralAsked = fetch('data/spectral-colors.json')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => { SPECTRAL = j || {}; })
-      // A missing table leaves every disc unlit, which is honest: it means
-      // unclassified, not "no star". It is not worth failing the page over.
-      .catch(() => { SPECTRAL = {}; });
-  }
-  return spectralAsked;
-}
-
-/** '#rrggbb' for a spectral class, or '' when the table cannot place it. */
-function classColour(cls) {
-  if (!SPECTRAL || !cls) return '';
-  const c = String(cls).toUpperCase();
-  /* Longest key first. "K3" is K and "DA" is D, but "TTS6" is a T Tauri
-     star and emphatically not a T-class brown dwarf — matching it on its
-     first letter painted every young star in Great Annihilator the deep
-     magenta of a body four thousand degrees colder. */
-  const key = SPECTRAL[c] ? c
-            : SPECTRAL[c.slice(0, 3)] ? c.slice(0, 3)
-            : SPECTRAL[c.slice(0, 2)] ? c.slice(0, 2)
-            : SPECTRAL[c.charAt(0)] ? c.charAt(0) : '';
-  // Wolf-Rayet carries two colours; the first is the one to draw.
-  return key ? '#' + String(SPECTRAL[key]).split(',')[0].replace(/^#/, '') : '';
-}
+/* The table and the lookup live in js/canonn-spectral.js. They used to live
+   here and in console.js both, and the two copies tried different key lengths,
+   so the same star came out two colours depending on which surface drew it. */
+const spectralTable = () => CanonnSpectral.load();
+const classColour = (cls) => CanonnSpectral.colour(cls);
 
 /** Elite spells these "Black Hole" and "Supermassive Black Hole". */
 function isHole(sub) { return /black hole/i.test(sub || ''); }

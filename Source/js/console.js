@@ -1687,11 +1687,9 @@
     var TTL = 30 * 24 * 3600 * 1000;
     var mem = {}, inflight = {};
 
-    /* data/spectral-colors.json has been in this repo the whole time with
-       nothing reading it. This is its consumer: in Elite a star's colour is
-       how the game says what class it is, so the card paints the real one
-       rather than inventing an accent. 293 bytes from our own origin, asked
-       for once, and a failure only leaves the disc unlit. */
+    /* In Elite a star's colour is how the game says what class it is, so the
+       card paints the real one rather than inventing an accent. The table and
+       the lookup are in js/canonn-spectral.js, shared with the orrery. */
     /* The dump the digest was built from, kept whole for the rest of the
        session.
 
@@ -1710,11 +1708,7 @@
       dumps = dumps.slice(0, 3);
     }
 
-    var SPECTRAL = null;
-    fetch('data/spectral-colors.json')
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (j) { if (j) SPECTRAL = j; })
-      .catch(function () {});
+    CanonnSpectral.load();
 
     /* undefined: not asked yet. null: asked, nothing to show. */
     function cached(name) {
@@ -1800,19 +1794,10 @@
       },
       keep: keepDump,
 
-      /** '#rrggbb' for a spectral class, or '' when the table cannot place it —
-       *  which is honest: an unlit disc means unclassified, not "no star". */
-      colour: function (cls) {
-        if (!SPECTRAL || !cls) return '';
-        var c = String(cls).toUpperCase();
-        // "K3" is K, "DA" is D. Two-letter keys (WR) get first refusal.
-        var key = SPECTRAL[c] ? c
-                : SPECTRAL[c.slice(0, 2)] ? c.slice(0, 2)
-                : SPECTRAL[c.charAt(0)] ? c.charAt(0) : '';
-        if (!key) return '';
-        // Wolf-Rayet carries two colours; the first is the one to draw.
-        return '#' + String(SPECTRAL[key]).split(',')[0].replace(/^#/, '');
-      },
+      /** '#rrggbb' for a spectral class, or '' when the table cannot place it.
+       *  js/canonn-spectral.js holds the one copy; this used to be a second,
+       *  subtly different one. */
+      colour: function (cls) { return CanonnSpectral.colour(cls); },
 
       /** cb(summary | null). Called immediately when the answer is known. */
       get: function (name, cb) {

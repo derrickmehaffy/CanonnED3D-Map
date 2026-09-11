@@ -35,9 +35,18 @@
     /**
      * A number at a given precision with the padding taken off: 1.50 reads as
      * 1.5, 2.00 as 2, and 0 as "0" rather than as an empty string.
+     *
+     * The strip has to be anchored to the decimal point. It was not, so with
+     * dp = 0 there was no point for the regex to find and it ate the integer's
+     * own zeros: num(1500, 0) came back "15" and num(100, 0) came back "1".
+     * Live at orrery.js's millisecond readout, where two bodies half a
+     * light-second apart reported "5 ms" instead of 500.
      */
     num: function (v, dp) {
-      return Number(v).toFixed(dp).replace(/\.?0+$/, '') || '0';
+      return Number(v).toFixed(dp)
+        .replace(/(\.\d*?)0+$/, '$1')   // trailing zeros, but only after a point
+        .replace(/\.$/, '')             // and the point itself if nothing is left
+        || '0';
     }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

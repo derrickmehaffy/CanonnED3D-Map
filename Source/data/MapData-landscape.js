@@ -184,7 +184,7 @@ var canonnEd3d_landscape = {
             .catch(function (err) {
                 console.error('Failed to load landscape data:', err);
                 document.getElementById('loading').innerHTML =
-                    '<p style="color:#ff4444;font-family:Orbitron,sans-serif;text-align:center;margin-top:20%;">Failed to load landscape data.<br>' + err.message + '</p>';
+                    '<p style="color:#ff4444;font-family:var(--cond,sans-serif);text-align:center;margin-top:20%;">Failed to load landscape data.<br>' + err.message + '</p>';
             });
     },
 };
