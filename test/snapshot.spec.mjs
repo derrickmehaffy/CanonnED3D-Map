@@ -70,7 +70,7 @@ async function seedSnapshot(page) {
    pipes the body through DecompressionStream, so it has to be. Content-
    encoding is left off on purpose: setting it would make Chromium unzip the
    body first and hand the stream something already plain. */
-async function stubDump(page, { etag = '"NEW-DUMP"', delay = 0 } = {}) {
+async function stubDump(page, { etag = '"NEW-DUMP"', hold = null } = {}) {
   const body = gzipSync(JSON.stringify(DUMP));
   await page.route('**/downloads.spansh.co.uk/**', async (route) => {
     if (route.request().method() === 'HEAD') {
@@ -81,7 +81,14 @@ async function stubDump(page, { etag = '"NEW-DUMP"', delay = 0 } = {}) {
       return route.fulfill({ status: 200, body: '', headers: {
         etag, 'access-control-expose-headers': 'ETag' } });
     }
-    if (delay) await new Promise((r) => setTimeout(r, delay));
+    // `hold` is a promise the test resolves when it is ready for the dump to
+    // land. It used to be a fixed delay, which made the whole margin for
+    // asserting the mid-flight state a race against a timer: the expect.poll
+    // below backs off to 250/500/1000ms, so it could notice the snapshot only
+    // after the dump had already replaced it, and #feed never goes back to
+    // `snapshot`. Measured 1 failure in 5 with --repeat-each. A latch has no
+    // margin to lose.
+    if (hold) await hold;
     return route.fulfill({
       status: 200, headers: { 'content-type': 'application/octet-stream' }, body
     });
@@ -96,8 +103,10 @@ test('the last snapshot is drawn while the dump is refetched', async ({ page }) 
   await page.goto(PAGE, { waitUntil: 'domcontentloaded' });
   await seedSnapshot(page);
 
-  // Two seconds of dead air on the dump, so the snapshot has to be what shows.
-  await stubDump(page, { delay: 2000 });
+  // The dump is held until this test says so, so the snapshot is the only
+  // thing that can be on screen and there is no clock to beat.
+  let landDump;
+  await stubDump(page, { hold: new Promise((r) => { landDump = r; }) });
   await page.goto(PAGE, { waitUntil: 'domcontentloaded' });
 
   await expect.poll(() => systemCount(page), { timeout: 30_000 }).toBe(2);
@@ -105,6 +114,7 @@ test('the last snapshot is drawn while the dump is refetched', async ({ page }) 
   await expect(page.locator('#feedtxt')).toContainText('refreshing');
 
   // Then the fresh dump lands underneath, without a reload.
+  landDump();
   await expect.poll(() => systemCount(page), { timeout: 60_000 }).toBe(5);
   await expect(page.locator('#feed')).toHaveClass(/live/);
   await expect(page.locator('#feedtxt')).toHaveText('5 systems');

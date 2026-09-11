@@ -447,6 +447,17 @@ var Ed3d = {
       alpha: true
     });
     renderer.sortObjects = false
+    /* Cap the pixel ratio, the way the orrery already does. Uncapped, a phone
+       at devicePixelRatio 3 gets a backing store nine times the CSS area —
+       on a 752×576 canvas that is 3.9 megapixels, with MSAA on top and the
+       postfx composer's own targets behind it — for a point cloud whose
+       vertices are a few pixels across. Battery and heat, for no visible gain.
+
+       This was only safe to add once the picking maths stopped dividing by
+       renderer.domElement.width: that is the backing store, so at a ratio of 2
+       every click and hover would have landed at half the intended position.
+       Action.mapRect() measures in CSS pixels now. */
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setClearColor(0x000000, 1);
     renderer.setSize(container.offsetWidth, container.offsetHeight);
     renderer.domElement.style.zIndex = 5;

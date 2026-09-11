@@ -66,6 +66,11 @@ var PostFX = {
     });
 
     this.composer = new EffectComposer(renderer, target);
+    /* EffectComposer keeps its own pixel ratio, defaulting to 1. The renderer
+       now caps at 2 for high-DPI screens, so without this the bloom chain
+       would render at a different resolution from the pass feeding it. The
+       orrery does the same thing for the same reason. */
+    this.composer.setPixelRatio(renderer.getPixelRatio());
     this.composer.addPass(new RenderPass(scene, camera));
     this.bloom = new UnrealBloomPass(size, this.strength, this.radius, this.threshold);
     //-- A zero-strength bloom still costs its blur passes every frame, so it is
@@ -154,6 +159,7 @@ var PostFX = {
     if (this.composer === null) return;
     var size = new THREE.Vector2();
     renderer.getSize(size);
+    this.composer.setPixelRatio(renderer.getPixelRatio());
     this.composer.setSize(size.x, size.y);
     if (this.bloom !== null) this.bloom.setSize(size.x, size.y);
   }

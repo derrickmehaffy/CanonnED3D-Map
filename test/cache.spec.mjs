@@ -57,12 +57,21 @@ test('the ETag probe does not download the dump', async ({ page }) => {
   });
   await page.goto('/index.html', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => !!window.canonnEd3d_multifaction, { timeout: 30_000 });
+
+  /* The page itself legitimately GETs the dump to build the map, so the title's
+     claim can only be checked over the probe alone. Everything before this line
+     is the page doing its job; everything after is stampOf and nothing else. */
+  gets.length = 0;
   const stamp = await page.evaluate(() =>
     canonnEd3d_multifaction.stampOf('https://downloads.spansh.co.uk/factions.json.gz'));
-  // The stub answers without an ETag, and a missing stamp must simply mean
-  // "no cache" rather than an error.
-  expect(stamp === null || typeof stamp === 'string').toBe(true);
-  expect(gets.includes('HEAD'), 'the stamp is fetched with HEAD, not GET').toBe(true);
+
+  expect(gets, 'the probe issues exactly one HEAD').toEqual(['HEAD']);
+  expect(gets, 'and must never GET — that is 16.6MB').not.toContain('GET');
+  /* The stub answers without an ETag. A missing stamp has to come back as null,
+     meaning "nothing cached", rather than throwing: this assertion used to be
+     `stamp === null || typeof stamp === 'string'`, which is true of every value
+     stampOf can return, so it could not fail. */
+  expect(stamp).toBeNull();
 });
 
 test('cache failure falls through instead of breaking the page', async ({ page }) => {

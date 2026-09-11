@@ -213,12 +213,23 @@ var Action = {
    * in two places; a bounding rect is that subtraction, and its left is
    * viewport-relative too — offset().left was not, so the two disagreed
    * whenever the page was scrolled sideways.
+   *
+   * The size comes from here too, and that matters. Both picking sites used to
+   * divide by `renderer.domElement.width`, which is the *backing store* in
+   * device pixels, while the pointer arrives in CSS pixels. Those are the same
+   * number only while the renderer's pixel ratio is 1 — so the maths was right
+   * by accident, and would have broken the moment anyone capped the ratio for
+   * a high-DPI screen. A rect is in CSS pixels by definition.
    */
   'mapRect' : function() {
-    var el = document.getElementById('ed3dmap');
-    if (!el) return { top: 0, left: 0 };
+    var el = renderer && renderer.domElement ? renderer.domElement
+           : document.getElementById('ed3dmap');
+    if (!el) return { top: 0, left: 0, width: 1, height: 1 };
     var r = el.getBoundingClientRect();
-    return { top: r.top, left: r.left };
+    return {
+      top: r.top, left: r.left,
+      width: r.width || 1, height: r.height || 1
+    };
   },
 
   /**
@@ -237,8 +248,8 @@ var Action = {
     var position = Action.mapRect();
 
     obj.mouseVector = new THREE.Vector3(
-      ( ( e.clientX - position.left ) / renderer.domElement.width ) * 2 - 1,
-      - ( ( e.clientY - position.top ) / renderer.domElement.height ) * 2 + 1,
+      ( ( e.clientX - position.left ) / position.width ) * 2 - 1,
+      - ( ( e.clientY - position.top ) / position.height ) * 2 + 1,
       1);
 
     obj.mouseVector.unproject(camera);
@@ -341,8 +352,8 @@ var Action = {
     var position = Action.mapRect();
 
     obj.mouseVector = new THREE.Vector3(
-      ( ( e.clientX - position.left ) / renderer.domElement.width ) * 2 - 1,
-      - ( ( e.clientY - position.top ) / renderer.domElement.height ) * 2 + 1,
+      ( ( e.clientX - position.left ) / position.width ) * 2 - 1,
+      - ( ( e.clientY - position.top ) / position.height ) * 2 + 1,
       1);
 
 

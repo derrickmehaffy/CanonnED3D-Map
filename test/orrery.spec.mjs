@@ -942,7 +942,9 @@ test('the star churns, on its own clock', async ({ page }) => {
   await expect(page.locator('.orr-row')).toHaveCount(3, { timeout: 60_000 });
 
   const starTime = () => page.evaluate(() => window.Orrery.state().starTime);
-  expect(await starTime(), 'the star has a shader clock').not.toBeNull();
+  /* not.toBeNull() also passes for undefined, which is what a renamed or
+     removed state key would give. Ask for the type. */
+  expect(typeof await starTime(), 'the star has a shader clock').toBe('number');
 
   // Pause the orbits: the surface must keep moving anyway.
   await page.locator('#orr-play').click();
@@ -952,9 +954,20 @@ test('the star churns, on its own clock', async ({ page }) => {
   const t1 = await starTime();
   expect(t1, 'the surface runs while the orbits are stopped').toBeGreaterThan(t0);
 
-  // And the orbit clock really was stopped, so the two are independent.
-  await expect(page.locator('#orr-date')).toHaveText(
-    await page.locator('#orr-date').textContent());
+  /* And the orbit clock really was stopped, so the two are independent.
+     This used to read `toHaveText(await …textContent())` — the element
+     compared against itself microseconds earlier, which passes on the first
+     poll whether or not the clock is moving. The date is sampled across the
+     same window the surface advanced over, in frames rather than milliseconds,
+     because sim time advances with frame count. */
+  const dateNow = () => page.locator('#orr-date').textContent();
+  const wasDate = await dateNow();
+  await page.evaluate(() => new Promise((res) => {
+    let n = 0;
+    const tick = () => (++n < 30 ? requestAnimationFrame(tick) : res());
+    requestAnimationFrame(tick);
+  }));
+  expect(await dateNow(), 'the orbit clock must not advance while paused').toBe(wasDate);
 
   // A shader that failed to compile shows up here, not in a screenshot.
   expect(errors.filter((e) => /shader|GLSL|WebGL|THREE/i.test(e))).toEqual([]);
