@@ -14,7 +14,7 @@ tooling. Anything that would need transpiling does not.
 | Part | Files | What it is |
 |---|---|---|
 | **The engine** | `js/ed3dmap.js`, `js/components/*.js` | Draws the galaxy: a point cloud of systems, a grid, routes, a HUD. Predates everything else — classic scripts, module-scope globals referenced as bare identifiers. Written on jQuery, off it now. See [ED3D-ENGINE.md](ED3D-ENGINE.md). |
-| **The console** | `js/console.js` | The chrome around the engine on every map page — rail, panels, system card, command palette, saved views. One file, generic across all 37 pages. |
+| **The console** | `js/console.js` | The chrome around the engine on every map page — rail, panels, system card, command palette, saved views. One file, generic across the 36 pages that load it. `orrery.html` is the 37th and does not. |
 | **The orrery** | `js/orrery.js`, `js/orrery-surface.js`, `js/orrery-sky.js` | One system's bodies on their real orbits. An ES module, and the only part written after the rest. See [ORRERY.md](ORRERY.md). |
 
 ## What a page is made of
@@ -53,7 +53,7 @@ plain classic tags, and they must come before the things that read them.
 browser — because a page whose smoke test happens to be skipped will not tell
 you its script tag is missing, and two of them once shipped that way.
 
-## The four shared globals
+## The five shared globals
 
 Each is a classic script setting exactly one global. That posture is
 deliberate: `console.js` and the data files are classic scripts and cannot
@@ -65,6 +65,9 @@ deliberate: `console.js` and the data files are classic scripts and cannot
 | `CanonnFmt` | `js/canonn-fmt.js` | `esc` and `num`. They were duplicated, and the two copies of `esc` disagreed about `null`. |
 | `CanonnPalette` | `js/canonn-palette.js` | Category colours. Hue says what kind of thing it is, shade says which type within that kind. |
 | `CanonnConsole` | set by `console.js` | The small surface the orrery reads back: the star colour table, and the system dump the card already fetched. |
+
+| `CanonnFilters` | `js/canonn-filters.js` | The Science / Class / Name dropdowns. Three loaders carried 88 byte-identical lines of this each. |
+| `CanonnSpectral` | `js/canonn-spectral.js` | A star's colour from its class. This existed twice and the two copies tried different key lengths, so a T Tauri star came out two different colours depending on which surface drew it. |
 
 `js/main.js` additionally publishes the engine's singletons onto `window` —
 `Ed3d`, `System`, `Action`, `HUD`, `Route`, `Grid`, `Galaxy`, `Heatmap`,

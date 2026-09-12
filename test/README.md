@@ -13,7 +13,7 @@ page requires nothing but a text editor and a push.
 
 | Command | What it does |
 |---|---|
-| `npm test` | The whole suite across all 36 pages. Deterministic, offline, ~18s. |
+| `npm test` | The whole suite. Deterministic, offline, about nine minutes on four workers. |
 | `npm run serve` | Serve `Source/` on http://localhost:4173 for manual poking. |
 
 ## What it checks
@@ -31,9 +31,12 @@ dead-code removals (`deadcode.spec.mjs`), and the test hook itself
 
 ## Engine architecture
 
-The engine is ES modules running on three.js r75. `Source/js/main.js` is the
-entry point: every page loads the four vendor classic scripts (OrbitControls,
-FontUtils, the typeface, Tween) and then `main.js` as
+The engine is ES modules running on three.js **r185**, vendored under
+`Source/vendor/three/` and resolved through an import map on all 37 pages.
+`Source/js/main.js` is the entry point. The only vendor classic scripts left
+are Tween (36 pages), PapaParse (36) and bodymovin (30) — OrbitControls, the
+font loader and the typeface are ES module imports or runtime fetches now.
+`main.js` loads as
 `<script type="module">`, which imports the engine modules — including
 `Source/js/ed3dmap.js` — and republishes the engine singletons on `window`
 (`Ed3d`, `Grid`, `Ico`, `HUD`, `Action`, `Route`, `System`, `Galaxy`,
@@ -50,14 +53,18 @@ at call time. This is deliberate, not an oversight.
 the former are plain globals declared in each classic data file, the latter is
 assigned directly inside `ed3dmap.js`.)
 
-The 30 `Source/data/MapData-*.js` files are deliberately still classic
+The 34 `Source/data/MapData-*.js` files are deliberately still classic
 scripts: they read those engine globals off `window` rather than importing
-them, so they stay untouched by this migration. Each page loads its data file
-with `defer` and calls its `canonnEd3d_X.init()` from inside a
-`DOMContentLoaded` listener — `<script type="module">` and `<script defer>`
-both run after parsing, in document order, and `DOMContentLoaded` fires after
-both, so the module always publishes its globals before the data file runs
-and before init is called.
+them. Each page loads its data file with `defer`, and 32 of the 36 then call
+`canonnEd3d_X.init()` from a `DOMContentLoaded` listener — `<script
+type="module">` and `<script defer>` both run after parsing, in document order,
+and `DOMContentLoaded` fires after both, so the module always publishes its
+globals before the data file runs and before init is called.
+
+The remaining four — `galnet.html`, `gec.html`, `index.html` and
+`multifaction.html` — have no inline call at all: their loader invokes itself
+at the end of the file. Same ordering guarantee, different place, and worth
+knowing before you go looking for the call in the page.
 
 ## How it works
 

@@ -889,3 +889,11 @@ body.orr-dragging{user-select:none}
 .orr-ports button,
 .orr-seeds button,
 .orr-lost-do button{border-color:var(--rule-strong)}
+
+
+/* The body list's numeric column is light-seconds from arrival, for bodies and
+   stations alike. Saying so once in the header beats repeating a unit on every
+   one of Sol's hundred-odd rows — and beats the previous arrangement, which
+   was two different units in the same column with no label at all. */
+.orr-s-u{margin-left:auto;font-family:var(--mono);font-size:9px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--dimmer)}

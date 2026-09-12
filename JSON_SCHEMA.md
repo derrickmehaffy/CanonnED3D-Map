@@ -57,7 +57,12 @@ Example system:
 }
 
 3) Routes
-Routes are provided as objects in `routes` keyed by route id. Each route has:
+Routes may be either an **object keyed by route id** or an **array**. Both are
+accepted, and `Ed3d.routeList()` normalises them. Worth knowing that they are
+both real: this file documented only the object form, every `MapData-*.js` in
+the tree uses the array, and jQuery's `$.each` happened to walk both — so when
+those walks became `forEach`, which walks only arrays, the documented shape
+started throwing. Each route has:
 - `points`: array of points. Each point is either `{ "s": "systemName" }` (reference to an already defined system) or `{ "coords": {"x":n,"y":n,"z":n}, "s": "optionalName" }` to define inline coordinates.
 - optional `cat`: array of category ids to style the route
 - optional `circle`: boolean — controls whether start/end circle markers are created (default true)
@@ -70,7 +75,10 @@ Example route:
   "circle": true
 }
 
-The route code will collect coordinates for points whose systems appear in the systems list (or use provided coords). If a referenced system is missing you'll see a console "Missing point" message.
+The route code collects coordinates for points whose systems appear in the
+systems list, or uses coordinates given on the point itself. A referenced
+system that is missing is skipped silently — there was a console
+`"Missing point"` message and it was removed, so do not go looking for it.
 
 4) Heatmap
 Heatmap input is an array of objects. The rendering code expects at least:
@@ -112,7 +120,7 @@ The code merges passed options onto internal defaults. Typical options used in t
 Example init call (as used in MapData files):
 Ed3d.init({
   container: 'edmap',
-  json: canonnEd3d_biology.systemsData,
+  json: canonnEd3d_gr.systemsData,
   withFullscreenToggle: false,
   withHudPanel: true,
   hudMultipleSelect: true,

@@ -1563,6 +1563,9 @@ const Orrery = (function () {
       '         aria-label="Resize the body list" tabindex="0"></div>',
       '    <div class="orr-s-h">',
       '      <h2 class="orr-s-t">System</h2>',
+      /* The column is numbers with no unit on them, so the unit is said once
+         here instead of eighty times down the list. */
+      '      <span class="orr-s-u" aria-hidden="true">Ls</span>',
       /* Sol has sixty-seven stations and forty bodies, and with all of them
          listed Mercury sits eleven rows below the star. They belong here —
          they are things in the system — but a reader looking for a body
@@ -4901,6 +4904,13 @@ const Orrery = (function () {
     /* A tree, and announced as one: which level a row is on is the whole
        point of the indent, and a hundred and eight buttons in a row said
        nothing about it. One tab stop for the lot, with the arrows inside. */
+    /* The arrival star is the origin, so a dump that omits its distance means
+       zero rather than unknown — the same reading the spine takes. */
+    const lsCell = (v, isStar) => {
+      if (typeof v !== 'number') return isStar ? '0' : '';
+      return Math.round(v).toLocaleString();
+    };
+
     const bodyRow = (n, depth) =>
       '<div class="orr-row" data-id="' + n.id + '" style="--depth:' + depth + '" ' +
       'role="treeitem" aria-level="' + (depth + 1) + '" aria-selected="' + (n === selected) +
@@ -4912,7 +4922,15 @@ const Orrery = (function () {
       '<span class="nm">' + esc(shortName(n)) + '</span>' +
       signalKinds(n.raw).map(([cls, , label]) =>
         '<i class="sg ' + cls + '" title="' + label + ' signals"></i>').join('') +
-      '<span class="ct">' + (n.aAu ? num(n.aAu, n.aAu < 0.1 ? 3 : 2) : '') + '</span></div>';
+      /* Light-seconds from the arrival point, which is what the station rows
+         below carry and what the distance spine and the ARRIVAL tile already
+         use. This column used to print a body's semi-major axis in AU while
+         the row under it printed a station's arrival distance in Ls — one
+         right-aligned column, two units, no label, three orders of magnitude
+         apart. "Earth 1" above "M.Gorbachev 501" read as the station being
+         five hundred times further out than the planet it orbits. */
+      '<span class="ct">' + lsCell(n.raw && n.raw.distanceToArrival,
+                                   n === model.star) + '</span></div>';
 
     const portRow = (p, depth) => {
       const st = p.st, pad = biggestPad(st);

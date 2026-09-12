@@ -382,3 +382,45 @@ test('body labels stop piling on top of each other', async ({ page }) => {
      the thing everything else orbits would be the worst possible trade. */
   expect(m.star, 'the star keeps its label').toBe(true);
 });
+
+test('the body list column is one unit, and says which', async ({ page }) => {
+  /* One right-aligned column carried two units: a body's semi-major axis in AU
+     and, on the row under it, a station's arrival distance in Ls — three
+     orders of magnitude apart, with no label and no header. "Earth 1" above
+     "M.Gorbachev 501" read as the station being five hundred times further out
+     than the planet it orbits, in the list a commander uses to decide where to
+     fly. Both are light-seconds from arrival now, which is what the distance
+     spine and the ARRIVAL tile already used. */
+  await crowded(page);
+
+  const m = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('.orr-row')].map((r) => ({
+      station: r.classList.contains('stn'),
+      // The arrival star is the origin and correctly reads 0.
+      star: r.getAttribute('aria-level') === '1',
+      name: (r.querySelector('.nm') || {}).textContent || '',
+      cell: (r.querySelector('.ct') || {}).textContent || ''
+    }));
+    return {
+      rows,
+      unitLabel: (document.querySelector('.orr-s-u') || {}).textContent || null
+    };
+  });
+
+  expect(m.unitLabel, 'the unit is named once, in the header').toBe('Ls');
+
+  /* The fixture's bodies sit 400 Ls and up. In AU they would have been under
+     10 — so any cell below 100 would mean the old unit had come back. */
+  const bodies = m.rows.filter((r) => !r.station && !r.star && r.cell);
+  expect(bodies.length, 'the fixture should list bodies with distances')
+    .toBeGreaterThan(3);
+  for (const b of bodies) {
+    const v = Number(b.cell.replace(/,/g, ''));
+    expect(v, b.name + ' reads ' + b.cell + ', which is AU not Ls')
+      .toBeGreaterThanOrEqual(100);
+  }
+
+  // The arrival star is the origin, so its own distance is zero, not blank.
+  const star = m.rows.find((r) => r.star);
+  expect(star.cell, 'the star sits at the origin of the column').toBe('0');
+});

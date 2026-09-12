@@ -1278,12 +1278,22 @@ var Loader = {
 }
 
 //------------------------------------------------------------------------------
-// Automated-test hook.
+// Readiness signal — named for tests, used by production.
 //
-// This is the ONLY surface the Playwright suite binds to.  Engine internals
-// (System, scene, particle geometry) are rewritten during the three.js
-// migration; keeping the tests behind this function means that rewrite does
-// not invalidate 50 test files.  Do not remove or rename it.
+// The comment here used to say this was "the ONLY surface the Playwright suite
+// binds to" and that keeping the tests behind it would save "50 test files"
+// from an engine rewrite. Neither was true: there are 22 spec files, and 15 of
+// them make 149 direct references to System, scene, HUD, Action and PostFX
+// internals.
+//
+// What *is* load-bearing is the part the old comment never mentioned.
+// js/console.js — production code on all 36 map pages — reads
+// window.__ed3dTestState() as its boot-readiness gate. So renaming this would
+// not inconvenience a test suite; it would stop the console from starting.
+//
+// If you want it gone, the replacement already exists: Ed3d.on('dataComplete')
+// is emitted from the same place this reports, and moving the console onto the
+// event bus would leave this function free to delete.
 //------------------------------------------------------------------------------
 
 window.__ed3dTestState = function () {
