@@ -350,12 +350,16 @@ test('no page loads jQuery, and nothing reaches for the global', () => {
      no longer loads jQuery is a ReferenceError at the point it runs, which on
      a data loader means a blank map.
 
-     `Source/prototype/` still loads it for its own copy of the console and is
-     deliberately out of scope — it is an orphan snapshot, listed as one in
-     docs/ARCHITECTURE.md, and nothing links to it. Which is why this reads
-     `Source/*.html` and not the tree. */
+     There is no exception any more: Source/prototype/ was the last thing
+     loading the library, for its own fork of a console that has since shipped,
+     and it is gone with the vendored copy. */
   const loading = pages.filter((p) => /jquery/i.test(read(p)));
   expect(loading).toEqual([]);
+
+  /* And the library itself is no longer vendored, so it cannot be loaded by
+     something this check does not read. */
+  expect(readdirSync(join(SRC, 'js')).filter((n) => /jquery/i.test(n)),
+    'the vendored copy is gone; do not bring it back').toEqual([]);
 
   /* console.js and orrery.js each define a local `$` — getElementById and a
      panel-scoped querySelector — so the bare name is not proof of jQuery. A

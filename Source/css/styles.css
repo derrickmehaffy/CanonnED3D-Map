@@ -212,26 +212,13 @@ body {
 /* -------------------------------------------------------------------------- */
 
 .map_filter,
-.map_link {
-  display: block;
-  margin: 0 0 3px;
-  cursor: pointer;
-}
 
 .map_filter:hover,
-.map_link:hover {
-  color: #FF7207;
-}
 
 .map_filter.disabled .check {
   background: #333 !important;
 }
 
-/* Collapse map filter */
-
-.show_childs {
-  text-decoration: underline;
-}
 
 .map_filter.hidden {
   display: none;
@@ -363,13 +350,6 @@ like a tickmark */
   -webkit-transform: rotate(45deg);
   -ms-transform: rotate(45deg);
   transform: rotate(45deg);
-}
-
-
-#hud.enlarge #filters>div.open {
-  columns: 250px;
-  -moz-columns: 250px;
-  -webkit-columns: 250px;
 }
 
 #hud.enlarge .map_filter {

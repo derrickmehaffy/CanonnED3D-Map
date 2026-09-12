@@ -5,7 +5,11 @@ import { join } from 'node:path';
 import { stubDataHosts } from './helpers.mjs';
 
 const DATA_DIR = fileURLToPath(new URL('../Source/data/', import.meta.url));
-const CONSOLE_PAGE = '/prototype/console.html?map=gr';
+/* This pointed at /prototype/console.html?map=gr — a mockup of the console
+   that has since shipped into js/console.js on every page, and which has now
+   been deleted along with the last copy of jQuery it kept alive. gr-data.html
+   is the same map with the real console around it. */
+const CONSOLE_PAGE = '/gr-data.html';
 
 /* The boot screen clears as soon as the data lands — about two seconds, and
    less under a warm cache. That is too quick to assert against, so tests that
@@ -22,7 +26,7 @@ function holdData(page, ms = 5000) {
    MapData-*.js ends its load with
        document.getElementById('loading').style.display = 'none'
    including on its error paths. That id is a hard contract between the pages
-   and all 35 data files. Renaming it — or dropping the element while migrating
+   and all 34 data files. Renaming it — or dropping the element while migrating
    pages to the console — leaves the map behind a black screen with no error in
    the log, which is exactly the kind of break that only shows up in production. */
 test('every MapData file dismisses the loading overlay', () => {

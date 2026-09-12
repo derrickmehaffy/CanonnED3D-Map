@@ -537,50 +537,21 @@ var HUD = {
           groupId = HUD.filterGroupIds[typeFilter];
         }
 
-        var nbFilters = values.length;
-        var count = isNewGroup ? 0 : document.querySelectorAll('#' + groupId + ' .filter').length;
-        var visible = true;
-        var addedAny = false;
-
+        /* Ed3d.categoryAutoCollapseSize is `false` in ed3dmap.js and is set
+           nowhere, so the view limit this used to apply, the "+ See more" link
+           it added and HUD.expandFilters are all removed with it. Two things
+           were wrong inside that path anyway, which is what an unreachable
+           feature buys you: the count queried `.filter` while addFilter writes
+           `map_filter`, so it restarted on every batch; and the click handler
+           landed on the group container rather than the link, because the
+           jQuery it was written in returned the original selection from
+           .append() — so a click anywhere in the group expanded it. */
         Object.keys(values).forEach(function (key) {
-          var val = values[key];
-
           // Skip items already registered
           if (Ed3d.catObjs[key] !== undefined) return;
-
-          visible = true;
-
-          //-- Manage view limit if activated
-          if (Ed3d.categoryAutoCollapseSize !== false) {
-            count++;
-            if (count > Ed3d.categoryAutoCollapseSize) visible = false;
-          }
-
-          //-- Add filter
-          HUD.addFilter(groupId, key, val, visible);
+          HUD.addFilter(groupId, key, values[key], true);
           Ed3d.catObjs[key] = [];
-          addedAny = true;
-
         });
-
-        // Add/update the "See more" toggle if needed
-        if (addedAny && visible == false && document.querySelectorAll('#' + groupId + ' .show_childs').length === 0) {
-          var group = document.getElementById(groupId);
-          if (group) {
-            group.insertAdjacentHTML('beforeend',
-              '<a class="show_childs">' +
-              '+ See more' +
-              '</a>'
-            );
-            // Bound to the group, not to the link just added: .append() returned
-            // the original selection, so .click() landed here. Kept as it was —
-            // any click inside the group expands it — because moving it to the
-            // link changes what the panel does, which is not this change's job.
-            group.addEventListener('click', function () {
-              HUD.expandFilters(groupId);
-            });
-          }
-        }
       }
 
     });
@@ -588,23 +559,6 @@ var HUD = {
 
   },
 
-  /**
-   * Expand filter
-   */
-
-  /**
-   * System typeahead search
-   */
-  'expandFilters': function (groupId) {
-
-    var group = document.getElementById(groupId);
-    if (group) group.classList.add('open');
-
-    var hud = document.getElementById('hud');
-    if (hud) hud.classList.add('enlarge');
-
-
-  },
 
   /**
    * Init on-screen 3D navigation buttons (Zoom In/Out + Pan 4-directions + Reset)

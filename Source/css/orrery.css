@@ -723,8 +723,14 @@ body.orr-dragging{user-select:none}
 .orr-time button{width:30px;height:24px;display:grid;place-items:center;
   border:1px solid var(--rule,#1B242E);color:var(--dim,#93A3B1);font-size:9px;
   background:none;cursor:pointer}
-.orr-time button:hover:not(:disabled){border-color:var(--amber,#FF9D00);color:var(--amber,#FF9D00)}
-.orr-time button:disabled{opacity:.35;cursor:default}
+/* .orr-time holds one button, the play/pause toggle. The :disabled rules that
+   used to sit here anticipated step controls that were never built.
+
+   Border only: .orr-play below sets its own colour with !important — amber
+   playing, ion paused — so a colour here would be inert, and the glyph
+   already carries the state. */
+.orr-time button:hover{border-color:var(--amber)}
+
 .orr-play{color:var(--amber,#FF9D00)!important;font-size:11px!important}
 .orr-play.paused{color:var(--ion,#4DE3E1)!important}
 /* The speed slider. Wider than a pair of nudge buttons because that width is

@@ -92,15 +92,6 @@ bare identifiers. This is a compatibility posture, not a design to copy.
   coordinates. `nothing fetches EDSM` holds that line, and it counts code
   rather than the word, so a comment recording the refresh query is fine.
 
-## Orphans worth knowing about
-
-- **`prototype/`** — a working mockup of the proposed console UI from September
-  2026, driving the real engine through the same import map and `main.js` as the
-  live pages. No page links it and the smoke suite's `Source/*.html` glob does
-  not reach it. Its design has since shipped into `js/console.js`, so its
-  `console.js` is now a 49KB fork of a file that moved on. It is a snapshot of a
-  decision already made, and it will only drift further.
-
 ## Tests
 
 ```bash

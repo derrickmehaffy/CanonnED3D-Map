@@ -202,9 +202,6 @@ var Ed3d = {
   //-- With button to toggle fullscreen
   'withFullscreenToggle': false,
 
-  //-- Collapse subcategories (false: don't collapse)
-  'categoryAutoCollapseSize': false,
-
   /**
    * Init Ed3d map
    *

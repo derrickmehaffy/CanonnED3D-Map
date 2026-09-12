@@ -424,3 +424,30 @@ test('the body list column is one unit, and says which', async ({ page }) => {
   const star = m.rows.find((r) => r.star);
   expect(star.cell, 'the star sits at the origin of the column').toBe('0');
 });
+
+test('the play button still lights up on hover', async ({ page }) => {
+  /* .orr-time held two rules for a :disabled state that no control in it can
+     reach — they anticipated step buttons that were never built. Removing them
+     took the play button's hover with it on the first attempt, because the
+     hover rule was written as :hover:not(:disabled). It is the only button in
+     that bar, so this is the one interaction it has. */
+  await crowded(page);
+  const btn = page.locator('#orr-play');
+  await expect(btn).toBeVisible();
+
+  const at = () => page.evaluate(() => {
+    const cs = getComputedStyle(document.querySelector('#orr-play'));
+    return { border: cs.borderTopColor, color: cs.color };
+  });
+
+  const rest = await at();
+  await btn.hover();
+  const hot = await at();
+
+  expect(hot.border, 'the border should change on hover').not.toBe(rest.border);
+  /* The glyph does not change, and should not: .orr-play sets its own colour
+     with !important — amber playing, ion paused — so the colour is carrying
+     the state, not the hover. */
+  expect(hot.color, 'the glyph keeps the colour that means play or pause')
+    .toBe(rest.color);
+});
