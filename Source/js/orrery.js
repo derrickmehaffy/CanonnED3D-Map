@@ -1553,6 +1553,14 @@ const Orrery = (function () {
 
       '<div class="orr-mid">',
       '  <aside class="orr-side orr-left" id="orr-left">',
+      /* Inside the rail it resizes, mirroring orr-grip-r in .orr-right. It used
+         to be a sibling of the stage, and .orr-mid is not positioned, so
+         `right:-3px` resolved against the fixed .orrery — putting the *left*
+         panel's handle 3px off the *right* edge of the window, two pixels of it
+         on screen, running through the header and the time bar. The left panel
+         could not be resized from its own edge at all. */
+      '    <div class="orr-grip orr-grip-l" id="orr-grip-l" role="separator"',
+      '         aria-label="Resize the body list" tabindex="0"></div>',
       '    <div class="orr-s-h">',
       '      <h2 class="orr-s-t">System</h2>',
       /* Sol has sixty-seven stations and forty bodies, and with all of them
@@ -1614,8 +1622,6 @@ const Orrery = (function () {
       '    <div class="orr-msg" id="orr-msg" role="status" aria-live="polite"></div>',
       '    <div class="orr-legend" id="orr-legend"></div>',
       '  </div>',
-      '    <div class="orr-grip orr-grip-l" id="orr-grip-l" role="separator"',
-      '         aria-label="Resize the body list" tabindex="0"></div>',
 
       /* Stacked under the model there is only room for one rail at a time, so
          they take turns. Without this the list — and with it every station in
@@ -4070,9 +4076,11 @@ const Orrery = (function () {
   function measures(cells) {
     const live = cells.filter((c) => c && c[1]);
     if (!live.length) return '';
-    return '<div class="orr-meas">' + live.map(([k, v, u]) =>
+    /* A dl, not a div: dt and dd are only valid inside one (a div wrapping
+       each pair is allowed, and is what gives each tile its own cell). */
+    return '<dl class="orr-meas">' + live.map(([k, v, u]) =>
       '<div><dt>' + k + '</dt><dd>' + esc(String(v)) +
-      (u ? '<em>' + u + '</em>' : '') + '</dd></div>').join('') + '</div>';
+      (u ? '<em>' + u + '</em>' : '') + '</dd></div>').join('') + '</dl>';
   }
 
   /* Out to the wider tooling.
@@ -4997,10 +5005,20 @@ const Orrery = (function () {
     }
 
     stopBoot('gone');
+    /* Elite's dump has two body types, Star and Planet, and a moon is a Planet
+       with a Planet for a parent. Counting types alone made Sol "39 planets ·
+       1 star" — the second-largest string on the page, against the one name
+       every commander knows, wrong by thirty-one. */
+    const stars = model.all.filter((n) => n.type === 'Star').length;
+    const planets = model.all.filter((n) =>
+      n.type === 'Planet' && (!n.parent || n.parent.type === 'Star')).length;
+    const moons = model.all.filter((n) =>
+      n.type === 'Planet' && n.parent && n.parent.type !== 'Star').length;
+    const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
     panel.querySelector('#orr-sub').textContent =
-      model.all.filter((n) => n.type === 'Planet').length + ' planets · ' +
-      model.all.filter((n) => n.type === 'Star').length + ' star' +
-      (model.all.filter((n) => n.type === 'Star').length > 1 ? 's' : '');
+      [planets && plural(planets, 'planet'),
+       moons && plural(moons, 'moon'),
+       stars && plural(stars, 'star')].filter(Boolean).join(' · ');
 
     limitRates();
 

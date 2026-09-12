@@ -191,10 +191,26 @@ test('nothing moves when the star lookup answers', async ({ page }) => {
     await route.fallback();
   });
 
-  const geometry = () => page.evaluate(() => ({
-    star: Math.round(document.querySelector('#cstar .c-star').getBoundingClientRect().height),
-    buttons: Math.round(document.querySelector('#card .c-acts').getBoundingClientRect().top)
-  }));
+  /* The skeleton holds its own height so the card does not jump when the
+     answer lands — that is what this test is for, and it is measured below.
+
+     `.c-acts` is no longer measured by its absolute top. It is a sticky footer
+     now, because at 1280x720 it used to begin 395px into a 371px-tall card:
+     "Open the orrery" and "Open in Signals" were off-screen with a 1.21:1
+     scrollbar thumb as the only clue. A sticky element's position is by
+     definition different once its container starts scrolling, and resolving
+     the star is what makes this one scroll. What still has to hold — and what
+     a reader would notice — is that the actions stay inside the card and
+     visible either way. */
+  const geometry = () => page.evaluate(() => {
+    const card = document.querySelector('#card').getBoundingClientRect();
+    const acts = document.querySelector('#card .c-acts').getBoundingClientRect();
+    return {
+      star: Math.round(document.querySelector('#cstar .c-star').getBoundingClientRect().height),
+      actionsVisible: acts.bottom <= card.bottom + 1 && acts.top >= card.top - 1,
+      actionsPinned: getComputedStyle(document.querySelector('#card .c-acts')).position
+    };
+  });
 
   await pickFromList(page, 'B3');
   await expect(page.locator('#cstar .c-star.wait')).toBeVisible();
@@ -205,7 +221,13 @@ test('nothing moves when the star lookup answers', async ({ page }) => {
 
   release();
   await expect(page.locator('#cstar .c-star-h b')).toHaveText('K3 Va');
-  expect(await geometry()).toEqual(waiting);
+  const answered = await geometry();
+
+  expect(answered.star, 'the skeleton held the height the answer needed')
+    .toBe(waiting.star);
+  expect(answered.actionsVisible, 'and the actions are still reachable').toBe(true);
+  expect(waiting.actionsVisible, 'as they were while waiting').toBe(true);
+  expect(answered.actionsPinned).toBe('sticky');
 });
 
 /* Sol is the wrong ruler at both ends: a neutron star is 0.00003 solar radii,

@@ -308,7 +308,20 @@ body.orrery-open .app{visibility:hidden}
 .orr-grip-l,.orr-grip-r{top:0;bottom:0;width:5px;cursor:col-resize}
 .orr-grip-l{right:-3px}
 .orr-grip-r{left:-3px}
-.orr-grip-h{position:relative;height:5px;margin-top:-3px;cursor:row-resize}
+/* The spine's own handle, and it has to be told which row it belongs to.
+   The grid names four rows; this was a fifth grid child with no grid-row, so
+   auto-placement dropped it into an implicit row 5 — measured at x 0→1600,
+   y 895→900: the full width of the window along the bottom, lying over the
+   last 3px of the time bar, showing a row-resize cursor there and lighting up
+   amber on hover, while dragging it resized an axis at the top of the screen.
+
+   In the spine's row, aligned to its bottom edge, with the same 3px straddle
+   the negative margin was always for. */
+.orr-grip-h{grid-row:2;align-self:end;position:relative;height:5px;
+  margin-bottom:-3px;cursor:row-resize}
+/* No spine, no handle for it. */
+.orrery:not(.has-system) .orr-grip-h,
+.orr-spine.empty + .orr-grip-h{display:none}
 body.orr-dragging{user-select:none}
 .orr-left,.orr-right{position:relative}
 /* Below the height an axis can be read at, it is simply put away. */
@@ -525,16 +538,31 @@ body.orr-dragging{user-select:none}
 
 /* The numbers you decide on, set the way the galaxy map's system card sets
    them: label above, figure large and tabular, unit small beside it. */
-.orr-meas{display:grid;grid-template-columns:1fr 1fr;gap:1px;margin-top:11px;
-  background:var(--rule,#1B242E);border:1px solid var(--rule,#1B242E)}
-.orr-meas > div{background:var(--panel,#0C1116);padding:6px 9px 7px;min-width:0}
-.orr-meas dt{font-family:var(--cond,sans-serif);font-size:9px;letter-spacing:.14em;
-  text-transform:uppercase;color:var(--dimmer,#6E7F8D);white-space:nowrap;
+/* The measurement tile, and the one place in this file where the comment used
+   to describe something the browser was not doing.
+
+   It said these were set "the way the galaxy map's system card sets them:
+   label above, figure large and tabular". They were not. `.orr-facts dt` and
+   `.orr-facts dd` further down carry the same specificity (0,1,1) and come
+   later in the file, and .orr-meas lives inside .orr-facts — so the label came
+   out 10px and the figure 11px, a label the same size as its own number, in
+   the component both surfaces use for every reading a commander takes off the
+   screen. The card renders the same figure at 14.5px.
+
+   Fixed by selecting through the structure — `.orr-meas > div > dt` is (0,1,2)
+   and cannot be beaten by a bare descendant rule — and by taking the card's
+   values verbatim rather than near-misses of them. */
+.orr-meas{display:grid;grid-template-columns:1fr 1fr;gap:1px;margin:11px 0 0;
+  background:var(--rule);border:1px solid var(--rule)}
+.orr-meas > div{background:var(--panel);padding:7px 9px 8px;min-width:0}
+.orr-meas > div > dt{font-family:var(--cond);font-size:9px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--dimmer);white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}
-.orr-meas dd{margin:2px 0 0;display:flex;align-items:baseline;gap:4px;
-  font-family:var(--mono,monospace);font-size:13.5px;line-height:1.15;
-  color:var(--text,#CAD4DC);font-variant-numeric:tabular-nums}
-.orr-meas dd em{font-style:normal;font-size:9px;color:var(--dimmer,#6E7F8D);white-space:nowrap}
+.orr-meas > div > dd{margin:3px 0 0;display:flex;align-items:baseline;gap:5px;
+  font-family:var(--mono);font-size:14.5px;line-height:17px;height:20px;
+  color:var(--text);font-variant-numeric:tabular-nums}
+.orr-meas > div > dd em{font-style:normal;font-size:9.5px;letter-spacing:.02em;
+  color:var(--dimmer);white-space:nowrap}
 
 /* The stations on the selected body, as an index rather than as cards: the
    detail is a modal now, and repeating half of it here made the panel long
@@ -755,7 +783,7 @@ body.orr-dragging{user-select:none}
   .orr-menu .only-phone{display:flex}
 }
 @media (max-width:960px){
-  .orr-spine{display:none}
+  .orr-spine,.orr-grip-h{display:none}
 }
 /* ── stacked ────────────────────────────────────────────────────────────────
    No room for two rails beside a model worth looking at, so they take turns
@@ -843,3 +871,21 @@ body.orr-dragging{user-select:none}
   .orr-clock{flex:1;min-width:0}
   #orr-date{font-size:10.5px}
 }
+
+
+/* ── controls get a boundary you can see ──────────────────────────────────
+   The console's --rule-strong, applied to the orrery's own pressables for the
+   same reason and by the same mechanism. orrery.html loads console.css, so the
+   token is defined here too. */
+.orr-tb,
+.orr-opt,
+.orr-seg,
+.orr-seg button + button,
+.orr-chip,
+.orr-filter,
+.orr-x,
+.orr-s-key,
+#orr-now,
+.orr-ports button,
+.orr-seeds button,
+.orr-lost-do button{border-color:var(--rule-strong)}

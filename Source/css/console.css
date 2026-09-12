@@ -24,6 +24,17 @@
      search placeholder sat around 3:1 and 1.9:1 against --panel, which is
      below the 4.5:1 that small text needs. Now ~7:1 and ~4.6:1. */
   --dim:#93A3B1; --dimmer:#6E7F8D;
+  /* --rule is #1B242E, which is 1.21:1 against --panel and 1.29:1 against
+     --void. As a hairline separating blocks that is the point — quiet
+     structure. As the *only* boundary a ghost button has, it is not: WCAG
+     1.4.11 asks 3:1 for the visual boundary of a control, and at 1.21:1 these
+     read as flat labels until hovered, then vanish on a poor monitor.
+
+     So two tokens with one meaning each. --rule-strong is 3.05:1 on --panel
+     and 3.24:1 on --void, measured; it is applied at the bottom of this file
+     to things you press, and nowhere else. (The design review suggested
+     #2A3846 for this — it measures 1.58:1, so it would not have fixed it.) */
+  --rule-strong:#4A637D;
   --sans:'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif;
   --cond:'IBM Plex Sans Condensed','IBM Plex Sans',ui-sans-serif,sans-serif;
   --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
@@ -241,7 +252,16 @@ body.bare .top, body.bare .strip{display:none}
   border:1px solid var(--rule);box-shadow:0 8px 28px rgba(0,0,0,.6);z-index:9;
   /* Stops clear of the zoom/pan cluster below it, which is about 160px tall
      and sits 44px off the bottom. */
-  max-height:calc(100% - 275px);overflow-y:auto;resize:none}
+  /* 275px was reserved for chrome that is ~160px tall, and the overflow hid
+     the two links that take a commander anywhere: at 1280x720 .c-acts began
+     395px into a 371px-tall card, so "Open the orrery" and "Open in Signals"
+     were simply not on screen, with a scrollbar thumb at 1.21:1 as the only
+     hint. The actions are pinned below instead, so they never scroll away. */
+  /* A floor, because `calc(100% - Npx)` collapses to nothing on a short stage
+     — at 275px reserved it went to zero in a small window, and even at 150px a
+     200px-tall stage leaves 50. Never smaller than 220px; the sticky actions
+     below mean a short card still shows its way out. */
+  max-height:max(220px, calc(100% - 150px));overflow-y:auto;resize:none}
 .card.hidden{display:none}
 .c-h{padding:11px 13px;border-bottom:1px solid var(--rule);display:flex;
   justify-content:space-between;align-items:flex-start;gap:8px}
@@ -267,7 +287,12 @@ body.bare .top, body.bare .strip{display:none}
 .c-link{margin:0 13px 10px;padding:8px 10px;border:1px solid var(--rule);background:#080C10;
   font-family:var(--mono);font-size:10px;color:var(--dimmer);line-height:1.6}
 .c-link a{color:var(--ion);text-decoration:none;border-bottom:1px solid rgba(77,227,225,.3)}
-.c-acts{padding:0 13px 13px;display:grid;grid-template-columns:1fr 1fr;gap:4px}
+/* Pinned to the bottom of the card's scroll box: these are the only way out
+   of the card, so they are the last thing that should scroll out of reach. The
+   background is opaque because content passes underneath. */
+.c-acts{padding:9px 13px 13px;display:grid;grid-template-columns:1fr 1fr;gap:4px;
+  position:sticky;bottom:0;background:var(--panel);
+  box-shadow:0 -8px 12px -6px var(--panel)}
 .c-acts a,.c-acts button{display:flex;align-items:center;gap:6px;padding:6px 9px;
   border:1px solid var(--rule);font-size:11.5px;color:var(--text);text-decoration:none}
 .c-acts a:hover,.c-acts button:hover{border-color:var(--ion);color:var(--ion)}
@@ -667,3 +692,28 @@ body.card-dragging{user-select:none;cursor:grabbing}
 .p-act{display:block;width:100%;margin-top:8px;border:1px solid var(--rule);
   padding:7px 8px;font-size:11.5px;color:var(--text);background:none;cursor:pointer}
 .p-act:hover{border-color:var(--ion);color:var(--ion)}
+
+
+/* ── controls get a boundary you can see ──────────────────────────────────
+   Appended deliberately: equal specificity, later in source, so it lifts the
+   border colour of everything you press without touching the 50-odd places
+   --rule is doing its real job as structure. See the note beside
+   --rule-strong for the measurements. */
+.switch,
+.find,
+.viewmode,
+.viewmode button + button,
+#nav-controls .nav-btn,
+.selrow button,
+.syssort button,
+.btnrow button,
+.p-act,
+.tchip,
+.sw-t,
+.c-acts a,
+.c-acts button,
+.c-h .x,
+.idx-h .x,
+.totop,
+.sysfilter,
+.find .k{border-color:var(--rule-strong)}

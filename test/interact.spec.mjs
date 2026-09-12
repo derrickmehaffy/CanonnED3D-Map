@@ -468,10 +468,19 @@ test('the card hands out the coordinates, ready to paste', async ({ page }) => {
   // Three numbers, comma separated, and nothing else to strip out.
   expect(wrote).toMatch(/^-?\d+(\.\d+)?, -?\d+(\.\d+)?, -?\d+(\.\d+)?$/);
 
-  // The same three the card is showing, in the same order.
+  /* The same three the card is showing, in the same order — but rounded.
+     The card used to print the raw floats, which claims four decimals of
+     galactic position and disagreed with both the status strip and the
+     in-scene label on the same screen. Full precision is kept for the
+     clipboard, which is the one place someone actually wants it, so the two
+     are deliberately no longer the same string. */
   const shown = await page.locator('#card .c-meta').textContent();
   const nums = wrote.split(', ');
-  for (const n of nums) expect(shown).toContain(n);
+  for (const n of nums) expect(shown).toContain(String(Math.round(Number(n))));
+
+  // And the clipboard keeps the precision the display drops.
+  expect(nums.some((n) => n.includes('.')),
+    'at least one coordinate should still be copied unrounded').toBe(true);
 
   // And they are the game's coordinates, not the scene's mirrored z.
   const rec = await page.evaluate(() => {

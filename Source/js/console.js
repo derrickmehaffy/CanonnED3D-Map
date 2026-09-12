@@ -203,12 +203,26 @@
      #edmap is *moved*, not recreated: Ed3d has not run yet (this script is
      ordered before the MapData file), and moving the element keeps the boot
      overlay and its id="loading" contract intact. */
+  /* Elite Dangerous is overwhelmingly a PC game, and the shortcut handler has
+     always accepted `e.metaKey || e.ctrlKey`. Only the labels lied: they were
+     hardcoded to the Command glyph, so a Windows commander was shown a key
+     their keyboard does not have. */
+  var MOD = /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent)
+    ? '\u2318' : 'Ctrl+';
+  var SHIFT = /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent)
+    ? '\u21E7' : 'Shift+';
+
   function buildShell() {
     var map = $('edmap');
     if (!map) return false;
 
     var host = document.createElement('div');
-    host.innerHTML = SHELL;
+    /* The shell's literals are HTML entities, not characters, so they are what
+       gets replaced — longest first, or the Command glyph would be rewritten
+       out from under the Shift one. */
+    host.innerHTML = SHELL
+      .replace(/&#8984;&#8679;/g, MOD + SHIFT)
+      .replace(/&#8984;/g, MOD);
     while (host.firstChild) document.body.appendChild(host.firstChild);
 
     var slot = $('console-stage-slot');
@@ -951,6 +965,38 @@
       renderPanel();
     }
     setTimeout(function () { if (typeof refresh3dMapSize === 'function') refresh3dMapSize(); }, 0);
+  });
+
+  /* Enter and Space on a role="button" div do not synthesise a click — the
+     browser only does that for real buttons. Every row and toggle in this
+     panel carries tabindex="0" and a role, and the only handler was `click`,
+     so all of it was focusable and inert: 80 tab stops on the systems panel
+     that did nothing when pressed.
+
+     The orrery's own list has this right — role="tree", roving tabindex,
+     working Enter — so rather than invent anything, the key is turned into the
+     click the panel already handles. Space is preventDefault'd first or it
+     scrolls the panel instead. */
+  $('side').addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+    var hit = e.target.closest('[role="button"],[role="switch"]');
+    if (!hit || !$('side').contains(hit)) return;
+    e.preventDefault();
+
+    /* Toggling a layer re-renders the panel, which throws away the element
+       that had focus — so without this a keyboard reader is dumped back to the
+       top of the list after every press, and a second press goes nowhere.
+       Remember the row by the attribute that identifies it and take focus back
+       to whatever stands in its place. */
+    var keep = ['data-t', 'data-sys', 'data-sw', 'data-jr', 'data-mark']
+      .filter(function (a) { return hit.hasAttribute(a); })
+      .map(function (a) { return '[' + a + '="' + hit.getAttribute(a) + '"]'; })[0];
+
+    hit.click();
+
+    if (!keep) return;
+    var again = $('side').querySelector(keep);
+    if (again && again !== document.activeElement) again.focus();
   });
 
   $('side').addEventListener('click', function (e) {
@@ -2069,7 +2115,14 @@
         // so getElementById returned its <span> and the close button was
         // wired to nothing on any page where the HUD renders first.
         '<button class="x" id="card-x" aria-label="Close">&times;</button></div>' +
-      '<div class="c-meta">' + s.x + ' · ' + s.y + ' · ' + s.z + '<br>' +
+      /* Rounded, like the status strip and the in-scene label. The card used
+         to print the raw floats — "8614.1875 · -116.6875 · 2733.03125" — which
+         claims four decimals of galactic position, makes the coordinate the
+         longest string on the card, and disagrees with the other two places
+         the same numbers appear on the same screen. Copy x, y, z still copies
+         full precision, which is the one place it is wanted. */
+      '<div class="c-meta">' + Math.round(s.x) + ' · ' + Math.round(s.y) +
+      ' · ' + Math.round(s.z) + '<br>' +
         Math.round(Math.sqrt(s.x * s.x + s.y * s.y + s.z * s.z)).toLocaleString() + ' ly from Sol</div>' +
       '<div id="cstar"></div>' +
       '<div class="c-sec"><span>' + count + ' ' + CFG.unit + (count > 1 ? 's' : '') + '</span>' +
@@ -2460,7 +2513,7 @@
       var ms = allMaps().filter(function (m) { return !lo || m.n.toLowerCase().indexOf(lo) > -1; });
       grp('Maps', ms.slice(0, 6).map(function (m) {
         return { k: 'map', t: m.n, m: isCurrentPage(m.u) ? 'showing' : m.g, u: m.u };
-      }), ms.length > 6 ? ms.length + ' total — ⌘⇧M to browse' : '');
+      }), ms.length > 6 ? ms.length + ' total — ' + MOD + SHIFT + 'M to browse' : '');
     }
     if (only !== 'maps') {
       grp('Canonn tools', TOOLS.filter(function (t) { return !lo || t[0].toLowerCase().indexOf(lo) > -1; })
