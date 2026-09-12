@@ -1643,7 +1643,10 @@ const Orrery = (function () {
       '<div class="orr-foot">',
       '  <div class="orr-time">',
       '    <button id="orr-play" class="orr-play" title="Pause">&#10074;&#10074;</button>',
-      '    <input id="orr-speed" class="orr-speed" type="range" step="1"',
+      /* 0.02 of a rung: fine enough to read as continuous, coarse enough
+         that every rung is still a reachable value, since 0.02 divides 1
+         exactly. The keyboard shortcuts ignore it and move rung to rung. */
+      '    <input id="orr-speed" class="orr-speed" type="range" step="0.02"',
       '      aria-label="Speed, backwards through real time to forwards">',
       '    <span class="orr-rate" id="orr-rate"></span>',
       '  </div>',
@@ -2523,8 +2526,11 @@ const Orrery = (function () {
        guarded now, not just the brackets below, which had it all along. */
     else if (typing()) { /* let the field have it */ }
     else if (e.key === ' ') { e.preventDefault(); setPlaying(!playing); }
-    else if (e.key === ',') setRate(rateIx - 1);
-    else if (e.key === '.') setRate(rateIx + 1);
+    /* Rung to rung, not by a slider step: the shortcuts are for jumping
+       between the named rates, and after a freeform drag the position is
+       usually between two of them. */
+    else if (e.key === ',') setRate(Math.ceil(rateIx - 1e-6) - 1);
+    else if (e.key === '.') setRate(Math.floor(rateIx + 1e-6) + 1);
     /* The model had no way in without a pointer. Square brackets walk the
        bodies in the order the list shows them, from wherever focus happens
        to be — the same idea as the comma and the full stop. */
@@ -3055,11 +3061,74 @@ const Orrery = (function () {
     setRate(rateIx);
   }
 
+  /* The ladder's two "real time" rungs sit either side of the middle of the
+     track — LADDER is the rates reversed and negated, then the rates forwards —
+     so the centre is the slow crossing where the clock changes direction.
+
+     The slider reads continuously between the rungs now rather than stepping
+     from one to the next: asked for, "can we make it more freeform with a
+     noticeable detent at real time". Freeform is geometric interpolation
+     between the two rungs a position falls between — the rates are a
+     geometric series, so interpolating their logarithm is the only reading
+     that feels even. The detent is a dead zone about the centre: anywhere
+     inside it the clock runs at exactly real time, so the useful setting is
+     something you fall into rather than something you hunt for.
+
+     Keyboard shortcuts still move rung to rung, which is what they are for. */
+  const REAL_DAYS = 1 / 86400;
+  const CENTRE_LO = LADDER.findIndex((r) => r.dir === -1 && r.days === REAL_DAYS);
+  const CENTRE_HI = CENTRE_LO + 1;
+  const DETENT = 0.35;          // index units either side of the centre pair
+
+  function inDetent(t) {
+    return t > CENTRE_LO - DETENT && t < CENTRE_HI + DETENT;
+  }
+
+  /** days-per-second and direction for any position on the track. */
+  function rateAt(t) {
+    if (inDetent(t)) {
+      return { days: REAL_DAYS, dir: t < (CENTRE_LO + CENTRE_HI) / 2 ? -1 : 1, detent: true };
+    }
+    const lo = Math.max(0, Math.min(LADDER.length - 1, Math.floor(t)));
+    const hi = Math.min(LADDER.length - 1, lo + 1);
+    const a = LADDER[lo], b = LADDER[hi];
+    // Never interpolate across the direction flip; the detent owns that span.
+    if (a.dir !== b.dir || lo === hi) return { days: a.days, dir: a.dir, detent: false };
+    const f = t - lo;
+    return { days: a.days * Math.pow(b.days / a.days, f), dir: a.dir, detent: false };
+  }
+
+  /** A rate in words, for the positions between the named rungs. */
+  function rateWords(days) {
+    const trim = (v) => (v < 10 ? String(Math.round(v * 10) / 10) : String(Math.round(v)));
+    const unit = (v, one, many) => trim(v) + ' ' + (Math.abs(v - 1) < 0.05 ? one : many) + '/s';
+    const secs = days * 86400;
+    if (secs < 59.5) return unit(secs, 'sec', 'secs');
+    if (secs < 3570) return unit(secs / 60, 'min', 'mins');
+    if (days < 0.98) return unit(secs / 3600, 'hour', 'hours');
+    if (days < 6.9) return unit(days, 'day', 'days');
+    if (days < 30.2) return unit(days / 7, 'week', 'weeks');
+    if (days < 364) return unit(days / 30.44, 'month', 'months');
+    return unit(days / 365.25, 'yr', 'yrs');
+  }
+
   function setRate(ix) {
-    rateIx = Math.max(rateLo, Math.min(rateHi, ix));
-    const r = LADDER[rateIx];
+    let t = Math.max(rateLo, Math.min(rateHi, ix));
+    /* Snap inside the dead zone, so the stored position is the detent rather
+       than merely near it — otherwise the readout says "real time" while the
+       slider sits a hair off it and the next keyboard step is unpredictable. */
+    if (inDetent(t)) t = t < (CENTRE_LO + CENTRE_HI) / 2 ? CENTRE_LO : CENTRE_HI;
+    rateIx = t;
+
+    const cur = rateAt(rateIx);
+    /* On a rung, use that rung's own wording — "6 hours/s", "10 yrs/s" — so
+       the named rates read exactly as they always have. Between rungs, say it
+       in words. */
+    const onRung = Math.abs(rateIx - Math.round(rateIx)) < 1e-6;
+    const r = onRung ? LADDER[Math.round(rateIx)] : null;
+    const label = r ? r.label : rateWords(cur.days);
     panel.querySelector('#orr-rate').textContent =
-      (r.dir < 0 && r.days > 1 / 86400 ? '− ' : '') + r.label;
+      (cur.dir < 0 && cur.days > REAL_DAYS ? '− ' : '') + label;
     /* One slider over the whole signed ladder, rather than a pair of nudge
        buttons. Asked for: "I much prefer the slider bar idea for time skipping
        over the buttons — gives a lot more control." Its ends are the ladder's
@@ -3070,6 +3139,19 @@ const Orrery = (function () {
     bar.min = rateLo;
     bar.max = rateHi;
     if (+bar.value !== rateIx) bar.value = rateIx;
+
+    /* The track is drawn in CSS from these two — the thumb's position and the
+       detent's, as fractions of the track. The detent's is not a constant even
+       though it works out at a half today: rateLo and rateHi are clamped per
+       system, and only because that clamp is symmetric does the centre stay in
+       the middle. Computing it costs nothing and does not have to be revisited
+       if the ladder ever stops being symmetric. */
+    const span = Math.max(1e-9, rateHi - rateLo);
+    bar.style.setProperty('--sp-pos', (rateIx - rateLo) / span);
+    bar.style.setProperty('--sp-det', ((CENTRE_LO + CENTRE_HI) / 2 - rateLo) / span);
+    /* In the dead zone the thumb sits on the mark and hides it, so the thumb
+       itself has to carry the state. */
+    bar.classList.toggle('at-real', !!cur.detent);
     bar.title = 'Backwards ' + LADDER[rateLo].label + ' … forwards ' +
       LADDER[rateHi].label +
       ' — as fast as this system reads before its inner bodies skip whole orbits';
@@ -3616,7 +3698,7 @@ const Orrery = (function () {
   function draw(dtSeconds) {
     if (!model) return;
     if (playing && dtSeconds) {
-      const r = LADDER[rateIx];
+      const r = rateAt(rateIx);
       simDays += r.days * r.dir * dtSeconds;
     }
 
@@ -5339,7 +5421,15 @@ const Orrery = (function () {
           banded: !!m.rings.children[0].material.map
         };
       })(),
-      rate: LADDER[rateIx].label,
+      rate: panel.querySelector('#orr-rate').textContent.replace(/^−\s*/, ''),
+      rateSigned: panel.querySelector('#orr-rate').textContent,
+      rateIndex: rateIx,
+      /* Where the detent sits on the track. It is not a constant: the ends of
+         the ladder are clamped per system, so the centre's position along the
+         visible track moves with rateLo/rateHi. */
+      centreIndex: (CENTRE_LO + CENTRE_HI) / 2,
+      rateDays: rateAt(rateIx).days * rateAt(rateIx).dir,
+      atRealTime: rateAt(rateIx).detent,
       fastestRate: LADDER[rateHi].label,
       /* How far the worst-drawn orbit strays from the body riding on it, in
          that body's own radii. A polyline is a polygon, so it always sags

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { stubDataHosts } from './helpers.mjs';
+import { stubDataHosts, pixelRow } from './helpers.mjs';
 
 /* The orrery models one system from Canonn's dump. These tests are in two
    halves: the mechanics, which are checked as arithmetic because an orbit
@@ -3557,4 +3557,198 @@ test('a comma typed into a text field is a comma, not a shortcut', async ({ page
     await page.evaluate(() => document.querySelector('#orr-speed').value),
     'a text field still owns its characters'
   ).toBe(before);
+});
+
+test('the speed slider is freeform, with a detent at real time', async ({ page }) => {
+  /* Asked for: "can we make it more freeform with a noticeable detent at real
+     time". It used to step rung to rung, twenty positions over the whole
+     signed ladder. Now it reads continuously between the rungs — geometric
+     interpolation, because the rates are a geometric series and interpolating
+     their logarithm is the only reading that feels even — with a dead zone at
+     the centre where the clock runs at exactly real time.
+
+     The keyboard shortcuts still move rung to rung. That is what they are
+     for, and it is the half of the old behaviour worth keeping. */
+  await openOrrery(page);
+
+  const st = () => page.evaluate(() => {
+    const s = window.Orrery.state();
+    return { index: s.rateIndex, days: s.rateDays, label: s.rateSigned, detent: s.atRealTime };
+  });
+  const bar = page.locator('#orr-speed');
+
+  // Fine enough to be freeform rather than a twenty-position ladder.
+  expect(+(await bar.getAttribute('step')), 'the track has to be continuous')
+    .toBeLessThanOrEqual(0.1);
+
+  /* A position between two rungs gives a rate between them, and says so in
+     words rather than snapping to a named rate. */
+  const start = await st();
+  await bar.fill(String(start.index + 0.5));
+  await bar.dispatchEvent('input');
+  const between = await st();
+
+  expect(between.index, 'the slider holds a fractional position')
+    .toBeCloseTo(start.index + 0.5, 2);
+  expect(Math.abs(between.days), 'and the rate is genuinely between the two rungs')
+    .toBeGreaterThan(Math.abs(start.days));
+  expect(between.label, 'with a label that is not one of the rungs')
+    .not.toBe(start.label);
+
+  /* Geometric, not linear: half a rung between 1 day/s and 1 week/s is the
+     geometric mean, sqrt(7) ≈ 2.65 days — linear would give 4. */
+  expect(Math.abs(between.days) / Math.abs(start.days)).toBeCloseTo(Math.sqrt(7), 1);
+
+  // The detent: anywhere inside the dead zone runs at exactly real time.
+  const realDays = 1 / 86400;
+  for (const at of [-0.3, -0.1, 0, 0.1, 0.3]) {
+    await page.evaluate((d) => {
+      const s = window.Orrery.state();
+      const el = document.querySelector('#orr-speed');
+      el.value = String(s.centreIndex + d);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }, at);
+    const now = await st();
+    expect(now.detent, 'inside the dead zone at offset ' + at).toBe(true);
+    expect(Math.abs(now.days), 'and running at exactly real time')
+      .toBeCloseTo(realDays, 10);
+    expect(now.label).toContain('real time');
+  }
+
+  // Outside it, the clock leaves real time again.
+  await page.evaluate(() => {
+    const s = window.Orrery.state();
+    const el = document.querySelector('#orr-speed');
+    el.value = String(s.centreIndex + 1.2);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const out = await st();
+  expect(out.detent, 'past the dead zone').toBe(false);
+  expect(Math.abs(out.days)).toBeGreaterThan(realDays);
+
+  // The track is drawn from two fractions, and they follow the control.
+  const vars = await bar.evaluate((el) => ({
+    pos: +el.style.getPropertyValue('--sp-pos'),
+    det: +el.style.getPropertyValue('--sp-det'),
+    lo: +el.min, hi: +el.max
+  }));
+  expect(vars.pos, 'the thumb fraction is where the thumb is')
+    .toBeCloseTo((out.index - vars.lo) / (vars.hi - vars.lo), 4);
+  expect(vars.det, 'and the detent fraction is the centre of the ladder')
+    .toBeCloseTo(0.5, 4);
+});
+
+test('the detent is drawn where it can be seen', async ({ page }) => {
+  /* This is the bug a screenshot caught and no assertion would have.
+
+     The mark was first drawn on the input\'s own `background`, with
+     `accent-color` left on — console.css sets it on every range input. That
+     makes the engine paint a complete native track *over* the element
+     background: amber from the left end to the thumb, grey after it. So the
+     mark was in the stylesheet, and in the computed style, and simply never on
+     screen. And the left end of this ladder is ten years a second backwards,
+     so the fill it painted grew as the clock sped up in reverse — a bar that
+     was longest where the control was least neutral.
+
+     getComputedStyle cannot help here either: Chromium renders
+     ::-webkit-slider-runnable-track but reports nothing for it, which is how
+     the first version of this test passed against a track that was not drawn.
+     So read the pixels. A row through the middle of the control is enough:
+     rail, a mark, and a fill between the mark and the thumb. */
+  await openOrrery(page);
+  // Three screenshots of a WebGL page under SwiftShader is most of a minute.
+  test.slow();
+  await page.locator('#orr-play').click();
+  const bar = page.locator('#orr-speed');
+
+  expect(await bar.evaluate((el) => getComputedStyle(el).appearance),
+    'the engine must not paint its own track over the drawing').toBe('none');
+  expect(await bar.evaluate((el) => getComputedStyle(el).backgroundImage),
+    'nothing is drawn on the element itself any more').toBe('none');
+
+  /* A row through the middle of the rendered control, each pixel named by the
+     token it came from. */
+  const TOKENS = [
+    ['C', [77, 227, 225]],   // --ion, the detent mark and the thumb at real time
+    ['A', [255, 157, 0]],    // --amber, the thumb and the fill
+    ['-', [74, 99, 125]]     // --rule-strong, the bare rail
+  ];
+  /* page.screenshot with a clip rather than locator.screenshot: the latter
+     waits for the element to hold still, and the orrery is redrawing every
+     frame behind it. The control itself does not move. */
+  const scan = async () => {
+    const box = await bar.boundingBox();
+    const shot = await page.screenshot({ clip: box, animations: 'disabled' });
+    return pixelRow(shot, Math.floor(box.height / 2)).map(([r, g, b]) => {
+      for (const [ch, t] of TOKENS) {
+        if (Math.abs(r - t[0]) < 26 && Math.abs(g - t[1]) < 26 && Math.abs(b - t[2]) < 26) return ch;
+      }
+      return '.';
+    }).join('');
+  };
+
+  /* Away from real time: the mark is on the track, and the fill runs from the
+     mark to the thumb rather than from the left end. */
+  const fast = await scan();
+  const mark = fast.indexOf('C');
+  expect(mark, 'the detent mark is drawn').toBeGreaterThan(-1);
+  expect(mark / fast.length, 'at the centre of the track').toBeCloseTo(0.5, 1);
+
+  const amber = [...fast].map((c, i) => (c === 'A' ? i : -1)).filter((i) => i >= 0);
+  expect(amber.length, 'there is a fill').toBeGreaterThan(4);
+  expect(Math.min(...amber), 'which starts at the mark, not at the left end')
+    .toBeGreaterThanOrEqual(mark);
+  expect(fast.slice(0, mark), 'so the track left of real time is bare rail')
+    .not.toContain('A');
+
+  /* Backwards: the same fill, on the other side of the mark. The direction is
+     the side it is on, which is the whole reason for drawing it from here. */
+  await page.evaluate(() => {
+    const el = document.querySelector('#orr-speed');
+    el.value = String(window.Orrery.state().centreIndex - 3);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const back = await scan();
+  const backAmber = [...back].map((c, i) => (c === 'A' ? i : -1)).filter((i) => i >= 0);
+  expect(Math.max(...backAmber), 'running backwards fills to the left of the mark')
+    .toBeLessThanOrEqual(back.indexOf('C') + 2);
+
+  /* In the dead zone the thumb covers the mark, so the thumb is what says so:
+     it takes the detent colour, and the fill has collapsed to nothing. */
+  await page.evaluate(() => {
+    const el = document.querySelector('#orr-speed');
+    el.value = String(window.Orrery.state().centreIndex);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await expect(bar).toHaveClass(/at-real/);
+
+  const real = await scan();
+  expect(real.split('C').length - 1, 'at real time the thumb itself is the mark')
+    .toBeGreaterThan(8);
+  expect(real, 'and there is no amber left anywhere on the track').not.toContain('A');
+});
+
+test('the speed keys still land exactly on a named rate', async ({ page }) => {
+  /* The point of keeping them: after a freeform drag the slider sits between
+     two rungs, and a shortcut should put the clock on a rate that has a name
+     rather than nudging it by one hundredth of the track. */
+  await openOrrery(page);
+  const bar = page.locator('#orr-speed');
+  const rate = page.locator('.orr-rate');
+
+  await expect(rate).toHaveText('1 day/s');
+  const at = +(await bar.inputValue());
+
+  // Drag to somewhere untidy between rungs.
+  await bar.fill(String(at + 0.4));
+  await bar.dispatchEvent('input');
+  await expect(rate, 'between rungs it reads in words').not.toHaveText('1 day/s');
+
+  // One press up lands on the next rung, not at 1.4.
+  await page.locator('#orr-canvas').click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press('.');
+  await expect(rate, 'a press lands on the rung above').toHaveText('1 week/s');
+
+  await page.keyboard.press(',');
+  await expect(rate, 'and back down to the one below').toHaveText('1 day/s');
 });

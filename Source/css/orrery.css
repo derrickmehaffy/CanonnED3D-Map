@@ -736,8 +736,69 @@ body.orr-dragging{user-select:none}
 /* The speed slider. Wider than a pair of nudge buttons because that width is
    the point — it is what turns "faster" into "how much faster", and the whole
    signed ladder, backwards through real time to forwards, lives on it. */
-.orr-speed{width:132px;height:24px;margin:0 2px;accent-color:var(--amber,#FF9D00);
-  cursor:pointer;background:transparent}
+/* The speed slider reads continuously between the named rates now, with a dead
+   zone at real time. That needs the track to show where real time is — a detent
+   you can feel but cannot find is half a control — and to stop lying about
+   where zero is.
+
+   Both come from replacing the native track. `accent-color` fills the rail from
+   the LEFT end to the thumb, and the left end of this ladder is ten years a
+   second *backwards*: a bar that grows as you speed up in reverse and shrinks
+   as you approach real time is exactly backwards. It also paints over the
+   element's own background, so a mark drawn there is never seen — measured, not
+   assumed. So the track is drawn here instead, and the fill runs from the
+   detent to the thumb: its length is how far from real time, its side is which
+   way the clock is going.
+
+   --sp-pos and --sp-det are the thumb's and the detent's positions along the
+   track as fractions, set from JS. The thumb's centre travels between
+   thumb/2 and width - thumb/2, never 0 and 100%, so every position here is
+   calc(thumb/2 + f * (100% - thumb)) — at the ends the difference is half a
+   thumb, which is the whole mark. And they are colour stops inside full-width
+   gradients rather than background-positions, because a percentage in
+   background-position resolves against the area *less the image*, which is a
+   different number and silently so. */
+.orr-speed{
+  --sp-thumb:14px;
+  --sp-pos:.5;
+  --sp-det:.5;
+  --sp-p:calc(var(--sp-thumb) / 2 + var(--sp-pos) * (100% - var(--sp-thumb)));
+  --sp-d:calc(var(--sp-thumb) / 2 + var(--sp-det) * (100% - var(--sp-thumb)));
+  --sp-track:
+    /* the detent, standing proud of the rail so it reads from across the room */
+    linear-gradient(90deg,
+      transparent calc(var(--sp-d) - 1px), var(--ion,#4DE3E1) calc(var(--sp-d) - 1px),
+      var(--ion,#4DE3E1) calc(var(--sp-d) + 1px), transparent calc(var(--sp-d) + 1px))
+      no-repeat 0 50% / 100% 13px,
+    /* the rail, filled between real time and here */
+    linear-gradient(90deg,
+      var(--rule-strong,#4A637D) 0 min(var(--sp-p),var(--sp-d)),
+      var(--amber,#FF9D00) min(var(--sp-p),var(--sp-d)) max(var(--sp-p),var(--sp-d)),
+      var(--rule-strong,#4A637D) max(var(--sp-p),var(--sp-d)) 100%)
+      no-repeat 0 50% / 100% 4px;
+  width:132px;height:24px;margin:0 2px;cursor:pointer;
+  -webkit-appearance:none;appearance:none;background:none}
+
+/* One value, two vendor pseudo-elements that cannot share a selector: a
+   rule listing both is dropped whole by each engine, because neither
+   recognises the other's. --sp-track is the shared half. */
+.orr-speed::-webkit-slider-runnable-track{height:24px;background:var(--sp-track)}
+.orr-speed::-moz-range-track{height:24px;background:var(--sp-track)}
+
+.orr-speed::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+  width:var(--sp-thumb);height:var(--sp-thumb);
+  margin-top:calc((24px - var(--sp-thumb)) / 2);
+  border:none;border-radius:50%;background:var(--amber,#FF9D00);cursor:pointer}
+.orr-speed::-moz-range-thumb{width:var(--sp-thumb);height:var(--sp-thumb);
+  border:none;border-radius:50%;background:var(--amber,#FF9D00);cursor:pointer}
+
+/* In the dead zone the thumb covers the mark, so the mark cannot be what says
+   so. The thumb takes the detent's colour instead — and the fill either side
+   of it has collapsed to nothing, which is the other half of the same
+   statement. */
+.orr-speed.at-real::-webkit-slider-thumb{background:var(--ion,#4DE3E1)}
+.orr-speed.at-real::-moz-range-thumb{background:var(--ion,#4DE3E1)}
+
 /* 2px, like every other focus ring in both stylesheets. */
 .orr-speed:focus-visible{outline:2px solid var(--amber,#FF9D00);outline-offset:2px}
 @media (max-width:520px){.orr-speed{width:88px}}

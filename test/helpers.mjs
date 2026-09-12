@@ -1,3 +1,5 @@
+import zlib from 'node:zlib';
+
 // Every host that serves map *data*. Asset CDNs are deliberately absent, so
 // fonts and Font Awesome still load normally — three.js is vendored and served
 // locally, and jQuery is gone. Canonn's cloud functions are billed per
@@ -88,4 +90,82 @@ export async function waitForScene(page, expect, timeout = 60_000) {
   await expect
     .poll(() => page.evaluate(() => window.__ed3dTestState?.().sceneVisible ?? false), { timeout })
     .toBe(true);
+}
+
+/**
+ * One horizontal row of pixels out of a PNG screenshot, as [r,g,b] triples.
+ *
+ * Some things can only be checked by looking at what was painted. The orrery's
+ * speed slider is one: its detent mark was in the stylesheet and in the
+ * computed style and still not on screen, because `accent-color` had the engine
+ * painting a native track over it. Chromium renders
+ * ::-webkit-slider-runnable-track but reports nothing for it through
+ * getComputedStyle, so there is no way to ask — only to look.
+ *
+ * Decoding in the page (canvas + img.decode) hangs on a page running a
+ * requestAnimationFrame loop under SwiftShader, so it happens here instead.
+ * Playwright's screenshots are 8-bit, non-interlaced, RGB or RGBA depending on
+ * whether the shot has any transparency; those are the shapes this reads, and
+ * it throws rather than guess at anything else. zlib is in node, so this adds
+ * no dependency.
+ */
+export function pixelRow(png, y) {
+  if (png.readUInt32BE(0) !== 0x89504e47) throw new Error('not a PNG');
+
+  let p = 8, w = 0, h = 0, depth = 0, colour = 0, interlace = 0;
+  const idat = [];
+  while (p < png.length) {
+    const len = png.readUInt32BE(p);
+    const type = png.toString('ascii', p + 4, p + 8);
+    const body = png.subarray(p + 8, p + 8 + len);
+    if (type === 'IHDR') {
+      w = body.readUInt32BE(0); h = body.readUInt32BE(4);
+      depth = body[8]; colour = body[9]; interlace = body[12];
+    } else if (type === 'IDAT') idat.push(body);
+    else if (type === 'IEND') break;
+    p += len + 12;
+  }
+  /* Colour type 2 is RGB and 6 is RGBA — Playwright drops the alpha channel
+     when the shot is fully opaque, so both turn up. Anything else (palettes,
+     greyscale, 16-bit, interlaced) is not what this suite produces, and
+     guessing would be worse than saying so. */
+  const bpp = colour === 6 ? 4 : colour === 2 ? 3 : 0;
+  if (depth !== 8 || !bpp || interlace !== 0) {
+    throw new Error(`pixelRow reads 8-bit RGB or RGBA only, got depth ${depth} colour ${colour}`);
+  }
+  if (y < 0 || y >= h) throw new Error(`row ${y} is outside a ${w}×${h} image`);
+
+  const raw = zlib.inflateSync(Buffer.concat(idat));
+  const stride = w * bpp;
+  /* Every row's filter refers to the row above it, so they have to be undone
+     from the top however few are wanted. */
+  const out = Buffer.alloc(stride * (y + 1));
+  for (let row = 0; row <= y; row++) {
+    const f = raw[row * (stride + 1)];
+    const src = raw.subarray(row * (stride + 1) + 1, row * (stride + 1) + 1 + stride);
+    const cur = out.subarray(row * stride, (row + 1) * stride);
+    const prev = row ? out.subarray((row - 1) * stride, row * stride) : null;
+    for (let i = 0; i < stride; i++) {
+      const a = i >= bpp ? cur[i - bpp] : 0;
+      const b = prev ? prev[i] : 0;
+      const c = prev && i >= bpp ? prev[i - bpp] : 0;
+      let v = src[i];
+      if (f === 1) v += a;
+      else if (f === 2) v += b;
+      else if (f === 3) v += (a + b) >> 1;
+      else if (f === 4) {
+        const q = a + b - c;
+        const pa = Math.abs(q - a), pb = Math.abs(q - b), pc = Math.abs(q - c);
+        v += pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+      } else if (f !== 0) throw new Error('unknown PNG row filter ' + f);
+      cur[i] = v & 0xff;
+    }
+  }
+
+  const line = [];
+  for (let x = 0; x < w; x++) {
+    const i = y * stride + x * bpp;
+    line.push([out[i], out[i + 1], out[i + 2]]);
+  }
+  return line;
 }
