@@ -708,3 +708,12 @@ body.card-dragging{user-select:none;cursor:grabbing}
 .totop,
 .sysfilter,
 .find .k{border-color:var(--rule-strong)}
+
+
+/* The systems list's numeric column is light-years from Sol, which is the
+   origin of Elite's coordinates. Naming it once above the list beats a unit on
+   each of the sixteen thousand rows multifaction.html?factions=All produces —
+   and beats what was there before, which was nothing at all. */
+.syscol{margin-left:auto;font-family:var(--mono);font-size:9px;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--dimmer);
+  white-space:nowrap;align-self:center}

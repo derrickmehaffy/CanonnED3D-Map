@@ -385,3 +385,186 @@ test('the chrome you click is big enough to click', async ({ page }) => {
   });
   expect(small).toEqual([]);
 });
+
+/* ── the systems list on a map with thousands of them ───────────────────── */
+
+/* Reported against the deployed preview: "after the map has loaded if I go to
+   the list tab it freezes the map and takes forever to load", and then
+   "sorting in that data (typing something) also takes forever".
+
+   multifaction.html?factions=All is 16,500 systems. The list sorted them with
+   `a.localeCompare(b, undefined, {numeric:true})`, which builds a collator per
+   comparison — a quarter of a million of them for a sort that size, measured
+   at 1,167 ms. And it re-sorted on every keystroke in the filter, because the
+   cache the filter dropped was the only cache there was.
+
+   The fixture below is 16,000 rows with names that actually need a numeric
+   collation to order, so the comparison being asserted is the real one. */
+async function bigList(page, count = 16_000) {
+  await withSystems(page, count);
+  await page.locator('.rail button[data-p="systems"]').click();
+  await expect(page.locator('.sysrow').first()).toBeVisible({ timeout: 30_000 });
+}
+
+/* Count the two things the complaint was actually made of, rather than timing
+   them. A clock on a shared runner is the flakiest assertion there is, and a
+   ceiling loose enough not to flake turned out to be loose enough to pass with
+   the bug put back — measured, both ways. These do not: the counts are
+   mechanism, and they are exact. */
+async function countCollation(page) {
+  await page.addInitScript(() => {
+    window.__coll = { made: 0, compares: 0, locale: 0 };
+
+    const Native = Intl.Collator;
+    /* Every `new Intl.Collator` — the sort built a quarter of a million of
+       them for 16,000 rows, which is where the second went. */
+    const Counted = function (...a) {
+      window.__coll.made++;
+      return Reflect.construct(Native, a, new.target || Counted);
+    };
+    Counted.prototype = Native.prototype;
+    Counted.supportedLocalesOf = Native.supportedLocalesOf.bind(Native);
+    Intl.Collator = Counted;
+
+    /* `compare` is an accessor returning a bound function, and console.js reads
+       it once per comparison, so the getter counts comparisons. */
+    const d = Object.getOwnPropertyDescriptor(Native.prototype, 'compare');
+    Object.defineProperty(Native.prototype, 'compare', {
+      configurable: true,
+      get() { window.__coll.compares++; return d.get.call(this); }
+    });
+
+    /* localeCompare builds a collator internally on every call: the same cost
+       with none of the visibility. */
+    const lc = String.prototype.localeCompare;
+    String.prototype.localeCompare = function (...a) {
+      window.__coll.locale++;
+      return lc.apply(this, a);
+    };
+  });
+  return {
+    reset: () => page.evaluate(() => { window.__coll = { made: 0, compares: 0, locale: 0 }; }),
+    read: () => page.evaluate(() => window.__coll)
+  };
+}
+
+test('a map of 16,000 systems is sorted with one collator, not one per comparison',
+  async ({ page }) => {
+  const coll = await countCollation(page);
+  await withSystems(page, 16_000);
+  await coll.reset();
+
+  await page.locator('.rail button[data-p="systems"]').click();
+  await expect(page.locator('.sysrow').first()).toBeVisible({ timeout: 30_000 });
+
+  const n = await coll.read();
+  expect(n.compares, 'the list is sorted').toBeGreaterThan(10_000);
+  expect(n.locale, 'and not one call of it goes through localeCompare').toBe(0);
+  /* One, reused. Allow a couple in case something else on the page wants its
+     own; what must not happen is one per comparison. */
+  expect(n.made, 'at most a handful of collators exist, whatever the row count')
+    .toBeLessThan(5);
+});
+
+test('typing in the filter does not sort the map again', async ({ page }) => {
+  /* "sorting in that data (typing something) also takes forever". Narrowing by
+     name does not reorder anything, so the sorted array is reused and the
+     keystroke costs a filter. */
+  const coll = await countCollation(page);
+  await bigList(page);
+
+  const opened = await coll.read();
+  expect(opened.compares, 'opening sorted it once').toBeGreaterThan(10_000);
+  await coll.reset();
+
+  for (const text of ['T', 'Te', 'Tes', 'Test', 'Test ', 'Test S']) {
+    await page.evaluate((v) => {
+      const f = document.getElementById('sysfilter');
+      f.value = v;
+      f.dispatchEvent(new Event('input', { bubbles: true }));
+    }, text);
+  }
+
+  const typed = await coll.read();
+  expect(typed.compares, 'and six keystrokes cost no comparisons at all').toBe(0);
+  expect(typed.locale).toBe(0);
+
+  // Still a working filter, not a frozen one.
+  await expect(page.locator('.syshead .s-sub')).toContainText('matching');
+  expect(await page.evaluate(() =>
+    [...document.querySelectorAll('.sysrow')].every((r) => r.dataset.sys.startsWith('Test S'))))
+    .toBe(true);
+});
+
+test('the list orders names the way a reader counts', async ({ page }) => {
+  /* The collator is reused now rather than rebuilt per comparison, and this is
+     the assertion that it is still a *collator*: a plain string sort puts
+     "Test System 00010" before "Test System 00009" — it does not, here, since
+     the fixture pads its numbers, but a numeric collation is what the panel
+     promises and the cheap fix would have been to drop it. */
+  await withSystems(page, 40);
+  await page.evaluate(() => new Promise((res) => Ed3d.updateSystems({
+    categories: { 'Site type': { a: { name: 'Alpha', color: 'FF9D00' } } },
+    systems: ['Beta 10', 'Beta 9', 'Beta 2', 'Alpha 1'].map((name, i) => ({
+      name, coords: { x: i, y: 0, z: i }, cat: ['a']
+    }))
+  }, res)));
+  await page.locator('.rail button[data-p="systems"]').click();
+  await expect(page.locator('.sysrow').first()).toBeVisible({ timeout: 30_000 });
+
+  const names = await page.evaluate(() =>
+    [...document.querySelectorAll('.sysrow')].map((r) => r.dataset.sys));
+  expect(names).toEqual(['Alpha 1', 'Beta 2', 'Beta 9', 'Beta 10']);
+});
+
+test('the list follows the layer toggles, as it says it does', async ({ page }) => {
+  /* Its own comment says it "respects the layer toggles so it always agrees
+     with the status strip", and it did not: toggling a layer re-rendered the
+     panel but never dropped the sorted list, so the panel went on showing the
+     systems of a layer that had just been switched off. Found while keying
+     that list on something, since it needed a key that changed exactly when
+     the visible set did. */
+  await stubDataHosts(page);
+  await page.goto('/gr-data.html', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.app .top')).toBeVisible({ timeout: 30_000 });
+  await page.waitForFunction(() => window.Ed3d && Ed3d.updateSystems, { timeout: 30_000 });
+  await page.evaluate(() => new Promise((res) => Ed3d.updateSystems({
+    categories: { 'Site type': {
+      a: { name: 'Alpha', color: 'FF9D00' },
+      b: { name: 'Beta', color: '4DE3E1' }
+    } },
+    systems: [
+      { name: 'Alphaville', coords: { x: 1, y: 0, z: 1 }, cat: ['a'] },
+      { name: 'Betaville', coords: { x: 2, y: 0, z: 2 }, cat: ['b'] }
+    ]
+  }, res)));
+  await expect(page.locator('#side .layer').first()).toBeVisible({ timeout: 30_000 });
+
+  await page.locator('.rail button[data-p="systems"]').click();
+  const listed = () => page.evaluate(() =>
+    [...document.querySelectorAll('.sysrow')].map((r) => r.dataset.sys));
+  expect(await listed()).toEqual(['Alphaville', 'Betaville']);
+
+  // Switch Beta off in the Layers panel; the list must lose Betaville.
+  await page.locator('.rail button[data-p="layers"]').click();
+  await page.locator('.layer').filter({ hasText: 'Beta' }).first().click();
+  await page.locator('.rail button[data-p="systems"]').click();
+
+  await expect.poll(listed, { timeout: 10_000 }).toEqual(['Alphaville']);
+  await expect(page.locator('.syshead .s-sub')).toContainText('1');
+});
+
+test('the distance column says what it is measuring', async ({ page }) => {
+  /* "that distance on the list view isn't clear either, I assume it's LY from
+     sol?" — it is, and nothing said so: not a header, not a unit, not a
+     tooltip. The sort button said "Distance", which names the ordering rather
+     than the figure. */
+  await withSystems(page, 40);
+  await page.locator('.rail button[data-p="systems"]').click();
+  await expect(page.locator('.sysrow').first()).toBeVisible({ timeout: 30_000 });
+
+  const col = page.locator('.syscol');
+  await expect(col).toBeVisible();
+  await expect(col).toHaveText(/ly from Sol/i);
+  await expect(col).toHaveAttribute('title', /light-?years from Sol/i);
+});

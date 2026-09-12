@@ -549,8 +549,11 @@
     var c = CATS[i];
     if (!c || c.on === active) return;
     c.on = active;
-    if (window.jQuery) jQuery(c.el).trigger('click');
-    else c.el.click();
+    /* Ed3d's own filter element is what actually toggles the category; the
+       console reads its HUD rather than being told about it. This used to
+       prefer jQuery's .trigger('click') when jQuery was present — it no longer
+       is anywhere in the tree, so the branch was unreachable. */
+    c.el.click();
     syncFilteredVisibility();
   }
 
@@ -919,7 +922,11 @@
     if (panel === 'systems') {
       var f = $('sysfilter');
       if (f) {
-        f.oninput = function () { sysQuery = this.value; resetSysList(); renderPanel(); $('sysfilter').focus(); };
+        /* resetSysQuery, not resetSysList: typing narrows the list, it does not
+           reorder it, so the sort above is still good. On the 16,500-system
+           map that is the difference between 1,167 ms per keystroke and a
+           filter over an array. */
+        f.oninput = function () { sysQuery = this.value; resetSysQuery(); renderPanel(); $('sysfilter').focus(); };
         if (sysQuery) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
       }
       // Only chase the selection when it has actually changed. The panel
@@ -2333,25 +2340,93 @@
 
   var SYS_PAGE = 80;
   var sysLimit = SYS_PAGE;
-  var sysRowsCache = null;
+  var sysSortedCache = null;   // visible, in sort order — query-independent
+  var sysSortedKey = null;
+  var sysRowsCache = null;     // visible ∩ query, in sort order
+  var sysRowsOf = null;        // the sorted array it was filtered from
+  var sysRowsQ = null;         // and the query it was filtered by
 
-  function sysRows() {
-    if (sysRowsCache) return sysRowsCache;
-    var q = sysQuery.toLowerCase();
-    var rows = visibleSystems().filter(function (r) {
-      return !q || r.n.toLowerCase().indexOf(q) > -1;
-    });
+  /* One collator, built once.
+
+     `a.localeCompare(b, undefined, {numeric:true})` constructs a collator on
+     every single comparison, and a sort of n rows makes about n·log₂n of them:
+     for the 16,500 systems of multifaction.html?factions=All that is a quarter
+     of a million collators and, measured on the deployed page, **1,167 ms**.
+     The same sort through a reused Intl.Collator is **35 ms**, and a plain
+     comparison 7 ms — so this is the whole cost, and it is identical ordering.
+
+     It was paid on opening the panel and then again on every keystroke in the
+     filter, which is what "the map freezes and typing takes forever" was. */
+  var sysCollator = new Intl.Collator(undefined, { numeric: true });
+
+  /* The sort is over what is *visible*, which the query does not change — so
+     filtering by name reuses the sorted array rather than rebuilding it.
+     Filtering preserves order, so this is the same result for none of the
+     work. Only a change of data, of layer visibility or of sort mode drops
+     it. */
+  /* Which layers are on, as a string. CATS[i].on is what the layer rows
+     write, so this changes exactly when the visible set does.
+
+     It also closes a gap: toggling a layer called renderPanel() but never
+     invalidated the list, so the systems panel kept showing the systems of a
+     layer that had just been switched off — against its own comment, which
+     says it "respects the layer toggles so it always agrees with the status
+     strip". Keying the sort on this means it now does. */
+  function catSignature() {
+    var sig = '';
+    for (var i = 0; i < CATS.length; i++) sig += (CATS[i] && CATS[i].on) ? '1' : '0';
+    return sig;
+  }
+
+  function sysSorted() {
+    var key = sysSort + '|' + SYSLIST().length + '|' + catSignature();
+    if (sysSortedCache && sysSortedKey === key) return sysSortedCache;
+
+    var rows = visibleSystems();
     rows.forEach(function (r) {
       if (r._ly === undefined) r._ly = Math.round(Math.sqrt(r.x * r.x + r.y * r.y + r.z * r.z));
     });
     rows.sort(sysSort === 'name'
-      ? function (a, b) { return a.n.localeCompare(b.n, undefined, { numeric: true }); }
+      ? function (a, b) { return sysCollator.compare(a.n, b.n); }
       : function (a, b) { return a._ly - b._ly; });
-    sysRowsCache = rows;
+
+    sysSortedCache = rows;
+    sysSortedKey = key;
     return rows;
   }
 
-  function resetSysList() { sysRowsCache = null; sysLimit = SYS_PAGE; }
+  /* Keyed on the array it filtered and the query it filtered by, rather than
+     on being told to forget. A cache that has to be invalidated by hand is one
+     someone forgets to invalidate by hand — which is exactly what happened
+     here first time round: the sorted list above was correctly keyed on the
+     layer toggles, and this one sat in front of it answering from a filter run
+     before a layer was switched off. Identity is free and cannot be forgotten. */
+  function sysRows() {
+    var sorted = sysSorted();
+    var q = sysQuery.toLowerCase();
+    if (sysRowsCache && sysRowsOf === sorted && sysRowsQ === q) return sysRowsCache;
+    sysRowsOf = sorted;
+    sysRowsQ = q;
+    sysRowsCache = q
+      ? sorted.filter(function (r) { return r.n.toLowerCase().indexOf(q) > -1; })
+      : sorted;
+    return sysRowsCache;
+  }
+
+  /* Both of these exist for sysLimit, which is the reader's scroll position in
+     the list and belongs back at the top whenever the list changes under them.
+     Whether the *sort* survives is decided by the keys above, not here. */
+
+  /** The data moved. Same length and same layers would not change the key. */
+  function resetSysList() {
+    sysSortedCache = null;
+    sysLimit = SYS_PAGE;
+  }
+
+  /** Only the filter text moved. */
+  function resetSysQuery() {
+    sysLimit = SYS_PAGE;
+  }
 
   function sysRowHtml(r) {
     var types = {}; r.s.forEach(function (x) { types[x[0]] = 1; });
@@ -2393,6 +2468,13 @@
       '<div class="syssort">' +
       '<button data-sort="name"' + (sysSort === 'name' ? ' class="on"' : '') + '>Name</button>' +
       '<button data-sort="dist"' + (sysSort === 'dist' ? ' class="on"' : '') + '>Distance</button>' +
+      /* The right-hand column is a bare number. It is light-years from Sol —
+         Sol is the origin of Elite's coordinate system, so it is just the
+         magnitude of the system's position — and nothing said so: not a
+         header, not a unit, not a tooltip. "Distance" on the sort button is
+         the closest it came, and that names the ordering rather than the
+         figure. Said once here instead of on every row. */
+      '<span class="syscol" title="Light-years from Sol">ly from Sol</span>' +
       '</div></div>' +
       (rows.length ? '' : '<div class="note" style="margin:10px 13px">No system matches. Clear the ' +
         'filter, or re-enable a type in the Layers panel.</div>') +
