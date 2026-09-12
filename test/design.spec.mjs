@@ -35,6 +35,42 @@ async function orrery(page) {
   await expect(page.locator('.orr-row')).toHaveCount(2, { timeout: 60_000 });
 }
 
+/* A deliberately crowded system. The declutter cannot be tested on a star and
+   one planet — measured, the test passed with the whole mechanism removed —
+   so this is fourteen bodies on tightly spaced orbits with the kind of
+   designation-only names that are three times the width of "Mars". */
+const CROWDED = {
+  name: 'Crowdholm', id64: 2, date: '2026-01-01 00:00:00',
+  coords: { x: 1, y: 2, z: 3 },
+  bodies: [
+    { name: 'Crowdholm', type: 'Star', subType: 'G (White-Yellow) Star', bodyId: 0,
+      distanceToArrival: 0, solarMasses: 1, solarRadius: 1, surfaceTemperature: 5778,
+      age: 4800, spectralClass: 'G2' },
+    ...Array.from({ length: 14 }, (_, i) => ({
+      name: 'Crowdholm (' + (307261 + i * 977) + ') 20' + (10 + i) + ' MS' + i,
+      type: 'Planet', subType: 'High metal content world', bodyId: i + 1,
+      distanceToArrival: 400 + i * 12, parents: [{ Star: 0 }],
+      gravity: 1, earthMasses: 1, radius: 5500 + i * 40,
+      orbitalPeriod: 300 + i * 7, semiMajorAxis: 0.9 + i * 0.06,
+      surfaceTemperature: 280
+    }))
+  ]
+};
+
+async function crowded(page) {
+  await stubDataHosts(page);
+  await page.route('**/*codex/dump*', (r) =>
+    r.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ system: CROWDED }) }));
+  await page.route('**/*typeahead*', (r) =>
+    r.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ min_max: [{ id64: 2, name: 'Crowdholm', x: 1, y: 2, z: 3 }],
+                             values: ['Crowdholm'] }) }));
+  await page.goto('/orrery.html?system=Crowdholm', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.orrery.open')).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('.orr-row')).toHaveCount(15, { timeout: 60_000 });
+}
+
 test('the measurement tile is set the way the card sets it', async ({ page }) => {
   /* orrery.css said these were sized "the way the galaxy map's system card
      sets them: label above, figure large and tabular". They were not:
@@ -244,4 +280,105 @@ test('the key hints name a key the reader has', async ({ page }) => {
     expect(badge, 'a Windows or Linux commander has no Command key').not.toContain('⌘');
     expect(badge).toContain('Ctrl');
   }
+});
+
+/* The swatch beside a layer name is the only key a map has: nothing else tells
+   a commander which dot on the screen is which layer. route_uia.html listed
+   eighteen layers and drew nine of them in one identical yellow — every UIA
+   wave plus their roll-up — with a tenth pair sharing a green, one layer at
+   1.58:1 against the panel, and the interface's own --amber used as data. */
+for (const page_ of ['/route_uia.html', '/gr-data.html']) {
+  test(`every layer on ${page_} has its own visible colour`, async ({ page }) => {
+    await stubDataHosts(page);
+    await page.goto(page_, { waitUntil: 'load' });
+    await waitForScene(page, expect);
+    await expect.poll(() => page.evaluate(() => window.__ed3dTestState().dataComplete),
+      { timeout: 60_000 }).toBe(true);
+    await expect(page.locator('#filters .map_filter').first()).toBeAttached({ timeout: 30_000 });
+
+    const rows = await page.evaluate(() =>
+      [...document.querySelectorAll('#filters .map_filter')].map((a) => {
+        const sw = a.querySelector('.check');
+        return {
+          name: a.textContent.trim().replace(/\s+/g, ' ').slice(0, 40),
+          bg: sw ? getComputedStyle(sw).backgroundColor : null
+        };
+      }).filter((r) => r.bg && r.bg !== 'rgba(0, 0, 0, 0)'));
+
+    expect(rows.length, 'this map should have layers to check').toBeGreaterThan(1);
+
+    // No two layers may be the same colour.
+    const groups = {};
+    for (const r of rows) (groups[r.bg] = groups[r.bg] || []).push(r.name);
+    const shared = Object.entries(groups)
+      .filter(([, v]) => v.length > 1)
+      .map(([c, v]) => c + ' ← ' + v.join(' / '));
+    expect(shared, 'layers the panel names apart but the map draws the same').toEqual([]);
+
+    /* --amber means "selected" and --ion means "station" in the chrome around
+       every map. A data layer may not be either, or the colour carries two
+       meanings and therefore none. */
+    const reserved = ['rgb(255, 157, 0)', 'rgb(77, 227, 225)'];
+    expect(rows.filter((r) => reserved.includes(r.bg)).map((r) => r.name),
+      'a data layer is using an interface accent').toEqual([]);
+
+    // And each swatch has to be visible against the panel it sits on.
+    const lum = (c) => {
+      const [r, g, b] = c.match(/\d+/g).slice(0, 3).map(Number).map((v) => {
+        const x = v / 255;
+        return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const panel = await page.evaluate(() =>
+      getComputedStyle(document.querySelector('.side')).backgroundColor);
+    const faint = rows
+      .map((r) => ({ ...r, ratio: (lum(r.bg) + 0.05) / (lum(panel) + 0.05) }))
+      .filter((r) => r.ratio < 2)
+      .map((r) => r.name + ' @ ' + r.ratio.toFixed(2) + ':1');
+    expect(faint, 'a swatch nobody can see is not a key').toEqual([]);
+  });
+}
+
+test('body labels stop piling on top of each other', async ({ page }) => {
+  /* drawLabels culled by frustum and nothing else: no screen-space test, no
+     cap, no priority. Measured on Sol at 752x290, nineteen labels gave
+     thirteen overlapping pairs and the inner planets were a single grey smear.
+
+     drawFarLabels() in the same file already ranks and caps its 230 named
+     stars, with a comment saying all of them at once "is a wall of text over a
+     system of eight bodies — I know, because that is what the first version
+     did". The system's own bodies never got it, and they are the set that
+     clusters. */
+  await page.setViewportSize({ width: 900, height: 520 });
+  await crowded(page);
+  await expect(page.locator('.orr-label').first()).toBeAttached({ timeout: 30_000 });
+
+  const m = await page.evaluate(() => {
+    const shown = [...document.querySelectorAll('.orr-label')]
+      .filter((e) => !e.classList.contains('off'));
+    const boxes = shown.map((e) => {
+      const b = e.getBoundingClientRect();
+      return { t: e.textContent, l: b.left, r: b.right, tp: b.top, bt: b.bottom };
+    });
+    let pairs = 0;
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i], b = boxes[j];
+        if (!(a.r < b.l || a.l > b.r || a.bt < b.tp || a.tp > b.bt)) pairs++;
+      }
+    }
+    return {
+      shown: shown.length,
+      total: document.querySelectorAll('.orr-label').length,
+      overlapping: pairs,
+      star: shown.some((e) => e.classList.contains('star'))
+    };
+  });
+
+  expect(m.overlapping, 'no two visible labels may overlap').toBe(0);
+  expect(m.shown, 'and something is still labelled').toBeGreaterThan(0);
+  /* The star is rank 0, so it is never the one dropped — losing the name of
+     the thing everything else orbits would be the worst possible trade. */
+  expect(m.star, 'the star keeps its label').toBe(true);
 });

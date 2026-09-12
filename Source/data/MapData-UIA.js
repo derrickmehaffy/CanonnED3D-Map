@@ -26,7 +26,11 @@ var canonnEd3d_challenge = {
 			"Points of Interest": {
 				"1000": {
 					'name': "Populated Systems",
-					'color': 'FF9D00'
+					/* Was FF9D00 — the interface's own --amber, which already means
+					   "selected" in the chrome around this map. A data layer cannot
+					   also be the colour of selection. CanonnPalette's human anchor
+					   is the right hue for inhabited space. */
+					'color': '93A3B1'
 				},
 				"1002": {
 					'name': "Thargoid Systems",
@@ -38,7 +42,11 @@ var canonnEd3d_challenge = {
 				},
 				"1008": {
 					'name': "Permit Unlocked Centers",
-					'color': '393939'
+					/* Was 393939, which is 1.58:1 against the panel — the swatch was
+					   invisible in the legend and the points invisible on the void.
+					   Kept neutral, since "unlocked" is the absence of a permit
+					   rather than a kind of thing, but light enough to see. */
+					'color': '8A94A0'
 				}
 			},
 			'Unidentified Interstellar Anomaly': {
@@ -48,15 +56,24 @@ var canonnEd3d_challenge = {
 				},
 				'103': {
 					'name': 'Lost Section',
-					'color': '4F0000',
+					/* Was 4F0000 — 1.20:1 against the panel, so the swatch was not
+					   visible and neither was the line. One of three reds on this
+					   map that sat 23 apart in RGB; these three are now 67-95
+					   apart and all above 3:1. */
+					'color': 'C2453C',
 				},
 				'101': {
 					'name': 'Recorded Route',
-					'color': '66FF66',
+					/* Was 66FF66, the same green as "Thargoid Systems" — two layers
+					   the legend names separately and the map drew identically. */
+					'color': '4DE3A0',
 				},
 				'102': {
 					'name': 'Estimated Route',
-					'color': '334400',
+					/* Was 334400 at 1.78:1, and a yellow-green that now collides with
+					   the Titan ramp. A dimmer relative of Recorded Route instead:
+					   same family, so the pair reads as recorded-versus-estimated. */
+					'color': '3F8F6E',
 				},
 			},/*
 			"Measurements": {
@@ -72,11 +89,14 @@ var canonnEd3d_challenge = {
 			"Hyperdictions": {
 				"299": {
 					name: "All Hyperdictions",
-					color: "999900"
+					/* The roll-up of the eight waves below, so it takes the thargoid
+					   anchor itself and they ramp around it. */
+					color: "B9D94A"
 				},
 				"300": {
 					'name': "Hostile",
-					'color': '660000'
+					/* Was 660000 at 1.41:1. */
+					'color': 'E0673F'
 				},
 				//"301": {
 				//	'name': "Waypoint Area Only",
@@ -1402,13 +1422,23 @@ var canonnEd3d_challenge = {
 			7: 'Raijin',
 			8: 'Hadad'
 		};
-		// UIA#9 does not exist; only create category filters for UIA#1..UIA#8
+		/* UIA#9 does not exist; only UIA#1..UIA#8 get a filter.
+
+		   All eight used to be '999900', and so did "All Hyperdictions" above —
+		   nine layers the panel lists separately and the map drew in one
+		   identical yellow, so a Taranis hyperdiction could not be told from a
+		   Raijin one. The swatch is the only key this map has.
+
+		   The waves are Thargoid Titans, so they ramp around CanonnPalette's
+		   thargoid anchor: one kind, eight shades, in wave order. The number is
+		   already in the name, which is what actually distinguishes them —
+		   colour alone across eight steps is a hint, not a legend. */
 		for (var i = 1; i <= 8; i++) {
 			var categoryName = 'UIA#' + i;
 			if (uiaTitanNames[i]) categoryName += ' ' + uiaTitanNames[i];
 			canonnEd3d_challenge.systemsData.categories["Hyperdictions"]["30" + i] = {
 				'name': categoryName,
-				'color': '999900'
+				'color': CanonnPalette.of('thargoid', i - 1, 8).replace(/^#/, '')
 			};
 		}
 

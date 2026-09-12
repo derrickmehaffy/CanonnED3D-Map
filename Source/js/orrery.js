@@ -4743,22 +4743,82 @@ const Orrery = (function () {
         el.className = 'orr-label' + (n === model.star ? ' star' : '');
         el.textContent = shortName(n);
         host.appendChild(el);
-        return { node: n, el };
+        /* Size it now. drawLabels needs a box to test for overlap and must not
+           read layout on every frame to get one. */
+        return { node: n, el, w: el.offsetWidth, h: el.offsetHeight };
       });
+  }
+
+  /* Which label matters when two of them want the same pixels.
+
+     0 is the star, 1 what is selected, 2 a child of the selection, 3 the rest
+     by decreasing drawn size then increasing orbit — so the big inner worlds
+     win over specks further out. The designation-only names are pushed down:
+     "(225088) 2007 OR10" is three times the width of "Mars" for a tenth of the
+     interest, and on a crowded inner system it is what buries everything. */
+  function labelRank(n) {
+    if (n === model.star) return 0;
+    if (n === selected) return 1;
+    if (n.parent === selected) return 2;
+    const designation = /^\(?\d/.test(shortName(n)) ? 1 : 0;
+    return 3 + designation;
   }
 
   function drawLabels() {
     if (!labels.length || !showLabels) return;
     const cam = mode3d ? cam3 : cam2;
     const w = canvas.clientWidth, h = canvas.clientHeight;
-    labels.forEach(({ node, el }) => {
-      proj.copy(node._pos).project(cam);
+
+    /* drawFarLabels() already solved this problem for the 230 named stars,
+       with a comment recording that all of them at once "is a wall of text
+       over a system of eight bodies — I know, because that is what the first
+       version did". The system's own bodies never got the same treatment, and
+       they are the set that actually clusters: measured on Sol at 752x290,
+       nineteen labels produced thirteen overlapping pairs, and the inner
+       planets were one grey smear.
+
+       Frustum culling first, as before. Then place them in order of what
+       matters, rejecting any whose box would touch one already placed, and cap
+       the count by the short side of the canvas — on a phone-sized stage that
+       is a handful, on a wide monitor it is most of them.
+
+       A rejected label loses its text, not its pip: the body is not crowded,
+       its name is. */
+    const placed = [];
+    const cap = Math.max(4, Math.min(24, Math.floor(Math.min(w, h) / 48)));
+    const want = [];
+
+    labels.forEach((rec) => {
+      proj.copy(rec.node._pos).project(cam);
       const on = proj.z < 1 && Math.abs(proj.x) < 1.06 && Math.abs(proj.y) < 1.06;
-      el.classList.toggle('off', !on);
-      if (!on) return;
-      el.classList.toggle('on', selected === node);
-      el.style.transform = 'translate(' + Math.round((proj.x * 0.5 + 0.5) * w) + 'px,' +
-                                          Math.round((-proj.y * 0.5 + 0.5) * h) + 'px)';
+      if (!on) { rec.el.classList.add('off'); return; }
+      want.push({
+        rec: rec,
+        rank: labelRank(rec.node),
+        x: Math.round((proj.x * 0.5 + 0.5) * w),
+        y: Math.round((-proj.y * 0.5 + 0.5) * h)
+      });
+    });
+
+    want.sort((a, b) => a.rank - b.rank ||
+      (b.rec.node.drawR || 0) - (a.rec.node.drawR || 0) ||
+      (a.rec.node.aAu || 0) - (b.rec.node.aAu || 0));
+
+    want.forEach((c) => {
+      const el = c.rec.el;
+      el.style.transform = 'translate(' + c.x + 'px,' + c.y + 'px)';
+      el.classList.toggle('on', selected === c.rec.node);
+
+      /* Measured once per label in buildLabels, not per frame: reading
+         offsetWidth here would lay the page out on every animation frame. */
+      const bw = c.rec.w || 60, bh = c.rec.h || 12;
+      const box = { l: c.x - 4, r: c.x + bw + 4, t: c.y - 4, b: c.y + bh + 4 };
+
+      const clash = placed.length >= cap ||
+        placed.some((q) => !(box.r < q.l || box.l > q.r || box.b < q.t || box.t > q.b));
+
+      el.classList.toggle('off', clash);
+      if (!clash) placed.push(box);
     });
   }
 
