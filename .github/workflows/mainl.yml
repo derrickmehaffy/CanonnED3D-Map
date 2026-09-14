@@ -1,30 +1,66 @@
+# The live deploy: https://map.canonn.tech
 #
+# Pages on canonn-science/CanonnED3D-Map is configured "Deploy from a branch" —
+# build_type "legacy", source gh-pages — so publishing means force-pushing the
+# contents of Source/ onto that branch. Deliberately NOT the Pages Actions path
+# that preview.yml uses: moving to it needs a repository settings change and
+# would put map.canonn.tech and its certificate through a re-provision, which is
+# not something a code change should decide.
+#
+# Same trigger and same result as before; what changed is the tooling under it.
+# actions/checkout@v2 and ad-m/github-push-action@v0.6.0 both target Node
+# runtimes GitHub has retired, and the push action wanted a token and a
+# safe.directory workaround to do what four lines of git do here.
 name: Deploy to ED3D Maps to GitHub Pages
+
 on:
   push:
     branches: [ master ]
+
+# Publishing is a force-push, so two runs at once would race over what is live.
+# Queued rather than cancelled: a deploy that has started should finish, and the
+# later run publishes last either way.
+concurrency:
+  group: pages-live
+  cancel-in-progress: false
+
+# Only to push gh-pages. Stated here because a repository or organisation whose
+# default token is read-only would otherwise fail at the push with no clue why.
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
-    - name: Init new repo in dist folder and commit generated files
-      run: |
-        cd Source
-        echo "map.canonn.tech" > CNAME
-        git init
-        git add -A
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git commit -m 'deploy'
-    - name: work around permission issue
-      run: git config --global --add safe.directory /github/workspace/Source
-    - name: Force push to destination branch
-      uses: ad-m/github-push-action@v0.6.0
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        branch: gh-pages
-        force: true
-        directory: ./Source
+      - name: Publish Source/ to gh-pages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # The custom domain is claimed by the published tree, not by a file in
+          # the repository — a committed Source/CNAME would be published by
+          # every fork that serves Source/ too, pointing the live map's domain
+          # at somebody else's Pages site. preview.yml refuses to build if one
+          # ever appears.
+          echo "map.canonn.tech" > Source/CNAME
+
+          # Nothing in Source/ has front matter, a _config.yml or layouts, so
+          # Jekyll has no work to do here. Skipping it saves a build step and
+          # stops a future underscore-prefixed path — a vendored library's
+          # internals, say — from being silently dropped from the site.
+          touch Source/.nojekyll
+
+          cd Source
+          git init -q -b gh-pages
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "deploy ${GITHUB_SHA}"
+          git push -q --force \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            gh-pages
