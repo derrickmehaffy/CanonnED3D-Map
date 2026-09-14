@@ -10,6 +10,15 @@
 # So this workflow publishes no CNAME at all. A preview lives at
 # https://<owner>.github.io/<repo>/ and nowhere else.
 #
+# And it only runs on a fork — see the guard on the job. The two deploys use
+# Pages modes that cannot coexist: canonn-science/CanonnED3D-Map serves
+# build_type "legacy" from the gh-pages branch that mainl.yml force-pushes,
+# while this one needs build_type "workflow". Upstream it would fail red rather
+# than deploy, which is noise nobody asked for; worse, a workflow on the default
+# branch gets a Run button, and the day Pages there is switched to "GitHub
+# Actions" that button would publish a CNAME-less build over map.canonn.tech and
+# take the custom domain and its certificate with it.
+#
 # It is scoped to the working branch and nothing else. GitHub only offers
 # workflow_dispatch for workflows that exist on the default branch, and putting
 # this on master would fire mainl.yml — the very deploy being avoided — so the
@@ -39,6 +48,11 @@ permissions:
 
 jobs:
   publish:
+    # Previews are a fork thing. Keyed on being a fork rather than on the
+    # upstream's name, so a rename or a transfer cannot quietly un-guard it,
+    # and so anyone who forks this gets previews of their own. A missing key
+    # reads as false, which errs towards not deploying.
+    if: github.event.repository.fork
     runs-on: ubuntu-latest
     environment:
       name: github-pages
